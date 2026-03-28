@@ -1265,7 +1265,7 @@ function renderHeaders(){
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
       const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
       if(logoSizeMode==='xl'){
-        el.innerHTML=`${hBadge}${aBadge}`;
+        el.innerHTML=`${hBadge}<span class="team-vs">VS</span>${aBadge}`;
       } else {
         const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
         const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
