@@ -1310,21 +1310,26 @@ function renderHeaders(){
     if(m.home||m.away){
       const soloMode = m.home && !m.away; // single-team event (e.g. golf tournament)
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
+      const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
       if(soloMode){
         // Show home team / logo only — no VS, no away side
-        if(logoSizeMode==='xl'){
+        if(logoSizeMode==='xl' && hBadge){
+          // XL: logo only (badge exists)
           el.innerHTML=`${hBadge}`;
         } else {
-          const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+          // All other sizes, or XL with no logo — always show name
           el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
         }
       } else {
         const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
-        if(logoSizeMode==='xl'){
-          el.innerHTML=`${hBadge}<span class="team-vs">VS</span>${aBadge}`;
+        const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+        if(logoSizeMode==='xl' && (hBadge||aBadge)){
+          // XL: show badges + VS; fall back to name for any side missing a logo
+          const hPart=hBadge||`<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
+          const aPart=aBadge||`<span style="color:${m.awayColour}">${esc(awayName)}</span>`;
+          el.innerHTML=`${hPart}<span class="team-vs">VS</span>${aPart}`;
         } else {
-          const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
-          const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+          // Non-XL, or XL where neither team has a logo — show names
           el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
         }
       }
