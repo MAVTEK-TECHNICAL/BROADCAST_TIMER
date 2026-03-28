@@ -1240,7 +1240,7 @@ function renderHeaders(){
       const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
       const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
-      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span>${aBadge}<span style="color:${m.awayColour}">${esc(awayName)}</span>`;
+      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
     } else {
       el.innerHTML='';
     }
