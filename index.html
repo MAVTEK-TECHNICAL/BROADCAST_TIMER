@@ -464,6 +464,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .team-badge-mini.logo-lg{ width:50px;height:50px; }
 .team-badge-mini.logo-lg.badge-logo{ width:84px;height:50px; }
 .team-badge-mini.logo-lg.has-logo{ width:84px;height:50px; }
+/* XL — logo-only mode (2× large) */
+.team-badge-mini.logo-xl{ width:100px;height:100px;border-radius:6px; }
+.team-badge-mini.logo-xl.badge-logo{ width:168px;height:100px;border-radius:6px;background-size:80%; }
+.team-badge-mini.logo-xl.has-logo{ width:168px;height:100px;border-radius:6px; }
 
 /* Toast */
 #toast{
@@ -559,6 +563,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <button class="nmb active" id="nlb-small"  onclick="setLogoSize('small')">S</button>
           <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
           <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
+          <button class="nmb"        id="nlb-xl"     onclick="setLogoSize('xl')">XL</button>
         </div>
       </div>
       <div class="nav-sf-btn" onclick="openSidebar()">
@@ -1257,11 +1262,15 @@ function renderHeaders(){
     document.getElementById(`match-label-${i}`).textContent=m.label;
     const el=document.getElementById(`match-teams-${i}`);
     if(m.home||m.away){
-      const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
-      const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
       const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
-      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
+      if(logoSizeMode==='xl'){
+        el.innerHTML=`${hBadge}${aBadge}`;
+      } else {
+        const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+        const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+        el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
+      }
     } else {
       el.innerHTML='';
     }
@@ -1426,7 +1435,7 @@ function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${docume
 // ── LOGO SIZE MODE ───────────────────────────────────────
 function setLogoSize(mode, silent){
   logoSizeMode=mode;
-  ['small','medium','large'].forEach(m=>{
+  ['small','medium','large','xl'].forEach(m=>{
     document.getElementById('nlb-'+m)?.classList.toggle('active', m===mode);
   });
   renderHeaders();
@@ -1509,7 +1518,7 @@ function getTeamBadgeMiniHTML(teamRef){
   if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
   const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
   if(!t) return '';
-  const szCls=logoSizeMode==='medium'?' logo-md':logoSizeMode==='large'?' logo-lg':'';
+  const szCls=logoSizeMode==='medium'?' logo-md':logoSizeMode==='large'?' logo-lg':logoSizeMode==='xl'?' logo-xl':'';
   if(t.logo){
     if(t.logo.includes('wikimedia.org')){
       // AFL: transparent badge on team colour, contained
