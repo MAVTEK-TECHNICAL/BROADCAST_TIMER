@@ -762,7 +762,12 @@ async function showApp(user){
   populateSelects();
   startClock();
   await refreshSfList();
-  if (sfList.length) await loadSf(sfList[0].id);
+  if (sfList.length){
+    // Try to restore the last showfile the user had open
+    const lastId = localStorage.getItem('lastSfId_' + user.uid);
+    const lastExists = lastId && sfList.find(s=>s.id===lastId);
+    await loadSf(lastExists ? lastId : sfList[0].id);
+  }
 }
 async function doSignOut(){
   clearTimeout(asTimer);
@@ -785,10 +790,22 @@ function sfDocRef(id){
 async function refreshSfList(){
   try {
     const {getDocs,query,orderBy}=window._fb;
-    const snap = await getDocs(query(sfColRef(), orderBy('updatedAt','desc')));
+    let snap;
+    try {
+      snap = await getDocs(query(sfColRef(), orderBy('updatedAt','desc')));
+    } catch(e){
+      // orderBy can fail if index not ready — fall back to unordered
+      snap = await getDocs(sfColRef());
+    }
     sfList = snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Sort client-side — use updatedAtMs (plain number) as reliable fallback
+    sfList.sort((a,b)=>{
+      const ta = a.updatedAtMs || (a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0);
+      const tb = b.updatedAtMs || (b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0);
+      return tb - ta;
+    });
     renderSfList();
-  } catch(e){ console.error(e); }
+  } catch(e){ console.error('refreshSfList error:',e); }
 }
 function renderSfList(){
   const el = document.getElementById('sb-list');
@@ -824,10 +841,12 @@ async function loadSf(id){
     applyState(data.state||data);
     sfId   = id;
     sfName = data.name||'Untitled';
+    // Remember this showfile for next session
+    if (window._user) localStorage.setItem('lastSfId_' + window._user.uid, id);
     updateSfUI();
     renderSfList();
     closeSidebar();
-    toast(`LOADED: ${sfName}`);
+    toast('LOADED: ' + sfName);
   } catch(e){ console.error(e); toast('Error loading showfile'); }
 }
 
@@ -835,6 +854,7 @@ function buildPayload(name){
   return {
     name: name||sfName||'Untitled',
     updatedAt: window._fb.serverTimestamp(),
+    updatedAtMs: Date.now(),
     state:{
       hubTz,
       matchTzs:[...matchTzs],
