@@ -455,6 +455,16 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   border-radius:3px;
 }
 
+/* ── Logo size variants ──────────────────────────────────── */
+/* Medium */
+.team-badge-mini.logo-md{ width:36px;height:36px; }
+.team-badge-mini.logo-md.badge-logo{ width:60px;height:36px; }
+.team-badge-mini.logo-md.has-logo{ width:60px;height:36px; }
+/* Large */
+.team-badge-mini.logo-lg{ width:50px;height:50px; }
+.team-badge-mini.logo-lg.badge-logo{ width:84px;height:50px; }
+.team-badge-mini.logo-lg.has-logo{ width:84px;height:50px; }
+
 /* Toast */
 #toast{
   position:fixed;bottom:36px;left:50%;transform:translateX(-50%) translateY(16px);
@@ -541,6 +551,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
           <button class="nmb"        id="nmb-short" onclick="setNameMode('short')">SHORT</button>
           <button class="nmb"        id="nmb-tri"   onclick="setNameMode('tri')">TRI</button>
+        </div>
+      </div>
+      <div class="name-mode-ctrl">
+        <span class="tz-label">LOGOS</span>
+        <div class="name-mode-btns">
+          <button class="nmb active" id="nlb-small"  onclick="setLogoSize('small')">S</button>
+          <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
+          <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
         </div>
       </div>
       <div class="nav-sf-btn" onclick="openSidebar()">
@@ -787,6 +805,7 @@ const TZ_GROUPS = [
 // ── App state ─────────────────────────────────────────────
 let hubTz       = 'Australia/Sydney';
 let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
+let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let matchTzs    = ['Australia/Sydney','Australia/Sydney','Australia/Sydney'];
 let matchVisible = [true,false,false];
 let matchEnabled = [true,false,false];
@@ -1037,6 +1056,7 @@ function buildPayload(name){
     state:{
       hubTz,
       teamDisplayMode,
+      logoSizeMode,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
       matchEnabled:[...matchEnabled],
@@ -1050,6 +1070,7 @@ function buildPayload(name){
 function applyState(s){
   if (s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
   if (s.teamDisplayMode) { teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
+  if (s.logoSizeMode)    { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
   if (s.matchTzs)     matchTzs=[...s.matchTzs];
   if (s.matchVisible) matchVisible=[...s.matchVisible];
   if (s.matchEnabled) matchEnabled=[...s.matchEnabled];
@@ -1402,6 +1423,16 @@ function syncTyped(p){
 }
 function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${document.getElementById(`${p}-hh`).value}:${document.getElementById(`${p}-mm`).value}`; }
 
+// ── LOGO SIZE MODE ───────────────────────────────────────
+function setLogoSize(mode, silent){
+  logoSizeMode=mode;
+  ['small','medium','large'].forEach(m=>{
+    document.getElementById('nlb-'+m)?.classList.toggle('active', m===mode);
+  });
+  renderHeaders();
+  if(!silent) scheduleSave();
+}
+
 // ── NAME DISPLAY MODE ────────────────────────────────────
 function setNameMode(mode, silent){
   teamDisplayMode=mode;
@@ -1478,16 +1509,17 @@ function getTeamBadgeMiniHTML(teamRef){
   if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
   const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
   if(!t) return '';
+  const szCls=logoSizeMode==='medium'?' logo-md':logoSizeMode==='large'?' logo-lg':'';
   if(t.logo){
     if(t.logo.includes('wikimedia.org')){
       // AFL: transparent badge on team colour, contained
-      return `<span class="team-badge-mini badge-logo" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
+      return `<span class="team-badge-mini badge-logo${szCls}" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
     }
     // Netball: full-bleed banner
-    return `<span class="team-badge-mini has-logo" style="background-image:url('${t.logo}');border:1.5px solid ${t.primary}"></span>`;
+    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');border:1.5px solid ${t.primary}"></span>`;
   }
   const tc=_badgeTextColor(t);
-  return `<span class="team-badge-mini" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
+  return `<span class="team-badge-mini${szCls}" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
 }
 
 // ── TOAST ─────────────────────────────────────────────────
