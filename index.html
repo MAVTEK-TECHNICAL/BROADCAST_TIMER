@@ -929,7 +929,11 @@ async function confirmNewShowfile(){
     await refreshSfList();
     toast(`CREATED: ${name}`);
     closeSidebar();
-  } catch(e){ console.error(e); toast('Error creating showfile'); }
+  } catch(e){
+    console.error('Create showfile error:', e);
+    console.error('Code:', e.code, 'Message:', e.message);
+    toast('Error: ' + (e.code || e.message || String(e)));
+  }
 }
 
 // Rename
