@@ -418,12 +418,16 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   background:rgba(0,0,0,.55);padding:3px 4px;
   color:#fff;font-size:8px;letter-spacing:.3px;
 }
-/* Watermark logo card (AFL) - team colour bg with mascot PNG */
-.team-card.has-logo.wm-logo{
-  background-size:80%;background-position:right center;background-repeat:no-repeat;
+/* Badge logo card (AFL) - team colour bg with transparent badge PNG centred */
+.team-card.has-logo.badge-logo{
+  background-size:72%;background-position:center 40%;background-repeat:no-repeat;
 }
-.team-card.has-logo.wm-logo .team-card-name{
+.team-card.has-logo.badge-logo .team-card-name{
   background:rgba(0,0,0,.45);
+}
+/* Mini badge with logo (AFL) */
+.team-badge-mini.badge-logo{
+  width:44px;height:26px;background-size:contain;background-position:center;background-repeat:no-repeat;
 }
 
 .team-badge{
@@ -795,24 +799,24 @@ let matchMeta   = [
 // ── SPORTS DATA ──────────────────────────────────────────────
 const SPORTS_DATA = {
   AFL:[
-    {name:'Adelaide Crows',    short:'Crows',      abbr:'ADE', primary:'#002B5C', secondary:'#CC2229', logo:'https://www.afl.com.au/resources/club-watermarks/24549/adel-right-colour.png'},
-    {name:'Brisbane Lions',    short:'Lions',      abbr:'BRI', primary:'#A1003C', secondary:'#F4A125', logo:'https://www.afl.com.au/resources/club-watermarks/24549/bl-right-colour.png'},
-    {name:'Carlton',           short:'Carlton',    abbr:'CAR', primary:'#001F5A', secondary:'#FFFFFF', logo:'https://www.afl.com.au/resources/club-watermarks/24549/carl-right-colour.png'},
-    {name:'Collingwood',       short:'Collingwood',abbr:'COL', primary:'#000000', secondary:'#FFFFFF', logo:'https://www.afl.com.au/resources/club-watermarks/24549/coll-right-colour.png'},
-    {name:'Essendon',          short:'Essendon',   abbr:'ESS', primary:'#CC0000', secondary:'#000000', logo:'https://www.afl.com.au/resources/club-watermarks/24549/ess-right-colour.png'},
-    {name:'Fremantle',         short:'Fremantle',  abbr:'FRE', primary:'#2A1A54', secondary:'#BF3E96', logo:'https://www.afl.com.au/resources/club-watermarks/24549/fre-right-colour.png'},
-    {name:'Geelong Cats',      short:'Cats',       abbr:'GEE', primary:'#001F5A', secondary:'#C8A26A', logo:'https://www.afl.com.au/resources/club-watermarks/24549/geel-right-colour.png'},
-    {name:'Gold Coast Suns',   short:'Suns',       abbr:'GCS', primary:'#DF2B35', secondary:'#F4A700', logo:'https://www.afl.com.au/resources/club-watermarks/24549/gcfc-right-colour.png'},
-    {name:'GWS Giants',        short:'Giants',     abbr:'GWS', primary:'#F36421', secondary:'#F2F2F2', logo:'https://www.afl.com.au/resources/club-watermarks/24549/gws-right-colour.png'},
-    {name:'Hawthorn',          short:'Hawthorn',   abbr:'HAW', primary:'#4D2004', secondary:'#F4A325', logo:'https://www.afl.com.au/resources/club-watermarks/24549/haw-right-colour.png'},
-    {name:'Melbourne',         short:'Melbourne',  abbr:'MEL', primary:'#CC2031', secondary:'#002EA6', logo:'https://www.afl.com.au/resources/club-watermarks/24549/melb-right-colour.png'},
-    {name:'North Melbourne',   short:'North',      abbr:'NOR', primary:'#003087', secondary:'#FFFFFF', logo:'https://www.afl.com.au/resources/club-watermarks/24549/nmfc-right-colour.png'},
-    {name:'Port Adelaide',     short:'Port',       abbr:'PTA', primary:'#008AAB', secondary:'#000000', logo:'https://www.afl.com.au/resources/club-watermarks/24549/port-right-colour.png'},
-    {name:'Richmond',          short:'Richmond',   abbr:'RIC', primary:'#000000', secondary:'#F5C200', logo:'https://www.afl.com.au/resources/club-watermarks/24549/rich-right-colour.png'},
-    {name:'St Kilda',          short:'Saints',     abbr:'STK', primary:'#ED0F05', secondary:'#FFFFFF', logo:'https://www.afl.com.au/resources/club-watermarks/24549/stk-right-colour.png'},
-    {name:'Sydney Swans',      short:'Swans',      abbr:'SYD', primary:'#C8102E', secondary:'#FFFFFF', logo:'https://www.afl.com.au/resources/club-watermarks/24549/syd-right-colour.png'},
-    {name:'West Coast Eagles', short:'Eagles',     abbr:'WCE', primary:'#002B7F', secondary:'#F5A623', logo:'https://www.afl.com.au/resources/club-watermarks/24549/wce-right-colour.png'},
-    {name:'Western Bulldogs',  short:'Bulldogs',   abbr:'WBD', primary:'#014093', secondary:'#CC2031', logo:'https://www.afl.com.au/resources/club-watermarks/24549/wb-right-colour.png'},
+    {name:'Adelaide Crows',    short:'Crows',      abbr:'ADE', primary:'#002B5C', secondary:'#CC2229', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/Adelaide_Crows_Logo_2024.svg/400px-Adelaide_Crows_Logo_2024.svg.png'},
+    {name:'Brisbane Lions',    short:'Lions',      abbr:'BRI', primary:'#A1003C', secondary:'#F4A125', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/c/c7/Brisbane_Lions_logo_2010.svg/400px-Brisbane_Lions_logo_2010.svg.png'},
+    {name:'Carlton',           short:'Carlton',    abbr:'CAR', primary:'#001F5A', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/58/Carlton_FC_Logo_2020.svg/400px-Carlton_FC_Logo_2020.svg.png'},
+    {name:'Collingwood',       short:'Collingwood',abbr:'COL', primary:'#000000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/a/a6/Collingwood_Football_Club_Logo_%282017%E2%80%93present%29.svg/400px-Collingwood_Football_Club_Logo_%282017%E2%80%93present%29.svg.png'},
+    {name:'Essendon',          short:'Essendon',   abbr:'ESS', primary:'#CC0000', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/8/8b/Essendon_FC_logo.svg/400px-Essendon_FC_logo.svg.png'},
+    {name:'Fremantle',         short:'Fremantle',  abbr:'FRE', primary:'#2A1A54', secondary:'#BF3E96', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/c/ca/Fremantle_FC_logo.svg/400px-Fremantle_FC_logo.svg.png'},
+    {name:'Geelong Cats',      short:'Cats',       abbr:'GEE', primary:'#001F5A', secondary:'#C8A26A', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5f/Geelong_Cats_logo.svg/400px-Geelong_Cats_logo.svg.png'},
+    {name:'Gold Coast Suns',   short:'Suns',       abbr:'GCS', primary:'#DF2B35', secondary:'#F4A700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/7/73/Gold_Coast_Suns_logo_%28introduced_late_2024%29.svg/400px-Gold_Coast_Suns_logo_%28introduced_late_2024%29.svg.png'},
+    {name:'GWS Giants',        short:'Giants',     abbr:'GWS', primary:'#F36421', secondary:'#F2F2F2', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/GWS_Giants_logo.svg/400px-GWS_Giants_logo.svg.png'},
+    {name:'Hawthorn',          short:'Hawthorn',   abbr:'HAW', primary:'#4D2004', secondary:'#F4A325', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/6/62/Hawthorn-football-club-brand.svg/400px-Hawthorn-football-club-brand.svg.png'},
+    {name:'Melbourne',         short:'Melbourne',  abbr:'MEL', primary:'#CC2031', secondary:'#002EA6', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4e/Melbournefc.svg/400px-Melbournefc.svg.png'},
+    {name:'North Melbourne',   short:'North',      abbr:'NOR', primary:'#003087', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/7/74/North_Melbourne_logo.png'},
+    {name:'Port Adelaide',     short:'Port',       abbr:'PTA', primary:'#008AAB', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/3/36/Port_Adelaide_Football_Club_logo.svg/400px-Port_Adelaide_Football_Club_logo.svg.png'},
+    {name:'Richmond',          short:'Richmond',   abbr:'RIC', primary:'#000000', secondary:'#F5C200', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/3/35/Richmond_Tigers_logo.svg/400px-Richmond_Tigers_logo.svg.png'},
+    {name:'St Kilda',          short:'Saints',     abbr:'STK', primary:'#ED0F05', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/06/St_Kilda_Football_Club_logo_2024.svg/400px-St_Kilda_Football_Club_logo_2024.svg.png'},
+    {name:'Sydney Swans',      short:'Swans',      abbr:'SYD', primary:'#C8102E', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/a/af/Sydney_Swans_Logo_2020.svg/400px-Sydney_Swans_Logo_2020.svg.png'},
+    {name:'West Coast Eagles', short:'Eagles',     abbr:'WCE', primary:'#002B7F', secondary:'#F5A623', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/b/b5/West_Coast_Eagles_logo_2017.svg/400px-West_Coast_Eagles_logo_2017.svg.png'},
+    {name:'Western Bulldogs',  short:'Bulldogs',   abbr:'WBD', primary:'#014093', secondary:'#CC2031', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/09/Western_Bulldogs_logo.svg/400px-Western_Bulldogs_logo.svg.png'},
   ],
   Netball:[
     {name:'Adelaide Thunderbirds',    short:'Thunderbirds', abbr:'THU', primary:'#e34f7a', secondary:'#92204d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/TBIRDS-1200x800.jpg.webp?itok=O7A73J8Y'},
@@ -1436,9 +1440,9 @@ function renderTeamPicker(slot,sport){
     const sel=curName===t.name.toUpperCase();
     const shortName=t.name.split(' ').slice(-1)[0];
     if(t.logo){
-      if(t.logo.includes('club-watermarks')){
-        // AFL: transparent mascot PNG on team colour background
-        return `<button class="team-card has-logo wm-logo${sel?' selected':''}" onclick="pickTeam('${slot}',${i})" type="button" style="background-color:${t.primary};background-image:url('${t.logo}');border-color:${sel?'var(--accent)':t.secondary}">
+      if(t.logo.includes('wikimedia.org')){
+        // AFL: transparent badge PNG centred on team colour background
+        return `<button class="team-card has-logo badge-logo${sel?' selected':''}" onclick="pickTeam('${slot}',${i})" type="button" style="background-color:${t.primary};background-image:url('${t.logo}');border-color:${sel?'var(--accent)':t.secondary}">
           <div class="team-card-name">${shortName}</div>
         </button>`;
       }
@@ -1474,8 +1478,12 @@ function getTeamBadgeMiniHTML(teamRef){
   if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
   const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
   if(!t) return '';
-  if(t.logo && !t.logo.includes('club-watermarks')){
-    // Netball banner: use logo at banner dimensions
+  if(t.logo){
+    if(t.logo.includes('wikimedia.org')){
+      // AFL: transparent badge on team colour, contained
+      return `<span class="team-badge-mini badge-logo" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
+    }
+    // Netball: full-bleed banner
     return `<span class="team-badge-mini has-logo" style="background-image:url('${t.logo}');border:1.5px solid ${t.primary}"></span>`;
   }
   const tc=_badgeTextColor(t);
