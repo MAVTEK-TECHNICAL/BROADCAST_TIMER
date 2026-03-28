@@ -1142,12 +1142,25 @@ function openSetTime(mi, tid){
   document.getElementById('modal-set-time').classList.remove('hidden');
   setTimeout(()=>document.getElementById('set-typed').focus(),50);
 }
+function parseTimeInput(v){
+  // Accept: 1200, 12:00, 900, 9:00, 930, 9:30
+  v = v.trim().replace(/[^0-9:]/g,'');
+  let h, m;
+  if (/^\d{1,2}:\d{2}$/.test(v)) {
+    [h,m] = v.split(':').map(Number);
+  } else if (/^\d{3,4}$/.test(v)) {
+    // 1200 -> 12:00, 900 -> 9:00, 930 -> 9:30
+    if (v.length === 3) { h = parseInt(v[0]); m = parseInt(v.slice(1)); }
+    else                { h = parseInt(v.slice(0,2)); m = parseInt(v.slice(2)); }
+  } else {
+    return null;
+  }
+  if (isNaN(h)||isNaN(m)||h<0||h>23||m<0||m>59) return null;
+  return pad(h) + ':' + pad(m);
+}
 function confirmSetTime(){
-  const v=document.getElementById('set-typed').value.trim();
-  if(!/^\d{1,2}:\d{2}$/.test(v)){ toast('INVALID TIME'); return; }
-  const [h,m]=v.split(':').map(Number);
-  if(h<0||h>23||m<0||m>59){ toast('INVALID TIME'); return; }
-  const ts=`${pad(h)}:${pad(m)}`;
+  const ts = parseTimeInput(document.getElementById('set-typed').value);
+  if(!ts){ toast('INVALID TIME — use HH:MM or HHMM'); return; }
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi]);
   closeModal('modal-set-time'); scheduleSave();
@@ -1168,8 +1181,7 @@ function openAddTimer(mi){
 function confirmAddTimer(){
   const name=(document.getElementById('add-name').value.trim().toUpperCase())||'CUSTOM';
   const v=document.getElementById('add-typed').value.trim();
-  let ts=null;
-  if(/^\d{1,2}:\d{2}$/.test(v)){ const [h,m]=v.split(':').map(Number); if(h>=0&&h<24&&m>=0&&m<60) ts=`${pad(h)}:${pad(m)}`; }
+  const ts = v ? parseTimeInput(v) : null;
   matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,matchTzs[ctx.mi]):null});
   closeModal('modal-add-timer'); scheduleSave();
 }
@@ -1197,7 +1209,18 @@ function confirmEditMatch(){
   closeModal('modal-edit-match'); renderHeaders(); scheduleSave();
 }
 
-function syncTyped(p){ const v=document.getElementById(`${p}-typed`).value; const m=v.match(/^(\d{1,2}):(\d{2})$/); if(!m)return; document.getElementById(`${p}-hh`).value=pad(parseInt(m[1])); document.getElementById(`${p}-mm`).value=pad(parseInt(m[2])); }
+function syncTyped(p){
+  const el=document.getElementById(`${p}-typed`);
+  let v=el.value.replace(/[^0-9:]/g,'');
+  // Auto-insert colon after 2 digits if no colon yet
+  if(/^\d{2}$/.test(v) && el._lastLen < v.length) v = v + ':';
+  el._lastLen = v.length;
+  el.value = v;
+  const m=v.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return;
+  document.getElementById(`${p}-hh`).value=pad(parseInt(m[1]));
+  document.getElementById(`${p}-mm`).value=pad(parseInt(m[2]));
+}
 function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${document.getElementById(`${p}-hh`).value}:${document.getElementById(`${p}-mm`).value}`; }
 
 // ── TOAST ─────────────────────────────────────────────────
