@@ -751,7 +751,13 @@ function authErr(code){
   return m[code] || 'Error: ' + code;
 }
 document.addEventListener('keydown', e=>{
-  if (e.key==='Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
+  if (e.key==='Enter'){
+    if (!document.getElementById('login-screen').classList.contains('hidden'))      doLogin();
+    else if (!document.getElementById('modal-set-time').classList.contains('hidden'))  confirmSetTime();
+    else if (!document.getElementById('modal-add-timer').classList.contains('hidden')) confirmAddTimer();
+    else if (!document.getElementById('modal-edit-match').classList.contains('hidden'))confirmEditMatch();
+    else if (!document.getElementById('modal-sf-name').classList.contains('hidden'))   confirmNewShowfile();
+  }
   if (e.key==='Escape'){
     ['modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name'].forEach(closeModal);
     closeSidebar();
