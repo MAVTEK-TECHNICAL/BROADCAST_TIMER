@@ -367,6 +367,50 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .colour-inp::-webkit-color-swatch-wrapper{ padding:0; }
 .colour-inp::-webkit-color-swatch{ border:none;border-radius:3px; }
 
+/* ─── SPORT / TEAM SELECTOR ─────────────────────────────── */
+.sport-select{
+  background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;
+  color:var(--text);font-family:var(--display);font-size:13px;letter-spacing:2px;
+  padding:8px 12px;outline:none;width:100%;text-transform:uppercase;cursor:pointer;
+}
+.sport-select:focus{ border-color:var(--accent); }
+.sport-select option{ background:#1a1d26; }
+
+.team-picker{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:5px;
+  max-height:182px;overflow-y:auto;padding:2px 0;
+}
+.team-picker::-webkit-scrollbar{ width:4px; }
+.team-picker::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+.team-picker.hidden{ display:none; }
+
+.team-card{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:5px;
+  padding:5px 3px;cursor:pointer;transition:all .15s;
+}
+.team-card:hover{ border-color:var(--border-bright);background:var(--surface); }
+.team-card.selected{ border-color:var(--accent);background:rgba(0,212,255,.1);box-shadow:0 0 0 1px rgba(0,212,255,.25); }
+
+.team-badge{
+  border-radius:4px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-weight:700;letter-spacing:.5px;
+  line-height:1;text-align:center;flex-shrink:0;
+}
+.team-card-name{
+  font-family:var(--display);font-size:8px;letter-spacing:.3px;
+  color:var(--text-dim);text-transform:uppercase;text-align:center;line-height:1.2;
+  word-break:break-word;max-width:100%;
+}
+
+/* Mini badge shown in match column header */
+.team-badge-mini{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:3px;
+  font-family:var(--display);font-size:7px;font-weight:700;
+  letter-spacing:.4px;line-height:1;flex-shrink:0;
+}
+
 /* Toast */
 #toast{
   position:fixed;bottom:36px;left:50%;transform:translateX(-50%) translateY(16px);
@@ -579,31 +623,43 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
 <!-- MODAL: Edit Match -->
 <div class="modal-overlay hidden" id="modal-edit-match">
-  <div class="modal">
+  <div class="modal" style="width:460px;max-width:96vw;">
     <div class="modal-title">EDIT MATCH</div>
     <div class="modal-field">
       <label>Match Label</label>
       <input class="modal-input" id="em-label" type="text" style="font-family:var(--ui);font-size:14px;letter-spacing:2px;" />
     </div>
     <div class="modal-divider">TEAMS</div>
-    <div style="display:flex;gap:10px;align-items:flex-end">
-      <div class="modal-field" style="flex:1">
-        <label>Home</label>
-        <input class="modal-input" id="em-home" type="text" placeholder="TEAM A" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;" />
-      </div>
-      <div class="colour-wrap" style="margin-bottom:4px">
-        <span class="colour-lbl">Colour</span>
-        <input class="colour-inp" id="em-home-c" type="color" value="#00d4ff" />
+    <div class="modal-field">
+      <label>Sport</label>
+      <select class="sport-select" id="em-sport" onchange="onSportChange()">
+        <option value="">— CUSTOM (free text) —</option>
+        <option value="AFL">AFL</option>
+        <option value="Netball">SUPER NETBALL</option>
+      </select>
+    </div>
+    <!-- HOME -->
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Home</label>
+      <div class="team-picker hidden" id="em-home-picker"></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class="modal-input" id="em-home" type="text" placeholder="TEAM A" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
+        <div class="colour-wrap">
+          <span class="colour-lbl">Colour</span>
+          <input class="colour-inp" id="em-home-c" type="color" value="#00d4ff" />
+        </div>
       </div>
     </div>
-    <div style="display:flex;gap:10px;align-items:flex-end">
-      <div class="modal-field" style="flex:1">
-        <label>Away</label>
-        <input class="modal-input" id="em-away" type="text" placeholder="TEAM B" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;" />
-      </div>
-      <div class="colour-wrap" style="margin-bottom:4px">
-        <span class="colour-lbl">Colour</span>
-        <input class="colour-inp" id="em-away-c" type="color" value="#ff6b35" />
+    <!-- AWAY -->
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Away</label>
+      <div class="team-picker hidden" id="em-away-picker"></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class="modal-input" id="em-away" type="text" placeholder="TEAM B" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
+        <div class="colour-wrap">
+          <span class="colour-lbl">Colour</span>
+          <input class="colour-inp" id="em-away-c" type="color" value="#ff6b35" />
+        </div>
       </div>
     </div>
     <div class="modal-buttons">
@@ -682,10 +738,56 @@ let matchTzs    = ['Australia/Sydney','Australia/Sydney','Australia/Sydney'];
 let matchVisible = [true,false,false];
 let matchEnabled = [true,false,false];
 let matchMeta   = [
-  {label:'MATCH 1',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35'},
-  {label:'MATCH 2',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35'},
-  {label:'MATCH 3',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35'},
+  {label:'MATCH 1',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
+  {label:'MATCH 2',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
+  {label:'MATCH 3',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
 ];
+
+// ── SPORTS DATA ──────────────────────────────────────────────
+const SPORTS_DATA = {
+  AFL:[
+    {name:'Adelaide Crows',    abbr:'ADEL', primary:'#002B5C', secondary:'#CC2229'},
+    {name:'Brisbane Lions',    abbr:'BRIS', primary:'#A1003C', secondary:'#F4A125'},
+    {name:'Carlton',           abbr:'CARL', primary:'#001F5A', secondary:'#FFFFFF'},
+    {name:'Collingwood',       abbr:'COLL', primary:'#000000', secondary:'#FFFFFF'},
+    {name:'Essendon',          abbr:'ESS',  primary:'#CC0000', secondary:'#000000'},
+    {name:'Fremantle',         abbr:'FRE',  primary:'#2A1A54', secondary:'#BF3E96'},
+    {name:'Geelong Cats',      abbr:'GEEL', primary:'#001F5A', secondary:'#C8A26A'},
+    {name:'Gold Coast Suns',   abbr:'GCS',  primary:'#DF2B35', secondary:'#F4A700'},
+    {name:'GWS Giants',        abbr:'GWS',  primary:'#F36421', secondary:'#F2F2F2'},
+    {name:'Hawthorn',          abbr:'HAW',  primary:'#4D2004', secondary:'#F4A325'},
+    {name:'Melbourne',         abbr:'MELB', primary:'#CC2031', secondary:'#002EA6'},
+    {name:'North Melbourne',   abbr:'NM',   primary:'#003087', secondary:'#FFFFFF'},
+    {name:'Port Adelaide',     abbr:'PORT', primary:'#008AAB', secondary:'#000000'},
+    {name:'Richmond',          abbr:'RICH', primary:'#000000', secondary:'#F5C200'},
+    {name:'St Kilda',          abbr:'STK',  primary:'#ED0F05', secondary:'#FFFFFF'},
+    {name:'Sydney Swans',      abbr:'SYD',  primary:'#C8102E', secondary:'#FFFFFF'},
+    {name:'West Coast Eagles', abbr:'WCE',  primary:'#002B7F', secondary:'#F5A623'},
+    {name:'Western Bulldogs',  abbr:'WB',   primary:'#014093', secondary:'#CC2031'},
+  ],
+  Netball:[
+    {name:'Adelaide Thunderbirds',     abbr:'THUN', primary:'#E8182B', secondary:'#F78F1E'},
+    {name:'Collingwood Magpies',       abbr:'COLL', primary:'#000000', secondary:'#FFFFFF'},
+    {name:'Giants Netball',            abbr:'GIAN', primary:'#F36421', secondary:'#F2F2F2'},
+    {name:'Melbourne Vixens',          abbr:'VIX',  primary:'#702082', secondary:'#FFFFFF'},
+    {name:'NSW Swifts',                abbr:'SWIF', primary:'#E40064', secondary:'#000000'},
+    {name:'Queensland Firebirds',      abbr:'FIRE', primary:'#4D1B7B', secondary:'#FFB81C'},
+    {name:'Sunshine Coast Lightning',  abbr:'LGTN', primary:'#009CDE', secondary:'#FFD700'},
+    {name:'West Coast Fever',          abbr:'FEVR', primary:'#00843D', secondary:'#FFFFFF'},
+  ]
+};
+
+function _badgeLum(hex){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+  return (0.299*r+0.587*g+0.114*b)/255;
+}
+function _badgeTextColor(team){
+  const lum=_badgeLum(team.primary);
+  if(lum>0.45) return '#000000';
+  if(lum<0.12) return team.secondary;
+  return '#ffffff';
+}
 let matchTimers = [
   [{id:uid(),name:'ON AIR',    core:true,timeStr:null,targetUTC:null},
    {id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}],
@@ -1078,9 +1180,13 @@ function renderHeaders(){
     const m=matchMeta[i];
     document.getElementById(`match-label-${i}`).textContent=m.label;
     const el=document.getElementById(`match-teams-${i}`);
-    el.innerHTML=(m.home||m.away)
-      ? `<span style="color:${m.homeColour}">${esc(m.home||'—')}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(m.away||'—')}</span>`
-      : '';
+    if(m.home||m.away){
+      const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
+      const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
+      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(m.home||'—')}</span><span class="team-vs">VS</span>${aBadge}<span style="color:${m.awayColour}">${esc(m.away||'—')}</span>`;
+    } else {
+      el.innerHTML='';
+    }
   });
 }
 
@@ -1201,16 +1307,26 @@ function openEditMatch(i){
   document.getElementById('em-away').value=m.away;
   document.getElementById('em-home-c').value=m.homeColour;
   document.getElementById('em-away-c').value=m.awayColour;
+  const sport=m.sport||'';
+  document.getElementById('em-sport').value=sport;
+  renderTeamPicker('home',sport);
+  renderTeamPicker('away',sport);
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
 function confirmEditMatch(){
+  const home=document.getElementById('em-home').value.trim().toUpperCase();
+  const away=document.getElementById('em-away').value.trim().toUpperCase();
+  const sport=document.getElementById('em-sport').value||'';
   matchMeta[ctx.i]={
     label:(document.getElementById('em-label').value.trim().toUpperCase())||matchMeta[ctx.i].label,
-    home: document.getElementById('em-home').value.trim().toUpperCase(),
-    away: document.getElementById('em-away').value.trim().toUpperCase(),
+    home,
+    away,
     homeColour:document.getElementById('em-home-c').value,
     awayColour:document.getElementById('em-away-c').value,
+    sport,
+    homeTeamRef:findTeamRef(sport,home),
+    awayTeamRef:findTeamRef(sport,away),
   };
   closeModal('modal-edit-match'); renderHeaders(); scheduleSave();
 }
@@ -1228,6 +1344,52 @@ function syncTyped(p){
   document.getElementById(`${p}-mm`).value=pad(parseInt(m[2]));
 }
 function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${document.getElementById(`${p}-hh`).value}:${document.getElementById(`${p}-mm`).value}`; }
+
+// ── SPORT / TEAM PICKER ──────────────────────────────────
+function onSportChange(){
+  const sport=document.getElementById('em-sport').value;
+  renderTeamPicker('home',sport);
+  renderTeamPicker('away',sport);
+}
+
+function renderTeamPicker(slot,sport){
+  const picker=document.getElementById(`em-${slot}-picker`);
+  if(!sport||!SPORTS_DATA[sport]){ picker.classList.add('hidden'); picker.innerHTML=''; return; }
+  picker.classList.remove('hidden');
+  const teams=SPORTS_DATA[sport];
+  const curName=document.getElementById(`em-${slot}`).value.trim().toUpperCase();
+  picker.innerHTML=teams.map((t,i)=>{
+    const tc=_badgeTextColor(t);
+    const sel=curName===t.name.toUpperCase();
+    return `<button class="team-card${sel?' selected':''}" onclick="pickTeam('${slot}',${i})" type="button">
+      <div class="team-badge" style="width:38px;height:38px;font-size:8px;background:${t.primary};color:${tc};border:2px solid ${t.secondary}">${t.abbr}</div>
+      <div class="team-card-name">${t.name.split(' ').slice(-1)[0]}</div>
+    </button>`;
+  }).join('');
+}
+
+function pickTeam(slot,idx){
+  const sport=document.getElementById('em-sport').value;
+  if(!sport||!SPORTS_DATA[sport]) return;
+  const team=SPORTS_DATA[sport][idx];
+  document.getElementById(`em-${slot}`).value=team.name;
+  document.getElementById(`em-${slot}-c`).value=team.primary;
+  renderTeamPicker(slot,sport); // refresh to show selection highlight
+}
+
+function findTeamRef(sport,name){
+  if(!sport||!SPORTS_DATA[sport]) return null;
+  const idx=SPORTS_DATA[sport].findIndex(t=>t.name.toUpperCase()===name);
+  return idx>=0?{sport,idx}:null;
+}
+
+function getTeamBadgeMiniHTML(teamRef){
+  if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
+  const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
+  if(!t) return '';
+  const tc=_badgeTextColor(t);
+  return `<span class="team-badge-mini" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
+}
 
 // ── TOAST ─────────────────────────────────────────────────
 let _t; function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>el.classList.remove('show'),2200); }
