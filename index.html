@@ -263,6 +263,17 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 .hub-label{ font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;white-space:nowrap; }
 .hub-clock{ font-family:var(--mono);font-size:52px;font-weight:700;color:#fff;letter-spacing:4px;line-height:1;flex:1;text-align:center; }
 .tz-selector{ display:flex;align-items:center;gap:8px; }
+.name-mode-ctrl{ display:flex;align-items:center;gap:8px;flex-shrink:0; }
+.name-mode-btns{ display:flex;border:1px solid var(--border-bright);border-radius:4px;overflow:hidden; }
+.nmb{
+  background:transparent;border:none;border-right:1px solid var(--border-bright);
+  color:var(--text-dim);font-family:var(--display);font-size:10px;font-weight:600;
+  letter-spacing:1.5px;text-transform:uppercase;padding:5px 9px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.nmb:last-child{ border-right:none; }
+.nmb:hover{ color:var(--text);background:var(--surface2); }
+.nmb.active{ background:var(--accent);color:#000; }
 .tz-label{ font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase; }
 select{ background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;color:var(--text);font-family:var(--ui);font-size:12px;padding:4px 8px;cursor:pointer;outline:none; }
 select:focus{ border-color:var(--accent); }
@@ -513,6 +524,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <span class="tz-label">TZ</span>
         <select id="hub-tz" onchange="onHubTzChange()"></select>
       </div>
+      <div class="name-mode-ctrl">
+        <span class="tz-label">TEAMS</span>
+        <div class="name-mode-btns">
+          <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
+          <button class="nmb"        id="nmb-short" onclick="setNameMode('short')">SHORT</button>
+          <button class="nmb"        id="nmb-tri"   onclick="setNameMode('tri')">TRI</button>
+        </div>
+      </div>
       <div class="nav-sf-btn" onclick="openSidebar()">
         <div class="as-pip" id="nav-pip"></div>
         <div class="nav-sf-icon">📁</div>
@@ -756,6 +775,7 @@ const TZ_GROUPS = [
 
 // ── App state ─────────────────────────────────────────────
 let hubTz       = 'Australia/Sydney';
+let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
 let matchTzs    = ['Australia/Sydney','Australia/Sydney','Australia/Sydney'];
 let matchVisible = [true,false,false];
 let matchEnabled = [true,false,false];
@@ -768,34 +788,34 @@ let matchMeta   = [
 // ── SPORTS DATA ──────────────────────────────────────────────
 const SPORTS_DATA = {
   AFL:[
-    {name:'Adelaide Crows',    abbr:'ADEL', primary:'#002B5C', secondary:'#CC2229'},
-    {name:'Brisbane Lions',    abbr:'BRIS', primary:'#A1003C', secondary:'#F4A125'},
-    {name:'Carlton',           abbr:'CARL', primary:'#001F5A', secondary:'#FFFFFF'},
-    {name:'Collingwood',       abbr:'COLL', primary:'#000000', secondary:'#FFFFFF'},
-    {name:'Essendon',          abbr:'ESS',  primary:'#CC0000', secondary:'#000000'},
-    {name:'Fremantle',         abbr:'FRE',  primary:'#2A1A54', secondary:'#BF3E96'},
-    {name:'Geelong Cats',      abbr:'GEEL', primary:'#001F5A', secondary:'#C8A26A'},
-    {name:'Gold Coast Suns',   abbr:'GCS',  primary:'#DF2B35', secondary:'#F4A700'},
-    {name:'GWS Giants',        abbr:'GWS',  primary:'#F36421', secondary:'#F2F2F2'},
-    {name:'Hawthorn',          abbr:'HAW',  primary:'#4D2004', secondary:'#F4A325'},
-    {name:'Melbourne',         abbr:'MELB', primary:'#CC2031', secondary:'#002EA6'},
-    {name:'North Melbourne',   abbr:'NM',   primary:'#003087', secondary:'#FFFFFF'},
-    {name:'Port Adelaide',     abbr:'PORT', primary:'#008AAB', secondary:'#000000'},
-    {name:'Richmond',          abbr:'RICH', primary:'#000000', secondary:'#F5C200'},
-    {name:'St Kilda',          abbr:'STK',  primary:'#ED0F05', secondary:'#FFFFFF'},
-    {name:'Sydney Swans',      abbr:'SYD',  primary:'#C8102E', secondary:'#FFFFFF'},
-    {name:'West Coast Eagles', abbr:'WCE',  primary:'#002B7F', secondary:'#F5A623'},
-    {name:'Western Bulldogs',  abbr:'WB',   primary:'#014093', secondary:'#CC2031'},
+    {name:'Adelaide Crows',    short:'Crows',      abbr:'ADE', primary:'#002B5C', secondary:'#CC2229'},
+    {name:'Brisbane Lions',    short:'Lions',      abbr:'BRI', primary:'#A1003C', secondary:'#F4A125'},
+    {name:'Carlton',           short:'Carlton',    abbr:'CAR', primary:'#001F5A', secondary:'#FFFFFF'},
+    {name:'Collingwood',       short:'Collingwood',abbr:'COL', primary:'#000000', secondary:'#FFFFFF'},
+    {name:'Essendon',          short:'Essendon',   abbr:'ESS', primary:'#CC0000', secondary:'#000000'},
+    {name:'Fremantle',         short:'Fremantle',  abbr:'FRE', primary:'#2A1A54', secondary:'#BF3E96'},
+    {name:'Geelong Cats',      short:'Cats',       abbr:'GEE', primary:'#001F5A', secondary:'#C8A26A'},
+    {name:'Gold Coast Suns',   short:'Suns',       abbr:'GCS', primary:'#DF2B35', secondary:'#F4A700'},
+    {name:'GWS Giants',        short:'Giants',     abbr:'GWS', primary:'#F36421', secondary:'#F2F2F2'},
+    {name:'Hawthorn',          short:'Hawthorn',   abbr:'HAW', primary:'#4D2004', secondary:'#F4A325'},
+    {name:'Melbourne',         short:'Melbourne',  abbr:'MEL', primary:'#CC2031', secondary:'#002EA6'},
+    {name:'North Melbourne',   short:'North',      abbr:'NOR', primary:'#003087', secondary:'#FFFFFF'},
+    {name:'Port Adelaide',     short:'Port',       abbr:'PTA', primary:'#008AAB', secondary:'#000000'},
+    {name:'Richmond',          short:'Richmond',   abbr:'RIC', primary:'#000000', secondary:'#F5C200'},
+    {name:'St Kilda',          short:'Saints',     abbr:'STK', primary:'#ED0F05', secondary:'#FFFFFF'},
+    {name:'Sydney Swans',      short:'Swans',      abbr:'SYD', primary:'#C8102E', secondary:'#FFFFFF'},
+    {name:'West Coast Eagles', short:'Eagles',     abbr:'WCE', primary:'#002B7F', secondary:'#F5A623'},
+    {name:'Western Bulldogs',  short:'Bulldogs',   abbr:'WBD', primary:'#014093', secondary:'#CC2031'},
   ],
   Netball:[
-    {name:'Adelaide Thunderbirds',    abbr:'THUN', primary:'#e34f7a', secondary:'#92204d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/TBIRDS-1200x800.jpg.webp?itok=O7A73J8Y'},
-    {name:'GIANTS Netball',           abbr:'GIAN', primary:'#e36c02', secondary:'#85250c', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/GIANTS-1200x800.jpg.webp?itok=9ImirMnW'},
-    {name:'Melbourne Mavericks',      abbr:'MAV',  primary:'#3d57a7', secondary:'#11215d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-09/MelbourneMavericks_1200x800_TeamLogo.png.webp?itok=ad8NNeQK'},
-    {name:'Melbourne Vixens',         abbr:'VIX',  primary:'#016782', secondary:'#02001e', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/VIXENS-1200x800.jpg.webp?itok=f-d5rvUS'},
-    {name:'NSW Swifts',               abbr:'SWIF', primary:'#d62012', secondary:'#720001', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/SWIFTS-1200x800.jpg.webp?itok=gtzKSfWM'},
-    {name:'Queensland Firebirds',     abbr:'FIRE', primary:'#51306e', secondary:'#060022', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-11/1200x800_Teamlogo_Firebirds.png.webp?itok=FA5luhF4'},
-    {name:'Sunshine Coast Lightning', abbr:'LGTN', primary:'#f0ae23', secondary:'#916806', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/LIGHTNING-1200x800_0.jpg.webp?itok=uVebAEc5'},
-    {name:'West Coast Fever',         abbr:'FEVR', primary:'#1a5f3f', secondary:'#0b3124', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/FEVER-1200x800.jpg.webp?itok=lvaAqKag'},
+    {name:'Adelaide Thunderbirds',    short:'Thunderbirds', abbr:'THU', primary:'#e34f7a', secondary:'#92204d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/TBIRDS-1200x800.jpg.webp?itok=O7A73J8Y'},
+    {name:'GIANTS Netball',           short:'GIANTS',       abbr:'GIA', primary:'#e36c02', secondary:'#85250c', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/GIANTS-1200x800.jpg.webp?itok=9ImirMnW'},
+    {name:'Melbourne Mavericks',      short:'Mavericks',    abbr:'MAV', primary:'#3d57a7', secondary:'#11215d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-09/MelbourneMavericks_1200x800_TeamLogo.png.webp?itok=ad8NNeQK'},
+    {name:'Melbourne Vixens',         short:'Vixens',       abbr:'VIX', primary:'#016782', secondary:'#02001e', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/VIXENS-1200x800.jpg.webp?itok=f-d5rvUS'},
+    {name:'NSW Swifts',               short:'Swifts',       abbr:'NSW', primary:'#d62012', secondary:'#720001', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/SWIFTS-1200x800.jpg.webp?itok=gtzKSfWM'},
+    {name:'Queensland Firebirds',     short:'Firebirds',    abbr:'QFB', primary:'#51306e', secondary:'#060022', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-11/1200x800_Teamlogo_Firebirds.png.webp?itok=FA5luhF4'},
+    {name:'Sunshine Coast Lightning', short:'Lightning',    abbr:'SCL', primary:'#f0ae23', secondary:'#916806', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/LIGHTNING-1200x800_0.jpg.webp?itok=uVebAEc5'},
+    {name:'West Coast Fever',         short:'Fever',        abbr:'WCF', primary:'#1a5f3f', secondary:'#0b3124', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/FEVER-1200x800.jpg.webp?itok=lvaAqKag'},
   ]
 };
 
@@ -1005,6 +1025,7 @@ function buildPayload(name){
     updatedAtMs: Date.now(),
     state:{
       hubTz,
+      teamDisplayMode,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
       matchEnabled:[...matchEnabled],
@@ -1017,6 +1038,7 @@ function buildPayload(name){
 
 function applyState(s){
   if (s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
+  if (s.teamDisplayMode) { teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
   if (s.matchTzs)     matchTzs=[...s.matchTzs];
   if (s.matchVisible) matchVisible=[...s.matchVisible];
   if (s.matchEnabled) matchEnabled=[...s.matchEnabled];
@@ -1203,9 +1225,11 @@ function renderHeaders(){
     document.getElementById(`match-label-${i}`).textContent=m.label;
     const el=document.getElementById(`match-teams-${i}`);
     if(m.home||m.away){
+      const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+      const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
       const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
-      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(m.home||'—')}</span><span class="team-vs">VS</span>${aBadge}<span style="color:${m.awayColour}">${esc(m.away||'—')}</span>`;
+      el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span>${aBadge}<span style="color:${m.awayColour}">${esc(awayName)}</span>`;
     } else {
       el.innerHTML='';
     }
@@ -1366,6 +1390,25 @@ function syncTyped(p){
   document.getElementById(`${p}-mm`).value=pad(parseInt(m[2]));
 }
 function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${document.getElementById(`${p}-hh`).value}:${document.getElementById(`${p}-mm`).value}`; }
+
+// ── NAME DISPLAY MODE ────────────────────────────────────
+function setNameMode(mode, silent){
+  teamDisplayMode=mode;
+  ['long','short','tri'].forEach(m=>{
+    document.getElementById('nmb-'+m)?.classList.toggle('active', m===mode);
+  });
+  renderHeaders();
+  if(!silent) scheduleSave();
+}
+
+function getTeamDisplayName(ref, fallback){
+  if(!ref||!SPORTS_DATA[ref.sport]) return fallback||'—';
+  const t=SPORTS_DATA[ref.sport][ref.idx];
+  if(!t) return fallback||'—';
+  if(teamDisplayMode==='short') return t.short||t.name;
+  if(teamDisplayMode==='tri')   return t.abbr;
+  return t.name;
+}
 
 // ── SPORT / TEAM PICKER ──────────────────────────────────
 function onSportChange(){
