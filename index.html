@@ -707,13 +707,16 @@ async function doLogin(){
   const err   = document.getElementById('l-err');
   err.textContent = '';
   if (!email||!pass){ err.textContent='Please enter email and password.'; return; }
+  if (!window._fb){ err.textContent='App still loading — please wait a moment and try again.'; return; }
   btn.disabled=true; btn.textContent='…';
   try {
     const {auth,signInWithEmailAndPassword,createUserWithEmailAndPassword} = window._fb;
     if (loginMode==='in') await signInWithEmailAndPassword(auth,email,pass);
     else                  await createUserWithEmailAndPassword(auth,email,pass);
   } catch(e){
-    err.textContent = authErr(e.code);
+    console.error('Auth error:', e);
+    const code = (e && e.code) ? e.code : (e && e.message) ? e.message : String(e);
+    err.textContent = authErr(code);
     btn.disabled=false;
     btn.textContent = loginMode==='in' ? 'SIGN IN' : 'CREATE ACCOUNT';
   }
@@ -727,8 +730,11 @@ function authErr(code){
     'auth/weak-password':'Password must be at least 6 characters.',
     'auth/invalid-credential':'Email or password is incorrect.',
     'auth/too-many-requests':'Too many attempts — try again later.',
+    'auth/operation-not-allowed':'Email/password sign-in is not enabled in Firebase.',
+    'auth/network-request-failed':'Network error — check your connection.',
+    'auth/configuration-not-found':'Firebase Auth is not configured correctly.',
   };
-  return m[code]||`Error: ${code}`;
+  return m[code] || 'Error: ' + code;
 }
 document.addEventListener('keydown', e=>{
   if (e.key==='Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
