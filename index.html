@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Broadcast Countdown</title>
+
+<!-- PWA / iOS Home Screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Countdown">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0c10">
+<meta name="description" content="Live broadcast countdown timing tool">
+
+<!-- Icons -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+<!-- Prevent tap highlight on iPad -->
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  /* Safe area insets for notched iPads */
+  #app {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #1a1d26;
+    --border: #2a2e3d;
+    --border-bright: #3d4259;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --green: #00ff88;
+    --red: #ff3355;
+    --yellow: #ffd600;
+    --text: #e8ecf4;
+    --text-dim: #6b7390;
+    --text-mid: #9ba3bf;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Oswald', sans-serif;
+    --ui: 'Rajdhani', sans-serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+
+  /* ── LAYOUT ── */
+  #app {
+    display: flex; flex-direction: column;
+    height: 100vh; width: 100vw;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  /* ── HUB HEADER ── */
+  #hub-bar {
+    display: flex; align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-top: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 8px 16px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .hub-label {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .hub-clock {
+    font-family: var(--mono);
+    font-size: 36px;
+    color: #fff;
+    letter-spacing: 4px;
+    line-height: 1;
+    flex: 1;
+    text-align: center;
+  }
+
+  .tz-selector {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .tz-label {
+    font-size: 11px; letter-spacing: 2px;
+    color: var(--text-dim); text-transform: uppercase;
+  }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  option { background: #1a1d26; }
+  optgroup { background: #0f1117; color: var(--accent); font-size: 11px; }
+
+  /* ── MATCHES GRID ── */
+  #matches-grid {
+    display: flex; gap: 8px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .match-col {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    min-width: 0;
+    transition: opacity 0.3s, filter 0.3s;
+  }
+
+  .match-col.disabled {
+    opacity: 0.35;
+    filter: grayscale(0.6);
+    pointer-events: none;
+  }
+
+  /* Match header */
+  .match-header {
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 10px 12px 8px;
+    background: var(--surface2);
+    border-bottom: 2px solid var(--accent);
+    gap: 4px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .match-title {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .match-local-time {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .match-tz-row {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .match-tz-label {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase;
+  }
+
+  .match-tz-select {
+    font-size: 11px; padding: 2px 6px;
+  }
+
+  /* Toggle button */
+  .toggle-btn {
+    position: absolute;
+    top: 8px; right: 10px;
+    width: 32px; height: 18px;
+    background: var(--border);
+    border: 1px solid var(--border-bright);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex; align-items: center;
+    padding: 2px;
+    pointer-events: all;
+  }
+  .toggle-btn.on { background: var(--accent); border-color: var(--accent); }
+  .toggle-btn::after {
+    content: '';
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+    display: block;
+  }
+  .toggle-btn.on::after { transform: translateX(14px); }
+
+  /* Timer rows */
+  .timers-list {
+    display: flex; flex-direction: column;
+    flex: 1; overflow-y: auto;
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .timer-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    gap: 8px;
+    min-height: 48px;
+    transition: border-color 0.2s;
+  }
+
+  .timer-row.core {
+    border-left: 3px solid var(--accent2);
+  }
+
+  .timer-row.optional {
+    border-left: 3px solid var(--border-bright);
+    font-style: italic;
+  }
+
+  .timer-row.countdown-warning { border-color: var(--yellow); }
+  .timer-row.countdown-live { border-color: var(--red); animation: pulse-border 1s infinite; }
+
+  @keyframes pulse-border {
+    0%, 100% { border-color: var(--red); box-shadow: 0 0 0 0 rgba(255,51,85,0); }
+    50% { border-color: #ff6680; box-shadow: 0 0 0 3px rgba(255,51,85,0.15); }
+  }
+
+  .timer-name {
+    font-family: var(--ui);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-mid);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .timer-row.optional .timer-name {
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  .timer-time-set {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-mid);
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border-bottom: 1px dashed var(--border-bright);
+    padding-bottom: 1px;
+    white-space: nowrap;
+  }
+  .timer-time-set:hover { color: var(--accent); border-color: var(--accent); }
+
+  .timer-countdown {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    min-width: 60px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .timer-countdown.positive { color: var(--green); }
+  .timer-countdown.warning { color: var(--yellow); }
+  .timer-countdown.live { color: var(--red); }
+  .timer-countdown.past { color: var(--text-dim); }
+
+  /* Add timer button */
+  .add-timer-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: var(--ui);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .add-timer-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.hidden { display: none; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-top: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 24px;
+    width: 320px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .modal-title {
+    font-family: var(--display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .modal-field { display: flex; flex-direction: column; gap: 6px; }
+  .modal-field label {
+    font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase;
+  }
+
+  .modal-input {
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    padding: 8px 12px;
+    outline: none;
+    width: 100%;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+
+  .modal-buttons {
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  .btn {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    border-color: var(--border-bright);
+    color: var(--text-dim);
+  }
+  .btn-cancel:hover { border-color: var(--text-mid); color: var(--text); }
+
+  .btn-confirm {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-confirm:hover { background: #33ddff; }
+
+  .btn-danger {
+    background: transparent;
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(255,51,85,0.1); }
+
+  /* ── STATUS BAR ── */
+  #status-bar {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    margin-right: 6px;
+    animation: blink 2s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Scrollbar */
+  .timers-list::-webkit-scrollbar { width: 4px; }
+  .timers-list::-webkit-scrollbar-track { background: transparent; }
+  .timers-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  /* Remove timer */
+  .timer-remove {
+    display: none;
+    background: none; border: none;
+    color: var(--red); font-size: 14px;
+    cursor: pointer; padding: 0 2px; line-height: 1;
+    flex-shrink: 0;
+  }
+  .timer-row.optional:hover .timer-remove { display: block; }
+  .timer-row { grid-template-columns: 1fr auto auto auto; }
+
+  .time-picker-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .time-text {
+    flex: 1;
+    font-family: var(--mono) !important;
+    font-size: 28px !important;
+    padding: 10px 14px !important;
+    letter-spacing: 4px;
+    text-align: center;
+    min-width: 0;
+  }
+  .time-text::placeholder { color: var(--border-bright); letter-spacing: 3px; }
+  .time-text:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.15); }
+  .time-colon {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .time-dropdowns {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .time-sel-sm {
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-mid);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 4px 6px;
+    cursor: pointer;
+    outline: none;
+    width: 72px;
+    text-align: center;
+  }
+  .time-sel-sm:focus { border-color: var(--accent); color: var(--text); }
+  .time-sel-sm option { background: #1a1d26; }
+
+  /* ── ADD / REMOVE MATCH ── */
+  .hidden-match { display: none; }
+
+  #add-match-col {
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+  }
+
+  .add-match-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 48px;
+    background: transparent;
+    border: 2px dashed var(--border-bright);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 12px 0;
+  }
+  .add-match-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,212,255,0.05);
+  }
+  .add-match-plus {
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1;
+    font-family: var(--mono);
+  }
+  .add-match-label {
+    font-family: var(--display);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.3;
+  }
+  #add-match-col.hidden { display: none; }
+
+  /* Remove match button in header */
+  .remove-match-btn {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,51,85,0.15);
+    border: 1.5px solid var(--red);
+    color: var(--red);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: all 0.15s;
+    pointer-events: all !important;
+    z-index: 10;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .remove-match-btn:hover,
+  .remove-match-btn:active {
+    background: rgba(255,51,85,0.5);
+    transform: scale(1.1);
+  }
+
+  /* ── MATCH HEADER EDIT ── */
+  .match-title-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; width: 100%;
+    position: relative;
+  }
+  .match-label {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .edit-match-btn {
+    background: none; border: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .edit-match-btn:hover { color: var(--accent); }
+
+  .match-teams {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.5em;
+    min-height: 16px;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .team-vs {
+    font-size: 11px; color: var(--text-dim);
+    letter-spacing: 2px; font-family: var(--ui);
+    font-weight: 600;
+  }
+
+  /* Colour picker */
+  .colour-picker-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    flex-shrink: 0;
+  }
+  .colour-label {
+    font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .colour-input {
+    width: 40px; height: 32px;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    background: var(--surface2);
+    cursor: pointer;
+    padding: 2px;
+  }
+  .colour-input::-webkit-color-swatch-wrapper { padding: 0; }
+  .colour-input::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+  /* Section divider inside modal */
+  .modal-section-divider {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-top: -4px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HUB BAR -->
+  <div id="hub-bar">
+    <div class="hub-label">HUB LOCAL TIME</div>
+    <div class="hub-clock" id="hub-clock">--:--:--</div>
+    <div class="tz-selector">
+      <span class="tz-label">TZ</span>
+      <select id="hub-tz" onchange="updateHubTz()"></select>
+    </div>
+  </div>
+
+  <!-- MATCHES -->
+  <div id="matches-grid">
+    <!-- Match 1 -->
+    <div class="match-col" id="match-col-0">
+      <div class="match-header" style="border-top-color: var(--accent)">
+        <div class="match-title-row">
+          <div class="match-label" id="match-label-0">MATCH 1</div>
+          <button class="edit-match-btn" onclick="openEditMatch(0)" title="Edit match details">✎</button>
+        </div>
+        <div class="match-teams" id="match-teams-0"></div>
+        <div class="match-local-time" id="match-clock-0">--:--:--</div>
+        <div class="match-tz-row">
+          <span class="match-tz-label">TZ</span>
+          <select class="match-tz-select" id="match-tz-0" onchange="updateMatchTz(0)"></select>
+        </div>
+      </div>
+      <div class="timers-list" id="timers-0"></div>
+      <button class="add-timer-btn" onclick="openAddTimer(0)">+ ADD TIMER</button>
+    </div>
+
+    <!-- Match 2 (hidden on startup) -->
+    <div class="match-col hidden-match" id="match-col-1">
+      <div class="match-header" style="border-top-color: var(--accent2)">
+        <button class="remove-match-btn" id="remove-1" onclick="removeMatch(1)" title="Remove Match 2">✕</button>
+        <div class="match-title-row">
+          <div class="match-label" id="match-label-1">MATCH 2</div>
+          <button class="edit-match-btn" onclick="openEditMatch(1)" title="Edit match details">✎</button>
+        </div>
+        <div class="match-teams" id="match-teams-1"></div>
+        <div class="match-local-time" id="match-clock-1">--:--:--</div>
+        <div class="match-tz-row">
+          <span class="match-tz-label">TZ</span>
+          <select class="match-tz-select" id="match-tz-1" onchange="updateMatchTz(1)"></select>
+        </div>
+      </div>
+      <div class="timers-list" id="timers-1"></div>
+      <button class="add-timer-btn" onclick="openAddTimer(1)">+ ADD TIMER</button>
+    </div>
+
+    <!-- Match 3 (hidden on startup) -->
+    <div class="match-col hidden-match" id="match-col-2">
+      <div class="match-header" style="border-top-color: #9b59b6">
+        <button class="remove-match-btn" id="remove-2" onclick="removeMatch(2)" title="Remove Match 3">✕</button>
+        <div class="match-title-row">
+          <div class="match-label" id="match-label-2">MATCH 3</div>
+          <button class="edit-match-btn" onclick="openEditMatch(2)" title="Edit match details">✎</button>
+        </div>
+        <div class="match-teams" id="match-teams-2"></div>
+        <div class="match-local-time" id="match-clock-2">--:--:--</div>
+        <div class="match-tz-row">
+          <span class="match-tz-label">TZ</span>
+          <select class="match-tz-select" id="match-tz-2" onchange="updateMatchTz(2)"></select>
+        </div>
+      </div>
+      <div class="timers-list" id="timers-2"></div>
+      <button class="add-timer-btn" onclick="openAddTimer(2)">+ ADD TIMER</button>
+    </div>
+
+    <!-- Add Match button -->
+    <div id="add-match-col">
+      <button class="add-match-btn" id="add-match-btn" onclick="addMatch()">
+        <span class="add-match-plus">+</span>
+        <span class="add-match-label">ADD<br>MATCH</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="status-bar">
+    <span><span class="status-dot"></span>LIVE</span>
+    <span id="utc-display">UTC --:--:--</span>
+    <span>TAP TIME TO SET &nbsp;|&nbsp; TAP + TO ADD TIMER</span>
+  </div>
+</div>
+
+<!-- MODAL: Set Timer Time -->
+<div class="modal-overlay hidden" id="modal-set-time">
+  <div class="modal">
+    <div class="modal-title" id="modal-set-title">SET TIME</div>
+    <div class="modal-field">
+      <label>Local Time (24hr)</label>
+      <div class="time-picker-row">
+        <input class="modal-input time-text" type="text" id="modal-set-typed"
+          placeholder="HH:MM" maxlength="5" inputmode="numeric"
+          oninput="syncTypedToDropdowns('set')" />
+        <span class="time-colon">or select</span>
+        <div class="time-dropdowns">
+          <select class="time-sel-sm" id="modal-set-hh" onchange="syncDropdownsToTyped('set')" title="Hour"></select>
+          <select class="time-sel-sm" id="modal-set-mm" onchange="syncDropdownsToTyped('set')" title="Min"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-cancel" onclick="closeModal('modal-set-time')">CANCEL</button>
+      <button class="btn btn-confirm" onclick="confirmSetTime()">SET</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Timer -->
+<div class="modal-overlay hidden" id="modal-add-timer">
+  <div class="modal">
+    <div class="modal-title">ADD TIMER</div>
+    <div class="modal-field">
+      <label>Timer Label</label>
+      <input class="modal-input" type="text" id="modal-timer-name" placeholder="e.g. HUB OP ONSITE" style="font-family:var(--ui); font-size:14px; letter-spacing:1px;" />
+    </div>
+    <div class="modal-field">
+      <label>Local Time (24hr)</label>
+      <div class="time-picker-row">
+        <input class="modal-input time-text" type="text" id="modal-add-typed"
+          placeholder="HH:MM" maxlength="5" inputmode="numeric"
+          oninput="syncTypedToDropdowns('add')" />
+        <span class="time-colon">or select</span>
+        <div class="time-dropdowns">
+          <select class="time-sel-sm" id="modal-add-hh" onchange="syncDropdownsToTyped('add')" title="Hour"></select>
+          <select class="time-sel-sm" id="modal-add-mm" onchange="syncDropdownsToTyped('add')" title="Min"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-cancel" onclick="closeModal('modal-add-timer')">CANCEL</button>
+      <button class="btn btn-confirm" onclick="confirmAddTimer()">ADD</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── TIMEZONES ──
+const TZ_GROUPS = [
+  {
+    group: '── AUSTRALIA ──',
+    zones: [
+      { label: 'Sydney (AEDT/AEST)',        tz: 'Australia/Sydney' },
+      { label: 'Melbourne (AEDT/AEST)',      tz: 'Australia/Melbourne' },
+      { label: 'Brisbane (AEST)',            tz: 'Australia/Brisbane' },
+      { label: 'Adelaide (ACDT/ACST)',       tz: 'Australia/Adelaide' },
+      { label: 'Perth (AWST)',               tz: 'Australia/Perth' },
+      { label: 'Darwin (ACST)',              tz: 'Australia/Darwin' },
+      { label: 'Hobart (AEDT/AEST)',         tz: 'Australia/Hobart' },
+      { label: 'Canberra (AEDT/AEST)',       tz: 'Australia/ACT' },
+    ]
+  },
+  {
+    group: '── OTHER ZONES ──',
+    zones: [
+      { label: 'UTC+0   London (GMT)',        tz: 'Europe/London' },
+      { label: 'UTC+1   Paris (CET)',          tz: 'Europe/Paris' },
+      { label: 'UTC+1   Berlin (CET)',         tz: 'Europe/Berlin' },
+      { label: 'UTC+1   Madrid (CET)',         tz: 'Europe/Madrid' },
+      { label: 'UTC+1   Rome (CET)',           tz: 'Europe/Rome' },
+      { label: 'UTC+2   Cairo (EET)',          tz: 'Africa/Cairo' },
+      { label: 'UTC+2   Johannesburg (SAST)',  tz: 'Africa/Johannesburg' },
+      { label: 'UTC+3   Moscow (MSK)',         tz: 'Europe/Moscow' },
+      { label: 'UTC+3   Nairobi (EAT)',        tz: 'Africa/Nairobi' },
+      { label: 'UTC+3:30 Tehran (IRST)',       tz: 'Asia/Tehran' },
+      { label: 'UTC+4   Dubai (GST)',          tz: 'Asia/Dubai' },
+      { label: 'UTC+4:30 Kabul (AFT)',         tz: 'Asia/Kabul' },
+      { label: 'UTC+5   Karachi (PKT)',        tz: 'Asia/Karachi' },
+      { label: 'UTC+5:30 Mumbai (IST)',        tz: 'Asia/Kolkata' },
+      { label: 'UTC+5:45 Kathmandu (NPT)',     tz: 'Asia/Kathmandu' },
+      { label: 'UTC+6   Dhaka (BST)',          tz: 'Asia/Dhaka' },
+      { label: 'UTC+7   Bangkok (ICT)',        tz: 'Asia/Bangkok' },
+      { label: 'UTC+7   Jakarta (WIB)',        tz: 'Asia/Jakarta' },
+      { label: 'UTC+8   Singapore (SGT)',      tz: 'Asia/Singapore' },
+      { label: 'UTC+8   Hong Kong (HKT)',      tz: 'Asia/Hong_Kong' },
+      { label: 'UTC+8   Kuala Lumpur (MYT)',   tz: 'Asia/Kuala_Lumpur' },
+      { label: 'UTC+8   Beijing (CST)',        tz: 'Asia/Shanghai' },
+      { label: 'UTC+9   Tokyo (JST)',          tz: 'Asia/Tokyo' },
+      { label: 'UTC+9   Seoul (KST)',          tz: 'Asia/Seoul' },
+      { label: 'UTC+9:30 Adelaide — see AUS', tz: 'Australia/Adelaide' },
+      { label: 'UTC+10  Port Moresby (PGT)',   tz: 'Pacific/Port_Moresby' },
+      { label: 'UTC+11  Noumea (NCT)',         tz: 'Pacific/Noumea' },
+      { label: 'UTC+12  Auckland (NZST)',      tz: 'Pacific/Auckland' },
+      { label: 'UTC+13  Apia (WST)',           tz: 'Pacific/Apia' },
+      { label: 'UTC-11  Pago Pago (SST)',      tz: 'Pacific/Pago_Pago' },
+      { label: 'UTC-10  Honolulu (HST)',       tz: 'Pacific/Honolulu' },
+      { label: 'UTC-8   Los Angeles (PST)',    tz: 'America/Los_Angeles' },
+      { label: 'UTC-7   Denver (MST)',         tz: 'America/Denver' },
+      { label: 'UTC-6   Chicago (CST)',        tz: 'America/Chicago' },
+      { label: 'UTC-5   New York (EST)',       tz: 'America/New_York' },
+      { label: 'UTC-4   Halifax (AST)',        tz: 'America/Halifax' },
+      { label: 'UTC-3   São Paulo (BRT)',      tz: 'America/Sao_Paulo' },
+      { label: 'UTC-3   Buenos Aires (ART)',   tz: 'America/Argentina/Buenos_Aires' },
+      { label: 'UTC-1   Azores (AZOT)',        tz: 'Atlantic/Azores' },
+    ]
+  }
+];
+
+// Flat list for legacy lookups
+const TZ_LIST = TZ_GROUPS.flatMap(g => g.zones);
+
+// ── STATE ──
+let hubTz = 'Australia/Sydney';
+let matchTzs = ['Australia/Sydney', 'Australia/Sydney', 'Australia/Sydney'];
+let matchEnabled = [true, false, false];
+let matchVisible = [true, false, false]; // tracks which match columns are shown
+
+// Match metadata: label, home/away team names and colours
+let matchMeta = [
+  { label: 'MATCH 1', home: '', homeColour: '#00d4ff', away: '', awayColour: '#ff6b35' },
+  { label: 'MATCH 2', home: '', homeColour: '#00d4ff', away: '', awayColour: '#ff6b35' },
+  { label: 'MATCH 3', home: '', homeColour: '#00d4ff', away: '', awayColour: '#ff6b35' },
+];
+
+// Timers per match: { id, name, core, timeStr (HH:MM local), targetUTC }
+let matchTimers = [
+  [
+    { id: uid(), name: 'ON AIR',      core: true,  timeStr: null, targetUTC: null },
+    { id: uid(), name: 'MATCH START', core: true,  timeStr: null, targetUTC: null },
+  ],
+  [
+    { id: uid(), name: 'ON AIR',      core: true,  timeStr: null, targetUTC: null },
+    { id: uid(), name: 'MATCH START', core: true,  timeStr: null, targetUTC: null },
+  ],
+  [
+    { id: uid(), name: 'ON AIR',      core: true,  timeStr: null, targetUTC: null },
+    { id: uid(), name: 'MATCH START', core: true,  timeStr: null, targetUTC: null },
+  ],
+];
+
+// Modal context
+let modalCtx = { matchIdx: null, timerId: null };
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+// ── INIT SELECTS ──
+function populateSelects() {
+  const selects = [
+    document.getElementById('hub-tz'),
+    document.getElementById('match-tz-0'),
+    document.getElementById('match-tz-1'),
+    document.getElementById('match-tz-2'),
+  ];
+  const defaults = ['Australia/Sydney', 'Australia/Sydney', 'Australia/Sydney', 'Australia/Sydney'];
+  selects.forEach((sel, i) => {
+    TZ_GROUPS.forEach(({ group, zones }) => {
+      const og = document.createElement('optgroup');
+      og.label = group;
+      zones.forEach(({ label, tz }) => {
+        const opt = document.createElement('option');
+        opt.value = tz; opt.textContent = label;
+        if (tz === defaults[i]) opt.selected = true;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+  });
+}
+
+function updateHubTz() {
+  hubTz = document.getElementById('hub-tz').value;
+}
+
+function updateMatchTz(idx) {
+  matchTzs[idx] = document.getElementById(`match-tz-${idx}`).value;
+  // Recalculate targetUTC for timers in this match (re-apply same timeStr)
+  matchTimers[idx].forEach(t => {
+    if (t.timeStr) t.targetUTC = localTimeStrToUTC(t.timeStr, matchTzs[idx]);
+  });
+}
+
+// ── ADD / REMOVE MATCH ──
+function addMatch() {
+  // Find first hidden match and show it
+  for (let i = 1; i < 3; i++) {
+    if (!matchVisible[i]) {
+      matchVisible[i] = true;
+      matchEnabled[i] = true;
+      document.getElementById(`match-col-${i}`).classList.remove('hidden-match');
+      updateAddMatchBtn();
+      setTimeout(scaleMatchFonts, 50);
+      return;
+    }
+  }
+}
+
+function removeMatch(idx) {
+  matchVisible[idx] = false;
+  matchEnabled[idx] = false;
+  document.getElementById(`match-col-${idx}`).classList.add('hidden-match');
+  // If match 2 removed, also hide match 3 and reset it
+  if (idx === 1 && matchVisible[2]) {
+    matchVisible[2] = false;
+    matchEnabled[2] = false;
+    document.getElementById('match-col-2').classList.add('hidden-match');
+  }
+  updateAddMatchBtn();
+  setTimeout(scaleMatchFonts, 50);
+}
+
+function updateAddMatchBtn() {
+  const allVisible = matchVisible[1] && matchVisible[2];
+  const addCol = document.getElementById('add-match-col');
+  addCol.classList.toggle('hidden', allVisible);
+}
+
+// ── TIME HELPERS ──
+function getTimeInTz(tz) {
+  return new Date().toLocaleTimeString('en-GB', { timeZone: tz, hour12: false });
+}
+
+function getTimeHHMM(tz) {
+  return new Date().toLocaleTimeString('en-GB', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' });
+}
+
+// Convert HH:MM local (in given tz) to UTC ms (next occurrence)
+function localTimeStrToUTC(timeStr, tz) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  const now = new Date();
+
+  // Get the current date in the target timezone as YYYY-MM-DD
+  const dateStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  // Get the UTC offset for this timezone right now using a reliable method:
+  // Format "now" in the target tz, parse it, compare to actual UTC
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  });
+  const parts = fmt.formatToParts(now);
+  const p = {};
+  parts.forEach(x => { p[x.type] = x.value; });
+
+  // Reconstruct "now" as UTC from the tz-local representation
+  const tzNowUTC = Date.UTC(
+    parseInt(p.year), parseInt(p.month) - 1, parseInt(p.day),
+    parseInt(p.hour), parseInt(p.minute), parseInt(p.second)
+  );
+  // The offset in ms: how far ahead/behind UTC this tz is right now
+  const offsetMs = tzNowUTC - now.getTime();
+
+  // Build the target time in UTC: treat the local HH:MM as UTC midnight + offset correction
+  const targetLocalMs = Date.UTC(year, month - 1, day, h, m, 0);
+  const targetUTC = targetLocalMs - offsetMs;
+
+  return targetUTC;
+}
+
+// Format countdown ms
+function formatCountdown(diffMs) {
+  const abs = Math.abs(diffMs);
+  const totalSec = Math.floor(abs / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const sign = diffMs < 0 ? '+' : '-';
+  if (h > 0) return `${sign}${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${sign}${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ── RENDER ──
+function renderTimers() {
+  for (let mi = 0; mi < 3; mi++) {
+    const list = document.getElementById(`timers-${mi}`);
+    const now = Date.now();
+
+    // Clear and rebuild
+    list.innerHTML = '';
+    matchTimers[mi].forEach(timer => {
+      const row = document.createElement('div');
+      row.className = 'timer-row ' + (timer.core ? 'core' : 'optional');
+
+      const diffMs = timer.targetUTC ? timer.targetUTC - now : null;
+
+      // Status class
+      if (diffMs !== null) {
+        if (diffMs < 0) row.classList.add('countdown-live');
+        else if (diffMs < 5 * 60 * 1000) row.classList.add('countdown-warning');
+      }
+
+      // Name
+      const nameEl = document.createElement('div');
+      nameEl.className = 'timer-name';
+      nameEl.textContent = timer.name;
+
+      // Set time display
+      const setEl = document.createElement('div');
+      setEl.className = 'timer-time-set';
+      setEl.textContent = timer.timeStr || '--:--';
+      setEl.onclick = () => openSetTime(mi, timer.id);
+
+      // Countdown
+      const cdEl = document.createElement('div');
+      cdEl.className = 'timer-countdown';
+      if (diffMs === null) {
+        cdEl.textContent = '--:--';
+        cdEl.classList.add('past');
+      } else if (diffMs < 0) {
+        cdEl.textContent = formatCountdown(diffMs);
+        cdEl.classList.add('live');
+      } else if (diffMs < 5 * 60 * 1000) {
+        cdEl.textContent = formatCountdown(diffMs);
+        cdEl.classList.add('warning');
+      } else {
+        cdEl.textContent = formatCountdown(diffMs);
+        cdEl.classList.add('positive');
+      }
+
+      // Remove (optional only)
+      const rmEl = document.createElement('button');
+      rmEl.className = 'timer-remove';
+      rmEl.textContent = '✕';
+      rmEl.onclick = (e) => { e.stopPropagation(); removeTimer(mi, timer.id); };
+
+      row.appendChild(nameEl);
+      row.appendChild(setEl);
+      row.appendChild(cdEl);
+      if (!timer.core) row.appendChild(rmEl);
+
+      list.appendChild(row);
+    });
+  }
+}
+
+function removeTimer(mi, id) {
+  matchTimers[mi] = matchTimers[mi].filter(t => t.id !== id);
+}
+
+// ── CLOCK TICK ──
+function tick() {
+  // Hub clock
+  document.getElementById('hub-clock').textContent = getTimeInTz(hubTz);
+  document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
+
+  // Match clocks
+  for (let i = 0; i < 3; i++) {
+    if (matchVisible[i]) {
+      document.getElementById(`match-clock-${i}`).textContent = getTimeInTz(matchTzs[i]);
+    }
+  }
+
+  renderTimers();
+}
+
+setInterval(tick, 1000);
+tick();
+
+// ── MODALS ──
+function openSetTime(matchIdx, timerId) {
+  modalCtx = { matchIdx, timerId };
+  const timer = matchTimers[matchIdx].find(t => t.id === timerId);
+  document.getElementById('modal-set-title').textContent = `SET TIME — ${timer.name}`;
+  const ts = timer.timeStr || localNowHHMM();
+  applyTimeToModal('set', ts);
+  document.getElementById('modal-set-time').classList.remove('hidden');
+  setTimeout(() => document.getElementById('modal-set-typed').focus(), 100);
+}
+
+function confirmSetTime() {
+  const { matchIdx, timerId } = modalCtx;
+  const val = resolveTimeVal('set');
+  if (!val) return;
+  const timer = matchTimers[matchIdx].find(t => t.id === timerId);
+  if (timer) {
+    timer.timeStr = val;
+    timer.targetUTC = localTimeStrToUTC(val, matchTzs[matchIdx]);
+  }
+  closeModal('modal-set-time');
+}
+
+function openAddTimer(matchIdx) {
+  modalCtx = { matchIdx, timerId: null };
+  document.getElementById('modal-timer-name').value = '';
+  applyTimeToModal('add', localNowHHMM());
+  document.getElementById('modal-add-timer').classList.remove('hidden');
+  setTimeout(() => document.getElementById('modal-timer-name').focus(), 100);
+}
+
+function confirmAddTimer() {
+  const { matchIdx } = modalCtx;
+  const name = document.getElementById('modal-timer-name').value.trim();
+  if (!name) return;
+  const timeStr = resolveTimeVal('add');
+  const timer = {
+    id: uid(), name: name.toUpperCase(), core: false,
+    timeStr: timeStr || null,
+    targetUTC: timeStr ? localTimeStrToUTC(timeStr, matchTzs[matchIdx]) : null,
+  };
+  matchTimers[matchIdx].push(timer);
+  closeModal('modal-add-timer');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+// Tap outside modal to close
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.add('hidden');
+  });
+});
+
+
+// Sync typed input → dropdowns (auto-format as user types)
+function syncTypedToDropdowns(prefix) {
+  const input = document.getElementById(`modal-${prefix}-typed`);
+  const raw = input.value.replace(/[^0-9:]/g, '');
+  // Auto-insert colon after 2 digits if no colon yet
+  let formatted = raw;
+  if (!raw.includes(':') && raw.length > 2) {
+    formatted = raw.slice(0, 2) + ':' + raw.slice(2, 4);
+    input.value = formatted;
+  }
+  // Sync to dropdowns as soon as we have HH:MM
+  const parts = formatted.split(':');
+  if (parts.length === 2 && parts[1].length >= 2) {
+    const h = parseInt(parts[0]), m = parseInt(parts[1]);
+    if (!isNaN(h) && h >= 0 && h <= 23) document.getElementById(`modal-${prefix}-hh`).value = String(h).padStart(2,'0');
+    if (!isNaN(m) && m >= 0 && m <= 59) document.getElementById(`modal-${prefix}-mm`).value = String(m).padStart(2,'0');
+  }
+}
+
+// Sync dropdowns → typed input
+function syncDropdownsToTyped(prefix) {
+  const hh = document.getElementById(`modal-${prefix}-hh`).value;
+  const mm = document.getElementById(`modal-${prefix}-mm`).value;
+  document.getElementById(`modal-${prefix}-typed`).value = `${hh}:${mm}`;
+}
+
+// Resolve final HH:MM — handles 1515, 15:15, 9:05, 905, etc.
+function resolveTimeVal(prefix) {
+  let typed = document.getElementById(`modal-${prefix}-typed`).value.trim();
+
+  // Strip non-numeric except colon
+  const digits = typed.replace(/[^0-9]/g, '');
+
+  let h, m;
+  if (digits.length === 3) {
+    // e.g. 915 → 9:15
+    h = parseInt(digits.slice(0, 1));
+    m = parseInt(digits.slice(1, 3));
+  } else if (digits.length === 4) {
+    // e.g. 1515 → 15:15
+    h = parseInt(digits.slice(0, 2));
+    m = parseInt(digits.slice(2, 4));
+  } else if (digits.length === 2) {
+    // e.g. 15 → 15:00
+    h = parseInt(digits);
+    m = 0;
+  } else if (typed.includes(':')) {
+    // Already formatted as HH:MM
+    const parts = typed.split(':');
+    h = parseInt(parts[0]);
+    m = parseInt(parts[1]);
+  }
+
+  if (h !== undefined && !isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  }
+
+  // Last fallback: use dropdowns directly
+  const hh = document.getElementById(`modal-${prefix}-hh`).value;
+  const mm = document.getElementById(`modal-${prefix}-mm`).value;
+  if (hh && mm) return `${hh}:${mm}`;
+  return null;
+}
+
+// Get device local time as HH:MM string
+function localNowHHMM() {
+  const now = new Date();
+  return String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+
+function applyTimeToModal(prefix, timeStr) {
+  const [hh, mm] = timeStr.split(':');
+  document.getElementById(`modal-${prefix}-typed`).value = timeStr;
+  document.getElementById(`modal-${prefix}-hh`).value = hh;
+  document.getElementById(`modal-${prefix}-mm`).value = mm;
+}
+
+function initTimeSelects() {
+  ['modal-set-hh', 'modal-add-hh'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let h = 0; h < 24; h++) {
+      const opt = document.createElement('option');
+      opt.value = String(h).padStart(2,'0');
+      opt.textContent = String(h).padStart(2,'0');
+      sel.appendChild(opt);
+    }
+    sel.value = String(new Date().getHours()).padStart(2,'0');
+  });
+  ['modal-set-mm', 'modal-add-mm'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let m = 0; m < 60; m++) {
+      const opt = document.createElement('option');
+      opt.value = String(m).padStart(2,'0');
+      opt.textContent = String(m).padStart(2,'0');
+      sel.appendChild(opt);
+    }
+    sel.value = String(new Date().getMinutes()).padStart(2,'0');
+  });
+
+  // Enter key on typed inputs triggers confirm
+  document.getElementById('modal-set-typed').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmSetTime();
+  });
+  document.getElementById('modal-add-typed').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmAddTimer();
+  });
+  document.getElementById('modal-timer-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('modal-add-typed').focus();
+  });
+  // Edit match modal — Enter on any field saves
+  ['edit-match-label','edit-home-name','edit-away-name'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') confirmEditMatch();
+    });
+  });
+}
+// ── MATCH EDIT ──
+function openEditMatch(idx) {
+  modalCtx = { matchIdx: idx };
+  const meta = matchMeta[idx];
+  document.getElementById('modal-edit-match-title').textContent = `EDIT — ${meta.label}`;
+  document.getElementById('edit-match-label').value = meta.label;
+  document.getElementById('edit-home-name').value = meta.home;
+  document.getElementById('edit-home-colour').value = meta.homeColour;
+  document.getElementById('edit-away-name').value = meta.away;
+  document.getElementById('edit-away-colour').value = meta.awayColour;
+  document.getElementById('modal-edit-match').classList.remove('hidden');
+  // Force uppercase live
+  ['edit-match-label','edit-home-name','edit-away-name'].forEach(id => {
+    const el = document.getElementById(id);
+    el.oninput = () => { const pos = el.selectionStart; el.value = el.value.toUpperCase(); el.setSelectionRange(pos,pos); };
+  });
+  setTimeout(() => document.getElementById('edit-match-label').focus(), 100);
+}
+
+function confirmEditMatch() {
+  const idx = modalCtx.matchIdx;
+  const label = document.getElementById('edit-match-label').value.trim().toUpperCase() || `MATCH ${idx + 1}`;
+  matchMeta[idx] = {
+    label,
+    home: document.getElementById('edit-home-name').value.trim().toUpperCase(),
+    homeColour: document.getElementById('edit-home-colour').value,
+    away: document.getElementById('edit-away-name').value.trim().toUpperCase(),
+    awayColour: document.getElementById('edit-away-colour').value,
+  };
+  renderMatchHeaders();
+  closeModal('modal-edit-match');
+}
+
+function renderMatchHeaders() {
+  for (let i = 0; i < 3; i++) {
+    const meta = matchMeta[i];
+    // Update label
+    const labelEl = document.getElementById(`match-label-${i}`);
+    if (labelEl) labelEl.textContent = meta.label;
+    // Update teams display
+    const teamsEl = document.getElementById(`match-teams-${i}`);
+    if (teamsEl) {
+      if (meta.home || meta.away) {
+        teamsEl.innerHTML =
+          `<span style="color:${meta.homeColour}">${meta.home || '—'}</span>` +
+          `<span class="team-vs">v</span>` +
+          `<span style="color:${meta.awayColour}">${meta.away || '—'}</span>`;
+      } else {
+        teamsEl.innerHTML = '';
+      }
+    }
+  }
+}
+
+// Enter key in edit-match modal
+
+populateSelects();
+initTimeSelects();
+// Re-set tz values after population
+document.getElementById('hub-tz').value = hubTz;
+document.getElementById('match-tz-0').value = matchTzs[0];
+document.getElementById('match-tz-1').value = matchTzs[1];
+document.getElementById('match-tz-2').value = matchTzs[2];
+
+// ── FONT SCALING ──
+// Scale clock and team text to fit column width
+function scaleMatchFonts() {
+  for (let i = 0; i < 3; i++) {
+    const col = document.getElementById(`match-col-${i}`);
+    if (!col || col.classList.contains('hidden-match')) continue;
+    const header = col.querySelector('.match-header');
+    if (!header) continue;
+    const availW = header.clientWidth - 24; // 12px padding each side
+
+    // Scale clock: target ~80% of available width for HH:MM:SS (8 chars)
+    const clockEl = document.getElementById(`match-clock-${i}`);
+    if (clockEl) {
+      let fs = Math.floor(availW / 5.2); // ~5.2px per char at scale 1
+      fs = Math.max(14, Math.min(fs, 38));
+      clockEl.style.fontSize = fs + 'px';
+    }
+
+    // Scale teams: target ~90% of available width
+    const teamsEl = document.getElementById(`match-teams-${i}`);
+    if (teamsEl && teamsEl.children.length) {
+      let fs = Math.floor(availW / 7);
+      fs = Math.max(10, Math.min(fs, 28));
+      teamsEl.style.fontSize = fs + 'px';
+    }
+
+    // Scale timer rows
+    const timerRows = col.querySelectorAll('.timer-row');
+    timerRows.forEach(row => {
+      const rowW = row.clientWidth - 20;
+      let fs = Math.max(9, Math.min(Math.floor(rowW / 28), 13));
+      row.querySelectorAll('.timer-name').forEach(el => el.style.fontSize = fs + 'px');
+      let cdFs = Math.max(10, Math.min(Math.floor(rowW / 20), 16));
+      row.querySelectorAll('.timer-countdown').forEach(el => el.style.fontSize = cdFs + 'px');
+      let tsFs = Math.max(9, Math.min(Math.floor(rowW / 24), 14));
+      row.querySelectorAll('.timer-time-set').forEach(el => el.style.fontSize = tsFs + 'px');
+    });
+  }
+}
+
+// Watch for column size changes
+const resizeObserver = new ResizeObserver(() => scaleMatchFonts());
+document.querySelectorAll('.match-col').forEach(col => resizeObserver.observe(col));
+
+</script>
+
+<!-- MODAL: Edit Match -->
+<div class="modal-overlay hidden" id="modal-edit-match">
+  <div class="modal" style="width: 380px;">
+    <div class="modal-title" id="modal-edit-match-title">EDIT MATCH</div>
+
+    <div class="modal-field">
+      <label>Match Label</label>
+      <input class="modal-input" type="text" id="edit-match-label" placeholder="e.g. MATCH 1" style="font-family:var(--ui); font-size:15px; letter-spacing:2px; text-transform:uppercase;" />
+    </div>
+
+    <div class="modal-section-divider">TEAMS</div>
+
+    <div class="modal-field">
+      <label>Home Team</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input class="modal-input" type="text" id="edit-home-name" placeholder="e.g. HAWKS" style="flex:1; font-family:var(--ui); font-size:15px; letter-spacing:2px; text-transform:uppercase;" />
+        <div class="colour-picker-wrap">
+          <label class="colour-label">Colour</label>
+          <input type="color" id="edit-home-colour" class="colour-input" value="#00d4ff" />
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-field">
+      <label>Away Team</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input class="modal-input" type="text" id="edit-away-name" placeholder="e.g. HAWKS" style="flex:1; font-family:var(--ui); font-size:15px; letter-spacing:2px; text-transform:uppercase;" />
+        <div class="colour-picker-wrap">
+          <label class="colour-label">Colour</label>
+          <input type="color" id="edit-away-colour" class="colour-input" value="#ff6b35" />
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-buttons">
+      <button class="btn btn-cancel" onclick="closeModal('modal-edit-match')">CANCEL</button>
+      <button class="btn btn-confirm" onclick="confirmEditMatch()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW error:', err));
+  });
+}
+</script>
+</body>
+</html>
