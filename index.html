@@ -1262,14 +1262,25 @@ function renderHeaders(){
     document.getElementById(`match-label-${i}`).textContent=m.label;
     const el=document.getElementById(`match-teams-${i}`);
     if(m.home||m.away){
+      const soloMode = m.home && !m.away; // single-team event (e.g. golf tournament)
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
-      const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
-      if(logoSizeMode==='xl'){
-        el.innerHTML=`${hBadge}<span class="team-vs">VS</span>${aBadge}`;
+      if(soloMode){
+        // Show home team / logo only — no VS, no away side
+        if(logoSizeMode==='xl'){
+          el.innerHTML=`${hBadge}`;
+        } else {
+          const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+          el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
+        }
       } else {
-        const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
-        const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
-        el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
+        const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
+        if(logoSizeMode==='xl'){
+          el.innerHTML=`${hBadge}<span class="team-vs">VS</span>${aBadge}`;
+        } else {
+          const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+          const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+          el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
+        }
       }
     } else {
       el.innerHTML='';
