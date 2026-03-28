@@ -865,6 +865,10 @@ async function loadSf(id){
 }
 
 function buildPayload(name){
+  // Firestore doesn't support nested arrays — flatten matchTimers into objects
+  const timers0 = matchTimers[0].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+  const timers1 = matchTimers[1].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+  const timers2 = matchTimers[2].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
   return {
     name: name||sfName||'Untitled',
     updatedAt: window._fb.serverTimestamp(),
@@ -875,10 +879,8 @@ function buildPayload(name){
       matchVisible:[...matchVisible],
       matchEnabled:[...matchEnabled],
       matchMeta: matchMeta.map(m=>({...m})),
-      matchTimers: matchTimers.map(mt=>mt.map(t=>({
-        id:t.id, name:t.name, core:t.core,
-        timeStr:t.timeStr||null, targetUTC:t.targetUTC||null
-      })))
+      // Stored as separate keys to avoid nested arrays
+      timers0, timers1, timers2
     }
   };
 }
@@ -889,9 +891,16 @@ function applyState(s){
   if (s.matchVisible) matchVisible=[...s.matchVisible];
   if (s.matchEnabled) matchEnabled=[...s.matchEnabled];
   if (s.matchMeta)    matchMeta=s.matchMeta.map(m=>({...m}));
-  if (s.matchTimers)  matchTimers=s.matchTimers.map((mt,mi)=>
-    mt.map(t=>({...t, targetUTC: t.timeStr ? localToUTC(t.timeStr, s.matchTzs?.[mi]||matchTzs[mi]) : null}))
-  );
+  // Support both old nested array format and new flat format
+  if (s.timers0 !== undefined) {
+    matchTimers = [s.timers0, s.timers1||[], s.timers2||[]].map((mt,mi)=>
+      mt.map(t=>({...t, targetUTC: t.timeStr ? localToUTC(t.timeStr, s.matchTzs?.[mi]||matchTzs[mi]) : null}))
+    );
+  } else if (s.matchTimers) {
+    matchTimers=s.matchTimers.map((mt,mi)=>
+      mt.map(t=>({...t, targetUTC: t.timeStr ? localToUTC(t.timeStr, s.matchTzs?.[mi]||matchTzs[mi]) : null}))
+    );
+  }
   [0,1,2].forEach(i=>{
     const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
     document.getElementById(`match-col-${i}`).classList.toggle('hidden-match',!matchVisible[i]);
