@@ -380,6 +380,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:5px;
   max-height:182px;overflow-y:auto;padding:2px 0;
 }
+.team-picker.logo-mode{
+  grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+  max-height:200px;
+}
 .team-picker::-webkit-scrollbar{ width:4px; }
 .team-picker::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
 .team-picker.hidden{ display:none; }
@@ -390,7 +394,19 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   padding:5px 3px;cursor:pointer;transition:all .15s;
 }
 .team-card:hover{ border-color:var(--border-bright);background:var(--surface); }
-.team-card.selected{ border-color:var(--accent);background:rgba(0,212,255,.1);box-shadow:0 0 0 1px rgba(0,212,255,.25); }
+.team-card.selected{ border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,.4); }
+
+/* Logo banner card (Netball) */
+.team-card.has-logo{
+  padding:0;height:58px;background-size:cover;background-position:center;
+  position:relative;overflow:hidden;align-items:flex-end;gap:0;
+}
+.team-card.has-logo:hover{ border-color:rgba(255,255,255,.5); }
+.team-card.has-logo .team-card-name{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(0,0,0,.55);padding:3px 4px;
+  color:#fff;font-size:8px;letter-spacing:.3px;
+}
 
 .team-badge{
   border-radius:4px;display:flex;align-items:center;justify-content:center;
@@ -409,6 +425,12 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   width:26px;height:26px;border-radius:3px;
   font-family:var(--display);font-size:7px;font-weight:700;
   letter-spacing:.4px;line-height:1;flex-shrink:0;
+}
+/* Logo banner version of mini badge */
+.team-badge-mini.has-logo{
+  width:44px;height:26px;
+  background-size:cover;background-position:center;
+  border-radius:3px;
 }
 
 /* Toast */
@@ -766,14 +788,14 @@ const SPORTS_DATA = {
     {name:'Western Bulldogs',  abbr:'WB',   primary:'#014093', secondary:'#CC2031'},
   ],
   Netball:[
-    {name:'Adelaide Thunderbirds',     abbr:'THUN', primary:'#E8182B', secondary:'#F78F1E'},
-    {name:'Collingwood Magpies',       abbr:'COLL', primary:'#000000', secondary:'#FFFFFF'},
-    {name:'Giants Netball',            abbr:'GIAN', primary:'#F36421', secondary:'#F2F2F2'},
-    {name:'Melbourne Vixens',          abbr:'VIX',  primary:'#702082', secondary:'#FFFFFF'},
-    {name:'NSW Swifts',                abbr:'SWIF', primary:'#E40064', secondary:'#000000'},
-    {name:'Queensland Firebirds',      abbr:'FIRE', primary:'#4D1B7B', secondary:'#FFB81C'},
-    {name:'Sunshine Coast Lightning',  abbr:'LGTN', primary:'#009CDE', secondary:'#FFD700'},
-    {name:'West Coast Fever',          abbr:'FEVR', primary:'#00843D', secondary:'#FFFFFF'},
+    {name:'Adelaide Thunderbirds',    abbr:'THUN', primary:'#e34f7a', secondary:'#92204d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/TBIRDS-1200x800.jpg.webp?itok=O7A73J8Y'},
+    {name:'GIANTS Netball',           abbr:'GIAN', primary:'#e36c02', secondary:'#85250c', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/GIANTS-1200x800.jpg.webp?itok=9ImirMnW'},
+    {name:'Melbourne Mavericks',      abbr:'MAV',  primary:'#3d57a7', secondary:'#11215d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-09/MelbourneMavericks_1200x800_TeamLogo.png.webp?itok=ad8NNeQK'},
+    {name:'Melbourne Vixens',         abbr:'VIX',  primary:'#016782', secondary:'#02001e', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/VIXENS-1200x800.jpg.webp?itok=f-d5rvUS'},
+    {name:'NSW Swifts',               abbr:'SWIF', primary:'#d62012', secondary:'#720001', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/SWIFTS-1200x800.jpg.webp?itok=gtzKSfWM'},
+    {name:'Queensland Firebirds',     abbr:'FIRE', primary:'#51306e', secondary:'#060022', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-11/1200x800_Teamlogo_Firebirds.png.webp?itok=FA5luhF4'},
+    {name:'Sunshine Coast Lightning', abbr:'LGTN', primary:'#f0ae23', secondary:'#916806', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/LIGHTNING-1200x800_0.jpg.webp?itok=uVebAEc5'},
+    {name:'West Coast Fever',         abbr:'FEVR', primary:'#1a5f3f', secondary:'#0b3124', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/FEVER-1200x800.jpg.webp?itok=lvaAqKag'},
   ]
 };
 
@@ -1354,16 +1376,24 @@ function onSportChange(){
 
 function renderTeamPicker(slot,sport){
   const picker=document.getElementById(`em-${slot}-picker`);
-  if(!sport||!SPORTS_DATA[sport]){ picker.classList.add('hidden'); picker.innerHTML=''; return; }
+  if(!sport||!SPORTS_DATA[sport]){ picker.classList.remove('logo-mode'); picker.classList.add('hidden'); picker.innerHTML=''; return; }
   picker.classList.remove('hidden');
   const teams=SPORTS_DATA[sport];
+  const hasLogos=teams.some(t=>t.logo);
+  picker.classList.toggle('logo-mode',hasLogos);
   const curName=document.getElementById(`em-${slot}`).value.trim().toUpperCase();
   picker.innerHTML=teams.map((t,i)=>{
-    const tc=_badgeTextColor(t);
     const sel=curName===t.name.toUpperCase();
+    const shortName=t.name.split(' ').slice(-1)[0];
+    if(t.logo){
+      return `<button class="team-card has-logo${sel?' selected':''}" onclick="pickTeam('${slot}',${i})" type="button" style="background-image:url('${t.logo}');border-color:${sel?'var(--accent)':t.secondary}">
+        <div class="team-card-name">${shortName}</div>
+      </button>`;
+    }
+    const tc=_badgeTextColor(t);
     return `<button class="team-card${sel?' selected':''}" onclick="pickTeam('${slot}',${i})" type="button">
       <div class="team-badge" style="width:38px;height:38px;font-size:8px;background:${t.primary};color:${tc};border:2px solid ${t.secondary}">${t.abbr}</div>
-      <div class="team-card-name">${t.name.split(' ').slice(-1)[0]}</div>
+      <div class="team-card-name">${shortName}</div>
     </button>`;
   }).join('');
 }
@@ -1387,6 +1417,9 @@ function getTeamBadgeMiniHTML(teamRef){
   if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
   const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
   if(!t) return '';
+  if(t.logo){
+    return `<span class="team-badge-mini has-logo" style="background-image:url('${t.logo}');border:1.5px solid ${t.primary}"></span>`;
+  }
   const tc=_badgeTextColor(t);
   return `<span class="team-badge-mini" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
 }
