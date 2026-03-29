@@ -355,8 +355,12 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .timer-countdown.warning{ color:var(--yellow); }
 .timer-countdown.live{ color:var(--red); }
 .timer-countdown.past{ color:var(--text-dim); }
-.add-timer-btn{ display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px;cursor:pointer;transition:all .2s;margin:0 6px 6px;flex-shrink:0; }
+.timer-footer{ display:flex;gap:4px;margin:0 6px 6px;flex-shrink:0; }
+.add-timer-btn{ display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px;cursor:pointer;transition:all .2s;flex:1; }
 .add-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.sort-timer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap; }
+.sort-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.sort-timer-btn.sort-active{ border-color:var(--accent);color:var(--accent);border-style:solid; }
 .timer-remove{ display:none;background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0; }
 .timer-row.optional:hover .timer-remove{ display:block; }
 .hidden-match{ display:none; }
@@ -637,7 +641,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           </div>
         </div>
         <div class="timers-list" id="timers-0"></div>
-        <button class="add-timer-btn" onclick="openAddTimer(0)">+ ADD TIMER</button>
+        <div class="timer-footer">
+          <button class="add-timer-btn" onclick="openAddTimer(0)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-0" onclick="sortTimers(0)" title="Sort by time remaining">⇅ SORT</button>
+        </div>
       </div>
 
       <!-- Match 2 -->
@@ -656,7 +663,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           </div>
         </div>
         <div class="timers-list" id="timers-1"></div>
-        <button class="add-timer-btn" onclick="openAddTimer(1)">+ ADD TIMER</button>
+        <div class="timer-footer">
+          <button class="add-timer-btn" onclick="openAddTimer(1)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-1" onclick="sortTimers(1)" title="Sort by time remaining">⇅ SORT</button>
+        </div>
       </div>
 
       <!-- Match 3 -->
@@ -675,7 +685,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           </div>
         </div>
         <div class="timers-list" id="timers-2"></div>
-        <button class="add-timer-btn" onclick="openAddTimer(2)">+ ADD TIMER</button>
+        <div class="timer-footer">
+          <button class="add-timer-btn" onclick="openAddTimer(2)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-2" onclick="sortTimers(2)" title="Sort by time remaining">⇅ SORT</button>
+        </div>
       </div>
 
       <div id="add-match-col">
@@ -1517,6 +1530,30 @@ function confirmAddTimer(){
   closeModal('modal-add-timer'); scheduleSave();
 }
 function removeTimer(mi,tid){ matchTimers[mi]=matchTimers[mi].filter(t=>t.id!==tid); scheduleSave(); }
+
+function sortTimers(mi){
+  const arr=matchTimers[mi];
+  const now=Date.now();
+  arr.sort((a,b)=>{
+    // Timers with no time set go to the bottom
+    if(!a.targetUTC && !b.targetUTC) return 0;
+    if(!a.targetUTC) return 1;
+    if(!b.targetUTC) return -1;
+    // Among timed timers: soonest remaining first;
+    // past timers (negative diff) go after future ones
+    const da=a.targetUTC-now;
+    const db=b.targetUTC-now;
+    const futureA=da>=0, futureB=db>=0;
+    if(futureA && !futureB) return -1;
+    if(!futureA && futureB) return 1;
+    return da-db; // ascending: soonest first (or least-past first)
+  });
+  // Flash the button to confirm
+  const btn=document.getElementById(`sort-btn-${mi}`);
+  btn?.classList.add('sort-active');
+  setTimeout(()=>btn?.classList.remove('sort-active'),800);
+  renderTimers(); scheduleSave();
+}
 
 function openEditMatch(i){
   ctx={i};
