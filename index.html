@@ -610,6 +610,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   overflow:hidden;text-overflow:ellipsis;
 }
 .hub-t-time{ font-family:var(--mono);font-size:9px;color:var(--text-dim);text-align:right;white-space:nowrap; }
+.hub-local-time{ font-family:var(--mono);font-size:14px;font-weight:700;color:#fff;letter-spacing:.08em;line-height:1;margin-top:4px;text-align:center;width:100%; }
 .hub-t-cd{ font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;text-align:right;white-space:nowrap; }
 .hub-t-cd.positive{ color:var(--green); }
 .hub-t-cd.warning { color:var(--yellow); }
@@ -2016,6 +2017,7 @@ function buildHubCard(i,now){
         </div>
       </div>
       ${teamsHtml?`<div class="hub-teams">${teamsHtml}</div>`:''}
+      <div class="hub-local-time" data-hub-clock-mi="${i}">${getTimeInTz(matchTzs[i])}</div>
     </div>
     <div class="hub-timers">${timersHtml}</div>`;
   return card;
@@ -2032,6 +2034,11 @@ function operateMatch(i){
 
 function updateHubCountdowns(){
   const now=Date.now();
+  // Update local clocks on each hub card
+  document.querySelectorAll('[data-hub-clock-mi]').forEach(el=>{
+    const mi=parseInt(el.dataset.hubClockMi);
+    el.textContent=getTimeInTz(matchTzs[mi]);
+  });
   document.querySelectorAll('[data-hub-tid]').forEach(el=>{
     const tid=el.dataset.hubTid;
     let t=null;
