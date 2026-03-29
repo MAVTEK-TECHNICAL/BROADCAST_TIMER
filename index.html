@@ -255,13 +255,18 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 
 /* Top bar */
 #top-bar{
-  display:flex;align-items:center;
+  display:flex;align-items:center;position:relative;
   background:var(--surface);border:1px solid var(--border-bright);
   border-top:3px solid var(--accent);border-radius:6px;
   padding:6px 12px 6px 16px;gap:12px;flex-shrink:0;
 }
 .hub-label{ font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;white-space:nowrap; }
-.hub-clock{ font-family:var(--mono);font-size:52px;font-weight:700;color:#fff;letter-spacing:4px;line-height:1;flex:1;text-align:center; }
+.hub-clock{
+  position:absolute;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:52px;font-weight:700;color:#fff;
+  letter-spacing:4px;line-height:1;pointer-events:none;
+}
+.top-bar-spacer{ flex:1; }
 .tz-selector{ display:flex;align-items:center;gap:8px; }
 .name-mode-ctrl{ display:flex;align-items:center;gap:8px;flex-shrink:0; }
 .name-mode-btns{ display:flex;border:1px solid var(--border-bright);border-radius:4px;overflow:hidden; }
@@ -575,6 +580,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <div id="top-bar">
       <div class="hub-label">HUB LOCAL</div>
       <div class="hub-clock" id="hub-clock">--:--:--</div>
+      <div class="top-bar-spacer"></div>
       <div class="tz-selector">
         <span class="tz-label">TZ</span>
         <select id="hub-tz" onchange="onHubTzChange()"></select>
