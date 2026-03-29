@@ -409,6 +409,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .btn-confirm:hover{ background:#33ddff; }
 .btn-danger{ background:transparent;border-color:var(--red);color:var(--red); }
 .btn-danger:hover{ background:rgba(255,51,85,.1); }
+.btn-sm{ background:transparent;border-color:var(--border-bright);color:var(--text-mid); }
+.btn-sm:hover{ border-color:var(--accent);color:var(--accent); }
 .modal-divider{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:-4px; }
 .time-picker-row{ display:flex;flex-direction:row;align-items:center;gap:10px; }
 .time-text{ flex:1;font-family:var(--mono)!important;font-size:28px!important;padding:10px 14px!important;letter-spacing:4px;text-align:center;min-width:0; }
@@ -642,6 +644,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   padding:6px;align-self:start;width:100%;
 }
 .hub-add-card:hover{ border-color:var(--green);color:var(--green); }
+.hub-info-grid{ display:grid;grid-template-columns:auto 1fr;gap:1px 6px;padding:4px 5px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto; }
+.hub-info-key{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.5; }
+.hub-info-val{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5; }
 </style>
 </head>
 <body>
@@ -944,6 +949,40 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <button class="nmb" id="em-align-right"  onclick="setEmAlign('right')">RIGHT</button>
       </div>
     </div>
+    <div class="modal-divider">SCHEDULE DATA</div>
+    <div class="modal-field">
+      <label>Game Schedule</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="modal-input" id="em-schedule" type="text" placeholder="e.g. GIA v VIX" style="flex:1;font-family:var(--mono);font-size:13px;letter-spacing:1px;" />
+        <button class="btn btn-sm" onclick="applySchedule()" style="white-space:nowrap;padding:5px 12px;font-size:11px;letter-spacing:1.5px;">PARSE</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="modal-field">
+        <label>Location</label>
+        <input class="modal-input" id="em-location" type="text" placeholder="e.g. Marvel Stadium" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Host</label>
+        <input class="modal-input" id="em-host" type="text" placeholder="e.g. FOX AFL" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Hub</label>
+        <input class="modal-input" id="em-hub-field" type="text" placeholder="e.g. AHS CR 05" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Truck</label>
+        <input class="modal-input" id="em-truck" type="text" placeholder="e.g. HG31" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Main</label>
+        <input class="modal-input" id="em-main" type="text" placeholder="e.g. AHS 01" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Backup</label>
+        <input class="modal-input" id="em-backup" type="text" placeholder="e.g. AHS 03" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+    </div>
     <div class="modal-buttons">
       <button class="btn btn-cancel"  onclick="closeModal('modal-edit-match')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmEditMatch()">SAVE</button>
@@ -1021,7 +1060,7 @@ let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left'}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:''}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1778,6 +1817,14 @@ function openEditMatch(i){
   renderTeamPicker('away',sport);
   document.getElementById('em-tz').value=matchTzs[i];
   setEmAlign(m.timerNameAlign||'left');
+  // Schedule data fields
+  document.getElementById('em-schedule').value='';
+  document.getElementById('em-location').value=m.location||'';
+  document.getElementById('em-host').value=m.host||'';
+  document.getElementById('em-hub-field').value=m.hub||'';
+  document.getElementById('em-truck').value=m.truck||'';
+  document.getElementById('em-main').value=m.main||'';
+  document.getElementById('em-backup').value=m.backup||'';
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
@@ -1803,6 +1850,12 @@ function confirmEditMatch(){
     homeTeamRef:findTeamRef(sport,home),
     awayTeamRef:findTeamRef(sport,away),
     timerNameAlign: ctx.timerNameAlign||'left',
+    location: document.getElementById('em-location').value.trim(),
+    host:     document.getElementById('em-host').value.trim().toUpperCase(),
+    hub:      document.getElementById('em-hub-field').value.trim().toUpperCase(),
+    truck:    document.getElementById('em-truck').value.trim().toUpperCase(),
+    main:     document.getElementById('em-main').value.trim().toUpperCase(),
+    backup:   document.getElementById('em-backup').value.trim().toUpperCase(),
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
 }
@@ -2032,6 +2085,19 @@ function buildHubCard(i,now){
     </div>`;
   }).join('');
 
+  // Info grid (schedule data)
+  const infoFields=[
+    ['LOC', m.location],
+    ['HOST',m.host],
+    ['HUB', m.hub],
+    ['TRK', m.truck],
+    ['MAIN',m.main],
+    ['BAK', m.backup],
+  ].filter(([,v])=>v);
+  const infoHtml=infoFields.length
+    ? `<div class="hub-info-grid">${infoFields.map(([k,v])=>`<span class="hub-info-key">${k}</span><span class="hub-info-val">${esc(v)}</span>`).join('')}</div>`
+    : '';
+
   // Operate button only for matches 0-2 (OPERATOR view can show them)
   const opBtn = i<3 ? `<button class="hub-card-btn op" onclick="operateMatch(${i})" title="Switch to OPERATOR">OP</button>` : '';
   const remBtn = i>0 ? `<button class="hub-card-btn rem" onclick="removeHubMatch(${i})" title="Remove match">✕</button>` : '';
@@ -2050,13 +2116,90 @@ function buildHubCard(i,now){
       ${teamsHtml?`<div class="hub-teams">${teamsHtml}</div>`:''}
       <div class="hub-local-time" data-hub-clock-mi="${i}">${getTimeInTz(matchTzs[i])}</div>
     </div>
-    <div class="hub-timers">${timersHtml}</div>`;
+    <div class="hub-timers">${timersHtml}</div>
+    ${infoHtml}`;
   return card;
 }
 
 function setEmAlign(a){
   ['left','center','right'].forEach(v=>document.getElementById(`em-align-${v}`)?.classList.toggle('active',v===a));
   ctx.timerNameAlign=a;
+}
+
+// ── SCHEDULE PARSER ──────────────────────────────────────
+// Team database: abbr = primary abbreviation, alt = other known codes
+const SCHED_TEAMS = {
+  AFL:[
+    {abbr:'ADE', name:'Adelaide Crows',      alt:['ADEL']},
+    {abbr:'BRI', name:'Brisbane Lions',       alt:['BRIS','LION']},
+    {abbr:'CAR', name:'Carlton',              alt:[]},
+    {abbr:'COL', name:'Collingwood',          alt:['COLL']},
+    {abbr:'ESS', name:'Essendon',             alt:[]},
+    {abbr:'FRE', name:'Fremantle',            alt:[]},
+    {abbr:'GCS', name:'Gold Coast Suns',      alt:['GC','GCK']},
+    {abbr:'GWS', name:'GWS Giants',           alt:['GIA','GIANTS','GWSG']},
+    {abbr:'HAW', name:'Hawthorn',             alt:[]},
+    {abbr:'MEL', name:'Melbourne',            alt:['MELB','DEES']},
+    {abbr:'NM',  name:'North Melbourne',      alt:['NMFC','NTH','NORTH']},
+    {abbr:'PTA', name:'Port Adelaide',        alt:['PORT','PADL','PA']},
+    {abbr:'RIC', name:'Richmond',             alt:['RICH']},
+    {abbr:'STK', name:'St Kilda',             alt:['SKT']},
+    {abbr:'SYD', name:'Sydney Swans',         alt:['SWAN']},
+    {abbr:'WCE', name:'West Coast Eagles',    alt:['WC','WEST']},
+    {abbr:'WBD', name:'Western Bulldogs',     alt:['BULL','WB','WBULL']},
+    {abbr:'GEE', name:'Geelong Cats',         alt:['GEL','GEEL']},
+  ],
+  Netball:[
+    {abbr:'ADE', name:'Adelaide Thunderbirds',      alt:['TBRD','THU','THBRD']},
+    {abbr:'COL', name:'Collingwood Magpies',         alt:['MAG']},
+    {abbr:'GIA', name:'GIANTS Netball',              alt:['GWS','GIANT']},
+    {abbr:'MEL', name:'Melbourne Mavericks',         alt:['MAV','MAVS']},
+    {abbr:'NSW', name:'NSW Swifts',                  alt:['SWI','SWF','SWIFT']},
+    {abbr:'QLD', name:'Queensland Firebirds',        alt:['FBD','FBRD','FIRE']},
+    {abbr:'SSW', name:'Sunshine Coast Lightning',    alt:['LIG','LGTN','LIGHT']},
+    {abbr:'VIX', name:'Melbourne Vixens',            alt:[]},
+    {abbr:'WNT', name:'West Coast Fever',            alt:['FVR','FEV','FEVER']},
+  ],
+};
+
+function fuzzyMatchTeam(token, sport){
+  if(!token) return null;
+  const a=token.toUpperCase().trim();
+  // Priority order: preferred sport first, then all sports
+  const preferred = SCHED_TEAMS[sport]||[];
+  const others = Object.values(SCHED_TEAMS).flat().filter(t=>!preferred.includes(t));
+  const list = [...preferred,...others];
+  // 1. Exact primary abbr
+  for(const t of list) if(t.abbr===a) return t;
+  // 2. Exact alt abbr
+  for(const t of list) if(t.alt.includes(a)) return t;
+  // 3. Initials match (e.g. "NM" → "North Melbourne")
+  const initials = t => t.name.split(' ').map(w=>w[0]).join('').toUpperCase();
+  for(const t of list) if(initials(t)===a) return t;
+  // 4. Name starts with token
+  for(const t of list) if(t.name.toUpperCase().startsWith(a)) return t;
+  // 5. Abbr/alt ends with token (e.g. "PADL" → Port Adelaide via alt "PADL")
+  for(const t of list) if(t.abbr.endsWith(a)||t.alt.some(x=>x.endsWith(a))) return t;
+  return null;
+}
+
+function applySchedule(){
+  const raw=document.getElementById('em-schedule').value.trim();
+  if(!raw) return;
+  // Split on "v", "vs", "-" separator (with optional spaces) or plain space
+  const parts=raw.split(/\s+(?:vs?|[-–])\s+|\s+/i).map(s=>s.trim()).filter(Boolean);
+  const sport=document.getElementById('em-sport').value||'';
+  if(parts.length>=1){
+    const h=fuzzyMatchTeam(parts[0],sport);
+    document.getElementById('em-home').value=h?h.name.toUpperCase():parts[0].toUpperCase();
+    if(h&&h.colour) document.getElementById('em-home-c').value=h.colour;
+  }
+  if(parts.length>=2){
+    const a=fuzzyMatchTeam(parts[parts.length-1],sport);
+    document.getElementById('em-away').value=a?a.name.toUpperCase():parts[parts.length-1].toUpperCase();
+    if(a&&a.colour) document.getElementById('em-away-c').value=a.colour;
+  }
+  if(sport){ renderTeamPicker('home',sport); renderTeamPicker('away',sport); }
 }
 
 function operateMatch(i){
