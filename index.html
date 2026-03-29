@@ -523,6 +523,111 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   opacity:0;transition:all .22s;pointer-events:none;z-index:300;white-space:nowrap;
 }
 #toast.show{ opacity:1;transform:translateX(-50%) translateY(0); }
+
+/* ─── VIEW TOGGLE ──────────────────────────────────────── */
+.view-toggle-wrap{ display:flex;border:1px solid var(--border-bright);border-radius:4px;overflow:hidden;flex-shrink:0; }
+.vtb{
+  background:transparent;border:none;border-right:1px solid var(--border-bright);
+  color:var(--text-dim);font-family:var(--display);font-size:11px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:6px 14px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.vtb:last-child{ border-right:none; }
+.vtb:hover{ color:var(--text);background:var(--surface2); }
+.vtb.active{ background:var(--accent2);color:#000; }
+.vtb.hub.active{ background:var(--purple);color:#fff; }
+
+/* ─── HUB VIEW ─────────────────────────────────────────── */
+#hub-view{ display:flex;flex-direction:column;flex:1;min-height:0;gap:6px; }
+.hub-layout-bar{ display:flex;align-items:center;gap:10px;flex-shrink:0;padding:0 2px; }
+.hub-layout-label{ font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase; }
+.hub-col-btns{ display:flex;border:1px solid var(--border-bright);border-radius:4px;overflow:hidden; }
+.hcb{
+  background:transparent;border:none;border-right:1px solid var(--border-bright);
+  color:var(--text-dim);font-family:var(--display);font-size:10px;font-weight:600;
+  letter-spacing:1px;text-transform:uppercase;padding:4px 10px;cursor:pointer;
+  transition:all .15s;
+}
+.hcb:last-child{ border-right:none; }
+.hcb:hover{ color:var(--text);background:var(--surface2); }
+.hcb.active{ background:var(--purple);color:#fff; }
+.hub-active-badge{ font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-left:auto;letter-spacing:1px; }
+
+#hub-grid{
+  display:grid;gap:6px;flex:1;min-height:0;overflow-y:auto;align-content:start;
+  grid-template-columns:repeat(4,1fr);
+}
+#hub-grid::-webkit-scrollbar{ width:4px; }
+#hub-grid::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+
+.hub-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;
+  display:flex;flex-direction:column;overflow:hidden;transition:border-color .15s;
+  min-height:120px;
+}
+.hub-card:hover{ border-color:var(--border-bright); }
+.hub-card-head{
+  background:var(--surface2);border-bottom:2px solid var(--accent);
+  padding:5px 7px 4px;flex-shrink:0;
+}
+.hub-card-head-row{ display:flex;align-items:center;gap:4px; }
+.hub-card-label{
+  font-family:var(--display);font-size:10px;font-weight:600;letter-spacing:2px;
+  color:var(--accent);text-transform:uppercase;flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.hub-card-acts{ display:flex;gap:3px;flex-shrink:0; }
+.hub-card-btn{
+  background:none;border:1px solid var(--border-bright);border-radius:3px;
+  color:var(--text-dim);font-size:9px;padding:1px 5px;cursor:pointer;
+  transition:all .15s;font-family:var(--display);letter-spacing:.5px;line-height:1.5;
+}
+.hub-card-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.hub-card-btn.op:hover{ border-color:var(--accent2);color:var(--accent2); }
+.hub-card-btn.rem:hover{ border-color:var(--red);color:var(--red); }
+.hub-teams{
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--text-mid);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;margin-top:3px;line-height:1.2;
+}
+.hub-timers{
+  flex:1;overflow-y:auto;padding:3px 5px;display:flex;flex-direction:column;
+  gap:2px;min-height:0;
+}
+.hub-timers::-webkit-scrollbar{ width:3px; }
+.hub-timers::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+.hub-timer-row{
+  display:grid;grid-template-columns:1fr 38px 58px;align-items:center;gap:4px;
+  padding:2px 4px;border-left:2px solid var(--border-bright);border-radius:2px;
+  background:rgba(0,0,0,.18);min-height:20px;
+}
+.hub-timer-row.core{ border-left-color:var(--accent2); }
+.hub-timer-row.countdown-warning{ background:rgba(255,214,0,.06); }
+.hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);animation:pulse-border 1s infinite; }
+.hub-t-name{
+  font-family:var(--ui);font-size:9px;font-weight:600;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--text-mid);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.hub-t-time{ font-family:var(--mono);font-size:9px;color:var(--text-dim);text-align:right;white-space:nowrap; }
+.hub-t-cd{ font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;text-align:right;white-space:nowrap; }
+.hub-t-cd.positive{ color:var(--green); }
+.hub-t-cd.warning { color:var(--yellow); }
+.hub-t-cd.live    { color:var(--red); }
+.hub-t-cd.past    { color:var(--text-dim); }
+.hub-empty-slot{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:9px;letter-spacing:2px;
+  color:var(--border-bright);text-transform:uppercase;min-height:60px;
+  border:1px dashed var(--border);border-radius:5px;opacity:.4;
+}
+.hub-add-card{
+  display:flex;align-items:center;justify-content:center;gap:6px;min-height:60px;
+  border:2px dashed var(--border-bright);border-radius:5px;background:transparent;
+  color:var(--text-dim);font-family:var(--display);font-size:10px;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;
+}
+.hub-add-card:hover{ border-color:var(--green);color:var(--green);background:rgba(0,255,136,.03); }
 </style>
 </head>
 <body>
@@ -591,6 +696,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       <div class="hub-label">HUB LOCAL</div>
       <div class="hub-clock" id="hub-clock">--:--:--</div>
       <div class="top-bar-spacer"></div>
+      <div class="view-toggle-wrap">
+        <button class="vtb active" id="vtb-op"  onclick="switchView('operator')">OPERATOR</button>
+        <button class="vtb hub"   id="vtb-hub" onclick="switchView('hub')">HUB</button>
+      </div>
       <div class="options-wrap" id="options-wrap">
         <button class="opts-cog-btn" id="opts-cog-btn" onclick="toggleOptions(event)" title="Options">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -692,6 +801,22 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <span class="add-match-label">ADD<br>MATCH</span>
         </button>
       </div>
+    </div>
+
+    <!-- HUB VIEW -->
+    <div id="hub-view" style="display:none">
+      <div class="hub-layout-bar">
+        <span class="hub-layout-label">LAYOUT</span>
+        <div class="hub-col-btns">
+          <button class="hcb" id="hcb-2" onclick="setHubCols(2)">2</button>
+          <button class="hcb" id="hcb-3" onclick="setHubCols(3)">3</button>
+          <button class="hcb active" id="hcb-4" onclick="setHubCols(4)">4</button>
+          <button class="hcb" id="hcb-6" onclick="setHubCols(6)">6</button>
+          <button class="hcb" id="hcb-8" onclick="setHubCols(8)">8</button>
+        </div>
+        <span class="hub-active-badge" id="hub-active-count">0 ACTIVE</span>
+      </div>
+      <div id="hub-grid"></div>
     </div>
 
     <div id="status-bar">
@@ -870,14 +995,14 @@ const TZ_GROUPS = [
 let hubTz       = 'Australia/Sydney';
 let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
-let matchTzs    = ['Australia/Sydney','Australia/Sydney','Australia/Sydney'];
-let matchVisible = [true,false,false];
-let matchEnabled = [true,false,false];
-let matchMeta   = [
-  {label:'MATCH 1',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
-  {label:'MATCH 2',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
-  {label:'MATCH 3',home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null},
-];
+let viewMode    = 'operator'; // 'operator' | 'hub'
+let hubCols     = 4;
+const MAX_MATCHES = 16;
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null}; }
+let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
+let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
+let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
+let matchMeta   = Array.from({length:MAX_MATCHES}, (_,i)=>_defMeta(i));
 
 // ── SPORTS DATA ──────────────────────────────────────────────
 const SPORTS_DATA = {
@@ -924,14 +1049,8 @@ function _badgeTextColor(team){
   if(lum<0.12) return team.secondary;
   return '#ffffff';
 }
-let matchTimers = [
-  [{id:uid(),name:'ON AIR',    core:true,timeStr:null,targetUTC:null},
-   {id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}],
-  [{id:uid(),name:'ON AIR',    core:true,timeStr:null,targetUTC:null},
-   {id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}],
-  [{id:uid(),name:'ON AIR',    core:true,timeStr:null,targetUTC:null},
-   {id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}],
-];
+function _defTimers(){ return [{id:uid(),name:'ON AIR',core:true,timeStr:null,targetUTC:null},{id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}]; }
+let matchTimers = Array.from({length:MAX_MATCHES}, ()=>_defTimers());
 let ctx = {}; // modal context
 
 // ── Showfile state ────────────────────────────────────────
@@ -1109,10 +1228,11 @@ async function loadSf(id){
 }
 
 function buildPayload(name){
-  // Firestore doesn't support nested arrays — flatten matchTimers into objects
-  const timers0 = matchTimers[0].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
-  const timers1 = matchTimers[1].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
-  const timers2 = matchTimers[2].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+  // Firestore doesn't support nested arrays — flatten matchTimers into keyed objects
+  const timerKeys = {};
+  for(let i=0;i<MAX_MATCHES;i++){
+    timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+  }
   return {
     name: name||sfName||'Untitled',
     updatedAt: window._fb.serverTimestamp(),
@@ -1121,33 +1241,51 @@ function buildPayload(name){
       hubTz,
       teamDisplayMode,
       logoSizeMode,
+      hubCols,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
       matchEnabled:[...matchEnabled],
       matchMeta: matchMeta.map(m=>({...m})),
-      // Stored as separate keys to avoid nested arrays
-      timers0, timers1, timers2
+      ...timerKeys
     }
   };
 }
 
 function applyState(s){
-  if (s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
-  if (s.teamDisplayMode) { teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
-  if (s.logoSizeMode)    { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
-  if (s.matchTzs)     matchTzs=[...s.matchTzs];
-  if (s.matchVisible) matchVisible=[...s.matchVisible];
-  if (s.matchEnabled) matchEnabled=[...s.matchEnabled];
-  if (s.matchMeta)    matchMeta=s.matchMeta.map(m=>({...m}));
-  // Support both old nested array format and new flat format
-  if (s.timers0 !== undefined) {
-    matchTimers = [s.timers0, s.timers1||[], s.timers2||[]].map((mt,mi)=>
-      mt.map(t=>({...t, targetUTC: t.timeStr ? localToUTC(t.timeStr, s.matchTzs?.[mi]||matchTzs[mi]) : null}))
-    );
-  } else if (s.matchTimers) {
-    matchTimers=s.matchTimers.map((mt,mi)=>
-      mt.map(t=>({...t, targetUTC: t.timeStr ? localToUTC(t.timeStr, s.matchTzs?.[mi]||matchTzs[mi]) : null}))
-    );
+  if(s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
+  if(s.teamDisplayMode){ teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
+  if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
+  if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
+  // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
+  if(s.matchTzs){
+    matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
+    s.matchTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES) matchTzs[i]=tz; });
+  }
+  if(s.matchVisible){
+    matchVisible = Array(MAX_MATCHES).fill(false);
+    s.matchVisible.forEach((v,i)=>{ if(i<MAX_MATCHES) matchVisible[i]=v; });
+  }
+  if(s.matchEnabled){
+    matchEnabled = Array(MAX_MATCHES).fill(false);
+    s.matchEnabled.forEach((v,i)=>{ if(i<MAX_MATCHES) matchEnabled[i]=v; });
+  }
+  if(s.matchMeta){
+    matchMeta = Array.from({length:MAX_MATCHES}, (_,i)=>s.matchMeta[i] ? {...s.matchMeta[i]} : _defMeta(i));
+  }
+  // Load timers — support new per-key format, old flat format, and legacy nested array
+  if(s.timers0 !== undefined){
+    // New format: timers0…timers15
+    for(let i=0;i<MAX_MATCHES;i++){
+      const key=`timers${i}`;
+      if(s[key]){
+        matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,matchTzs[i]):null}));
+      }
+    }
+  } else if(s.matchTimers){
+    // Legacy nested array format
+    s.matchTimers.forEach((mt,i)=>{
+      if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,matchTzs[i]):null}));
+    });
   }
   [0,1,2].forEach(i=>{
     const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
@@ -1259,10 +1397,11 @@ async function importJSON(e){
 
 // ── SELECTS ──────────────────────────────────────────────
 function populateSelects(){
-  ['hub-tz','match-tz-0','match-tz-1','match-tz-2','em-tz'].forEach((id,i)=>{
+  const tzSelIds = ['hub-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz'];
+  tzSelIds.forEach(id=>{
     const sel=document.getElementById(id);
-    if (!sel||sel.options.length) return;
-    const def=['Australia/Sydney','Australia/Sydney','Australia/Sydney','Australia/Sydney'][i];
+    if(!sel||sel.options.length) return;
+    const def='Australia/Sydney';
     TZ_GROUPS.forEach(({group,zones})=>{
       const og=document.createElement('optgroup'); og.label=group;
       zones.forEach(({label,tz})=>{
@@ -1313,7 +1452,7 @@ function fmtCountdown(ms){
 function pad(n){ return String(n).padStart(2,'0'); }
 
 // ── RENDER ───────────────────────────────────────────────
-function renderAll(){ renderHeaders(); renderTimers(); }
+function renderAll(){ renderHeaders(); renderTimers(); if(viewMode==='hub') renderHubGrid(); }
 
 // ── TIMER DRAG-TO-REORDER ─────────────────────────────────
 let _timerDragging=false, _dragMi=null, _dragFromIdx=null;
@@ -1470,20 +1609,50 @@ function startClock(){
     document.getElementById('hub-clock').textContent  = getTimeInTz(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
     [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[i]); });
-    renderTimers();
+    if(viewMode==='operator') renderTimers();
+    else updateHubCountdowns();
   }
   tick(); setInterval(tick,1000);
 }
 
 // ── MATCH MGMT ───────────────────────────────────────────
 function addMatch(){
-  for(let i=1;i<3;i++){ if(!matchVisible[i]){ matchVisible[i]=matchEnabled[i]=true; document.getElementById(`match-col-${i}`).classList.remove('hidden-match'); updateAddMatchBtn(); scheduleSave(); return; } }
+  // OPERATOR only uses slots 0-2
+  for(let i=1;i<3;i++){
+    if(!matchVisible[i]){
+      matchVisible[i]=matchEnabled[i]=true;
+      document.getElementById(`match-col-${i}`).classList.remove('hidden-match');
+      updateAddMatchBtn(); scheduleSave(); return;
+    }
+  }
+}
+function addHubMatch(){
+  // HUB can add any slot 0-15
+  for(let i=0;i<MAX_MATCHES;i++){
+    if(!matchVisible[i]){
+      matchVisible[i]=matchEnabled[i]=true;
+      if(i<3){ document.getElementById(`match-col-${i}`).classList.remove('hidden-match'); updateAddMatchBtn(); }
+      scheduleSave(); renderHubGrid(); return;
+    }
+  }
+  toast('MAX 16 MATCHES REACHED');
 }
 function removeMatch(i){
+  // Called from OPERATOR ✕ buttons (slots 1 and 2)
   matchVisible[i]=matchEnabled[i]=false;
   document.getElementById(`match-col-${i}`).classList.add('hidden-match');
   if(i===1&&matchVisible[2]){ matchVisible[2]=matchEnabled[2]=false; document.getElementById('match-col-2').classList.add('hidden-match'); }
   updateAddMatchBtn(); scheduleSave();
+}
+function removeHubMatch(i){
+  // Called from HUB card × buttons
+  matchVisible[i]=matchEnabled[i]=false;
+  if(i<3){
+    document.getElementById(`match-col-${i}`).classList.add('hidden-match');
+    if(i===1&&matchVisible[2]){ matchVisible[2]=matchEnabled[2]=false; document.getElementById('match-col-2').classList.add('hidden-match'); }
+    updateAddMatchBtn();
+  }
+  scheduleSave(); renderHubGrid();
 }
 function updateAddMatchBtn(){ document.getElementById('add-match-col').classList.toggle('hidden',matchVisible[1]&&matchVisible[2]); }
 
@@ -1521,11 +1690,13 @@ function confirmSetTime(){
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi]);
   closeModal('modal-set-time'); scheduleSave();
+  if(viewMode==='hub') renderHubGrid();
 }
 function clearTime(){
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   t.timeStr=null; t.targetUTC=null;
   closeModal('modal-set-time'); scheduleSave();
+  if(viewMode==='hub') renderHubGrid();
 }
 
 function openAddTimer(mi){
@@ -1608,7 +1779,7 @@ function confirmEditMatch(){
     homeTeamRef:findTeamRef(sport,home),
     awayTeamRef:findTeamRef(sport,away),
   };
-  closeModal('modal-edit-match'); renderHeaders(); scheduleSave();
+  closeModal('modal-edit-match'); renderAll(); scheduleSave();
 }
 
 function syncTyped(p){
@@ -1740,13 +1911,174 @@ function getTeamBadgeMiniHTML(teamRef){
   return `<span class="team-badge-mini${szCls}" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
 }
 
+// ── VIEW SWITCHING ────────────────────────────────────────
+function switchView(mode){
+  viewMode=mode;
+  const mg=document.getElementById('matches-grid');
+  const hv=document.getElementById('hub-view');
+  mg.style.display = mode==='operator' ? '' : 'none';
+  hv.style.display = mode==='hub'      ? '' : 'none';
+  document.getElementById('vtb-op').classList.toggle('active',  mode==='operator');
+  document.getElementById('vtb-hub').classList.toggle('active', mode==='hub');
+  if(mode==='hub') renderHubGrid();
+}
+
+// ── HUB LAYOUT ────────────────────────────────────────────
+function setHubCols(n, silent){
+  hubCols=n;
+  [2,3,4,6,8].forEach(c=>document.getElementById(`hcb-${c}`)?.classList.toggle('active',c===n));
+  const grid=document.getElementById('hub-grid');
+  if(grid) grid.style.gridTemplateColumns=`repeat(${n},1fr)`;
+  if(!silent) scheduleSave();
+}
+
+// ── HUB RENDER ────────────────────────────────────────────
+const HUB_COLORS=[
+  'var(--accent)','var(--accent2)','var(--purple)','var(--green)',
+  '#ffd600','#ff9100','#ec407a','#26c6da',
+  '#66bb6a','#ef5350','#7e57c2','#29b6f6',
+  '#ff7043','#d4e157','#ab47bc','#5c6bc0'
+];
+
+function renderHubGrid(){
+  const grid=document.getElementById('hub-grid');
+  if(!grid) return;
+  grid.style.gridTemplateColumns=`repeat(${hubCols},1fr)`;
+  grid.innerHTML='';
+  const now=Date.now();
+  const active=matchVisible.filter(Boolean).length;
+  document.getElementById('hub-active-count').textContent=`${active} ACTIVE`;
+
+  for(let i=0;i<MAX_MATCHES;i++){
+    if(matchVisible[i]) grid.appendChild(buildHubCard(i,now));
+  }
+
+  // "Add match" card (if room remains)
+  if(active<MAX_MATCHES){
+    const btn=document.createElement('button');
+    btn.className='hub-add-card';
+    btn.innerHTML='<span style="font-size:16px;font-family:var(--mono)">+</span>&nbsp;ADD MATCH';
+    btn.onclick=addHubMatch;
+    grid.appendChild(btn);
+  }
+}
+
+function buildHubCard(i,now){
+  const m=matchMeta[i];
+  const timers=matchTimers[i];
+  const color=HUB_COLORS[i]||'var(--accent)';
+
+  // Teams line
+  let teamsHtml='';
+  if(m.home||m.away){
+    const hName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
+    const aName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+    if(m.away){
+      teamsHtml=`<span style="color:${m.homeColour}">${esc(hName)}</span>`+
+                `<span style="color:var(--text-dim);font-size:8px;margin:0 3px">VS</span>`+
+                `<span style="color:${m.awayColour}">${esc(aName)}</span>`;
+    } else {
+      teamsHtml=`<span style="color:${m.homeColour}">${esc(hName)}</span>`;
+    }
+  }
+
+  // Timer rows
+  const timersHtml=timers.map(t=>{
+    const diff=t.targetUTC?t.targetUTC-now:null;
+    let cls='positive',txt='--:--';
+    if(diff!==null){
+      if(diff<0)      {cls='past';   txt=fmtCountdown(diff);}
+      else if(diff<6e4){cls='live';  txt=fmtCountdown(diff);}
+      else if(diff<6e5){cls='warning';txt=fmtCountdown(diff);}
+      else             {cls='positive';txt=fmtCountdown(diff);}
+    }
+    const rowCls=(t.core?'core':'')+(diff!==null&&diff>=0&&diff<6e4?' countdown-live':diff!==null&&diff>=0&&diff<6e5?' countdown-warning':'');
+    return `<div class="hub-timer-row ${rowCls}">
+      <div class="hub-t-name">${esc(t.name)}</div>
+      <div class="hub-t-time" onclick="openSetTime(${i},'${t.id}')" style="cursor:pointer;border-bottom:1px dashed var(--border-bright);padding-bottom:1px" title="Set time">${t.timeStr||'--:--'}</div>
+      <div class="hub-t-cd ${cls}" data-hub-tid="${t.id}">${txt}</div>
+    </div>`;
+  }).join('');
+
+  // Operate button only for matches 0-2 (OPERATOR view can show them)
+  const opBtn = i<3 ? `<button class="hub-card-btn op" onclick="operateMatch(${i})" title="Switch to OPERATOR">OP</button>` : '';
+  const remBtn = i>0 ? `<button class="hub-card-btn rem" onclick="removeHubMatch(${i})" title="Remove match">✕</button>` : '';
+
+  const card=document.createElement('div');
+  card.className='hub-card';
+  card.innerHTML=`
+    <div class="hub-card-head" style="border-bottom-color:${color}">
+      <div class="hub-card-head-row">
+        <div class="hub-card-label" style="color:${color}">${esc(m.label)}</div>
+        <div class="hub-card-acts">
+          <button class="hub-card-btn" onclick="openEditMatch(${i})" title="Edit">✎</button>
+          ${opBtn}${remBtn}
+        </div>
+      </div>
+      ${teamsHtml?`<div class="hub-teams">${teamsHtml}</div>`:''}
+    </div>
+    <div class="hub-timers">${timersHtml}</div>`;
+  return card;
+}
+
+function operateMatch(i){
+  if(i<3){
+    matchVisible[i]=matchEnabled[i]=true;
+    document.getElementById(`match-col-${i}`).classList.remove('hidden-match');
+    updateAddMatchBtn();
+  }
+  switchView('operator');
+}
+
+function updateHubCountdowns(){
+  const now=Date.now();
+  document.querySelectorAll('[data-hub-tid]').forEach(el=>{
+    const tid=el.dataset.hubTid;
+    let t=null;
+    for(let mi=0;mi<MAX_MATCHES;mi++){
+      const found=matchTimers[mi].find(x=>x.id===tid);
+      if(found){t=found;break;}
+    }
+    if(!t) return;
+    const diff=t.targetUTC?t.targetUTC-now:null;
+    let cls='positive',txt='--:--';
+    if(diff!==null){
+      if(diff<0)      {cls='past';   txt=fmtCountdown(diff);}
+      else if(diff<6e4){cls='live';  txt=fmtCountdown(diff);}
+      else if(diff<6e5){cls='warning';txt=fmtCountdown(diff);}
+      else             {cls='positive';txt=fmtCountdown(diff);}
+    }
+    el.textContent=txt;
+    el.className=`hub-t-cd ${cls}`;
+    // Update parent row state classes for live/warning pulse
+    const row=el.closest('.hub-timer-row');
+    if(row){
+      row.classList.toggle('countdown-live',    diff!==null&&diff>=0&&diff<6e4);
+      row.classList.toggle('countdown-warning', diff!==null&&diff>=0&&diff<6e5&&diff>=6e4);
+    }
+  });
+}
+
 // ── TOAST ─────────────────────────────────────────────────
 let _t; function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>el.classList.remove('show'),2200); }
 </script>
 <!-- Hidden match TZ selects — kept for populateSelects / applyState compatibility -->
 <div style="display:none" aria-hidden="true">
-  <select id="match-tz-0" onchange="onMatchTzChange(0)"></select>
-  <select id="match-tz-1" onchange="onMatchTzChange(1)"></select>
+  <select id="match-tz-0"  onchange="onMatchTzChange(0)"></select>
+  <select id="match-tz-1"  onchange="onMatchTzChange(1)"></select>
+  <select id="match-tz-3"  onchange="onMatchTzChange(3)"></select>
+  <select id="match-tz-4"  onchange="onMatchTzChange(4)"></select>
+  <select id="match-tz-5"  onchange="onMatchTzChange(5)"></select>
+  <select id="match-tz-6"  onchange="onMatchTzChange(6)"></select>
+  <select id="match-tz-7"  onchange="onMatchTzChange(7)"></select>
+  <select id="match-tz-8"  onchange="onMatchTzChange(8)"></select>
+  <select id="match-tz-9"  onchange="onMatchTzChange(9)"></select>
+  <select id="match-tz-10" onchange="onMatchTzChange(10)"></select>
+  <select id="match-tz-11" onchange="onMatchTzChange(11)"></select>
+  <select id="match-tz-12" onchange="onMatchTzChange(12)"></select>
+  <select id="match-tz-13" onchange="onMatchTzChange(13)"></select>
+  <select id="match-tz-14" onchange="onMatchTzChange(14)"></select>
+  <select id="match-tz-15" onchange="onMatchTzChange(15)"></select>
   <select id="match-tz-2" onchange="onMatchTzChange(2)"></select>
 </div>
 </body>
