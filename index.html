@@ -563,7 +563,6 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-card{
   background:var(--surface);border:1px solid var(--border);border-radius:5px;
   display:flex;flex-direction:column;overflow:hidden;transition:border-color .15s;
-  min-height:120px;
 }
 .hub-card:hover{ border-color:var(--border-bright); }
 .hub-card-head{
@@ -572,46 +571,59 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 }
 .hub-card-head-row{ display:flex;align-items:center;gap:4px; }
 .hub-card-label{
-  font-family:var(--display);font-size:10px;font-weight:600;letter-spacing:2px;
+  font-family:var(--display);font-size:calc(10px * var(--hub-fs,1));font-weight:600;letter-spacing:2px;
   color:var(--accent);text-transform:uppercase;flex:1;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;
 }
 .hub-card-acts{ display:flex;gap:3px;flex-shrink:0; }
 .hub-card-btn{
   background:none;border:1px solid var(--border-bright);border-radius:3px;
-  color:var(--text-dim);font-size:9px;padding:1px 5px;cursor:pointer;
+  color:var(--text-dim);font-size:calc(9px * var(--hub-fs,1));padding:1px 5px;cursor:pointer;
   transition:all .15s;font-family:var(--display);letter-spacing:.5px;line-height:1.5;
 }
 .hub-card-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .hub-card-btn.op:hover{ border-color:var(--accent2);color:var(--accent2); }
 .hub-card-btn.rem:hover{ border-color:var(--red);color:var(--red); }
 .hub-teams{
-  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;
+  font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;letter-spacing:.04em;
   text-transform:uppercase;color:var(--text-mid);white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;margin-top:3px;line-height:1.2;
 }
 .hub-timers{
   flex:1;overflow-y:auto;padding:3px 5px;display:flex;flex-direction:column;
-  gap:2px;min-height:0;
+  gap:3px;min-height:0;
 }
 .hub-timers::-webkit-scrollbar{ width:3px; }
 .hub-timers::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+/* Stacked timer row: name on top, time-set left / countdown right below */
 .hub-timer-row{
-  display:grid;grid-template-columns:1fr 38px 58px;align-items:center;gap:4px;
-  padding:2px 4px;border-left:2px solid var(--border-bright);border-radius:2px;
-  background:rgba(0,0,0,.18);min-height:20px;
+  display:flex;flex-direction:column;gap:1px;
+  padding:3px 5px;border-left:2px solid var(--border-bright);border-radius:2px;
+  background:rgba(0,0,0,.18);
 }
 .hub-timer-row.core{ border-left-color:var(--accent2); }
 .hub-timer-row.countdown-warning{ background:rgba(255,214,0,.06); }
 .hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);animation:pulse-border 1s infinite; }
 .hub-t-name{
-  font-family:var(--ui);font-size:9px;font-weight:600;letter-spacing:.5px;
+  font-family:var(--ui);font-size:calc(9px * var(--hub-fs,1));font-weight:600;letter-spacing:.5px;
   text-transform:uppercase;color:var(--text-mid);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;
+  overflow:hidden;text-overflow:ellipsis;line-height:1.2;
 }
-.hub-t-time{ font-family:var(--mono);font-size:9px;color:var(--text-dim);text-align:right;white-space:nowrap; }
-.hub-local-time{ font-family:var(--mono);font-size:14px;font-weight:700;color:#fff;letter-spacing:.08em;line-height:1;margin-top:4px;text-align:center;width:100%; }
-.hub-t-cd{ font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;text-align:right;white-space:nowrap; }
+.hub-t-time-row{ display:flex;justify-content:space-between;align-items:center; }
+.hub-t-time{
+  font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1));color:var(--text-dim);
+  white-space:nowrap;cursor:pointer;border-bottom:1px dashed var(--border-bright);
+  padding-bottom:1px;line-height:1.2;
+}
+.hub-t-time:hover{ color:var(--accent);border-color:var(--accent); }
+.hub-local-time{
+  font-family:var(--mono);font-size:calc(14px * var(--hub-fs,1));font-weight:700;
+  color:#fff;letter-spacing:.08em;line-height:1;margin-top:4px;text-align:center;width:100%;
+}
+.hub-t-cd{
+  font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;
+  letter-spacing:.04em;white-space:nowrap;line-height:1.2;
+}
 .hub-t-cd.positive{ color:var(--green); }
 .hub-t-cd.warning { color:var(--yellow); }
 .hub-t-cd.live    { color:var(--red); }
@@ -922,6 +934,15 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
       </div>
     </div>
+    <div class="modal-divider">HUB DISPLAY</div>
+    <div class="opts-row" style="padding:4px 0">
+      <span class="opts-label">TIMER NAME ALIGN</span>
+      <div class="name-mode-btns">
+        <button class="nmb" id="em-align-left"   onclick="setEmAlign('left')">LEFT</button>
+        <button class="nmb" id="em-align-center" onclick="setEmAlign('center')">CENTER</button>
+        <button class="nmb" id="em-align-right"  onclick="setEmAlign('right')">RIGHT</button>
+      </div>
+    </div>
     <div class="modal-buttons">
       <button class="btn btn-cancel"  onclick="closeModal('modal-edit-match')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmEditMatch()">SAVE</button>
@@ -999,7 +1020,7 @@ let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left'}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1755,6 +1776,7 @@ function openEditMatch(i){
   renderTeamPicker('home',sport);
   renderTeamPicker('away',sport);
   document.getElementById('em-tz').value=matchTzs[i];
+  setEmAlign(m.timerNameAlign||'left');
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
@@ -1779,6 +1801,7 @@ function confirmEditMatch(){
     sport,
     homeTeamRef:findTeamRef(sport,home),
     awayTeamRef:findTeamRef(sport,away),
+    timerNameAlign: ctx.timerNameAlign||'left',
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
 }
@@ -1949,6 +1972,10 @@ function renderHubGrid(){
   const now=Date.now();
   const active=matchVisible.filter(Boolean).length;
   document.getElementById('hub-active-count').textContent=`${active} ACTIVE`;
+  // Font scale: fewer rows = bigger text
+  const rows=Math.max(1,Math.ceil(active/hubCols));
+  const fs=rows<=1?1.75:rows<=2?1.35:rows<=3?1.1:rows<=4?1.0:0.88;
+  grid.style.setProperty('--hub-fs',fs);
 
   for(let i=0;i<MAX_MATCHES;i++){
     if(matchVisible[i]) grid.appendChild(buildHubCard(i,now));
@@ -1983,7 +2010,8 @@ function buildHubCard(i,now){
     }
   }
 
-  // Timer rows
+  // Timer rows — stacked: name on top, time-set left / countdown right
+  const nameAlign=m.timerNameAlign||'left';
   const timersHtml=timers.map(t=>{
     const diff=t.targetUTC?t.targetUTC-now:null;
     let cls='positive',txt='--:--';
@@ -1995,9 +2023,11 @@ function buildHubCard(i,now){
     }
     const rowCls=(t.core?'core':'')+(diff!==null&&diff>=0&&diff<6e4?' countdown-live':diff!==null&&diff>=0&&diff<6e5?' countdown-warning':'');
     return `<div class="hub-timer-row ${rowCls}">
-      <div class="hub-t-name">${esc(t.name)}</div>
-      <div class="hub-t-time" onclick="openSetTime(${i},'${t.id}')" style="cursor:pointer;border-bottom:1px dashed var(--border-bright);padding-bottom:1px" title="Set time">${t.timeStr||'--:--'}</div>
-      <div class="hub-t-cd ${cls}" data-hub-tid="${t.id}">${txt}</div>
+      <div class="hub-t-name" style="text-align:${nameAlign}">${esc(t.name)}</div>
+      <div class="hub-t-time-row">
+        <div class="hub-t-time" onclick="openSetTime(${i},'${t.id}')" title="Set time">${t.timeStr||'--:--'}</div>
+        <div class="hub-t-cd ${cls}" data-hub-tid="${t.id}">${txt}</div>
+      </div>
     </div>`;
   }).join('');
 
@@ -2021,6 +2051,11 @@ function buildHubCard(i,now){
     </div>
     <div class="hub-timers">${timersHtml}</div>`;
   return card;
+}
+
+function setEmAlign(a){
+  ['left','center','right'].forEach(v=>document.getElementById(`em-align-${v}`)?.classList.toggle('active',v===a));
+  ctx.timerNameAlign=a;
 }
 
 function operateMatch(i){
