@@ -280,6 +280,31 @@ select:focus{ border-color:var(--accent); }
 option{ background:#1a1d26; }
 optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
+/* ── Options cog + popout ────────────────────────────────── */
+.options-wrap{ position:relative;flex-shrink:0; }
+.opts-cog-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;background:var(--surface2);
+  border:1px solid var(--border-bright);border-radius:5px;
+  color:var(--text-dim);cursor:pointer;transition:all .15s;flex-shrink:0;
+}
+.opts-cog-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.opts-cog-btn.active{ border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.1); }
+.opts-panel{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:150;
+  background:var(--surface);border:1px solid var(--border-bright);
+  border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;
+  min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+.opts-panel.hidden{ display:none; }
+.opts-panel-title{
+  font-family:var(--display);font-size:11px;font-weight:600;
+  letter-spacing:3px;text-transform:uppercase;color:var(--accent);
+  padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+.opts-row{ display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.opts-label{ font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;white-space:nowrap; }
+
 .nav-sf-btn{
   display:flex;flex-direction:column;align-items:center;gap:2px;
   padding:6px 14px;background:var(--surface2);border:1px solid var(--border-bright);
@@ -554,21 +579,32 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <span class="tz-label">TZ</span>
         <select id="hub-tz" onchange="onHubTzChange()"></select>
       </div>
-      <div class="name-mode-ctrl">
-        <span class="tz-label">TEAMS</span>
-        <div class="name-mode-btns">
-          <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
-          <button class="nmb"        id="nmb-short" onclick="setNameMode('short')">SHORT</button>
-          <button class="nmb"        id="nmb-tri"   onclick="setNameMode('tri')">TRI</button>
-        </div>
-      </div>
-      <div class="name-mode-ctrl">
-        <span class="tz-label">LOGOS</span>
-        <div class="name-mode-btns">
-          <button class="nmb active" id="nlb-small"  onclick="setLogoSize('small')">S</button>
-          <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
-          <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
-          <button class="nmb"        id="nlb-xl"     onclick="setLogoSize('xl')">XL</button>
+      <div class="options-wrap" id="options-wrap">
+        <button class="opts-cog-btn" id="opts-cog-btn" onclick="toggleOptions(event)" title="Options">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <div class="opts-panel hidden" id="opts-panel">
+          <div class="opts-panel-title">OPTIONS</div>
+          <div class="opts-row">
+            <span class="opts-label">TEAMS</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
+              <button class="nmb"        id="nmb-short" onclick="setNameMode('short')">SHORT</button>
+              <button class="nmb"        id="nmb-tri"   onclick="setNameMode('tri')">TRI</button>
+            </div>
+          </div>
+          <div class="opts-row">
+            <span class="opts-label">LOGOS</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="nlb-small"  onclick="setLogoSize('small')">S</button>
+              <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
+              <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
+              <button class="nmb"        id="nlb-xl"     onclick="setLogoSize('xl')">XL</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="nav-sf-btn" onclick="openSidebar()">
@@ -1521,6 +1557,22 @@ function syncTyped(p){
   document.getElementById(`${p}-mm`).value=pad(parseInt(m[2]));
 }
 function syncDropdowns(p){ document.getElementById(`${p}-typed`).value=`${document.getElementById(`${p}-hh`).value}:${document.getElementById(`${p}-mm`).value}`; }
+
+// ── OPTIONS PANEL ────────────────────────────────────────
+function toggleOptions(e){
+  e.stopPropagation();
+  const panel=document.getElementById('opts-panel');
+  const btn=document.getElementById('opts-cog-btn');
+  const open=panel.classList.toggle('hidden');
+  btn.classList.toggle('active', !open);
+}
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('options-wrap');
+  if(wrap&&!wrap.contains(e.target)){
+    document.getElementById('opts-panel')?.classList.add('hidden');
+    document.getElementById('opts-cog-btn')?.classList.remove('active');
+  }
+});
 
 // ── LOGO SIZE MODE ───────────────────────────────────────
 function setLogoSize(mode, silent){
