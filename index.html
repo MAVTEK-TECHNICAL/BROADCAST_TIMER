@@ -1544,9 +1544,10 @@ function sortTimers(mi){
     const da=a.targetUTC-now;
     const db=b.targetUTC-now;
     const futureA=da>=0, futureB=db>=0;
-    if(futureA && !futureB) return -1;
-    if(!futureA && futureB) return 1;
-    return da-db; // ascending: soonest first (or least-past first)
+    if(futureA && !futureB) return -1; // future before past
+    if(!futureA && futureB) return 1;  // past after future
+    if(futureA) return da-db;          // both future: soonest first (smallest positive da)
+    return db-da;                       // both past: most recently finished first (least negative da)
   });
   // Flash the button to confirm
   const btn=document.getElementById(`sort-btn-${mi}`);
