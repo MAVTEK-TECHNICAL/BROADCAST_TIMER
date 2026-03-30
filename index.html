@@ -588,9 +588,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-card-btn.op:hover{ border-color:var(--accent2);color:var(--accent2); }
 .hub-card-btn.rem:hover{ border-color:var(--red);color:var(--red); }
 .hub-teams{
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;
   font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--text-mid);white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;margin-top:3px;line-height:1.2;text-align:center;
+  text-transform:uppercase;color:var(--text-mid);margin-top:3px;line-height:1.2;
+  overflow:hidden;
 }
 .hub-teams span[style*="color"]{
   text-shadow:1px 2px 4px rgba(0,0,0,.95),0 1px 3px rgba(0,0,0,.85),-1px 1px 3px rgba(0,0,0,.7);
@@ -763,6 +764,15 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">HUB TZ</span>
             <select id="hub-tz" onchange="onHubTzChange()"></select>
+          </div>
+          <div class="opts-row opts-view-hub hidden-view">
+            <span class="opts-label">LOGOS</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="hlb-off"    onclick="setHubLogoSize('off')">OFF</button>
+              <button class="nmb"        id="hlb-small"  onclick="setHubLogoSize('small')">S</button>
+              <button class="nmb"        id="hlb-medium" onclick="setHubLogoSize('medium')">M</button>
+              <button class="nmb"        id="hlb-large"  onclick="setHubLogoSize('large')">L</button>
+            </div>
           </div>
           <div class="opts-row opts-view-op">
             <span class="opts-label">TEAMS</span>
@@ -1154,6 +1164,7 @@ const TZ_GROUPS = [
 let hubTz       = 'Australia/Sydney';
 let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
+let hubLogoSize     = 'off';  // 'off' | 'small' | 'medium' | 'large'
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
@@ -1401,6 +1412,7 @@ function buildPayload(name){
       hubTz,
       teamDisplayMode,
       logoSizeMode,
+      hubLogoSize,
       hubCols,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
@@ -1415,6 +1427,7 @@ function applyState(s){
   if(s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
   if(s.teamDisplayMode){ teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
+  if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
   if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
@@ -2004,6 +2017,16 @@ function setLogoSize(mode, silent){
   if(!silent) scheduleSave();
 }
 
+// ── HUB LOGO SIZE ────────────────────────────────────────
+function setHubLogoSize(mode, silent){
+  hubLogoSize=mode;
+  ['off','small','medium','large'].forEach(m=>{
+    document.getElementById('hlb-'+m)?.classList.toggle('active', m===mode);
+  });
+  renderHubGrid();
+  if(!silent) scheduleSave();
+}
+
 // ── NAME DISPLAY MODE ────────────────────────────────────
 function setNameMode(mode, silent){
   teamDisplayMode=mode;
@@ -2076,11 +2099,12 @@ function findTeamRef(sport,name){
   return idx>=0?{sport,idx}:null;
 }
 
-function getTeamBadgeMiniHTML(teamRef){
+function getTeamBadgeMiniHTML(teamRef, sizeOverride){
   if(!teamRef||!SPORTS_DATA[teamRef.sport]) return '';
   const t=SPORTS_DATA[teamRef.sport][teamRef.idx];
   if(!t) return '';
-  const szCls=logoSizeMode==='medium'?' logo-md':logoSizeMode==='large'?' logo-lg':logoSizeMode==='xl'?' logo-xl':'';
+  const sz=sizeOverride||logoSizeMode;
+  const szCls=sz==='medium'?' logo-md':sz==='large'?' logo-lg':sz==='xl'?' logo-xl':'';
   if(t.logo){
     if(t.logo.includes('wikimedia.org')){
       // AFL: transparent badge on team colour, contained
@@ -2162,12 +2186,17 @@ function buildHubCard(i,now){
   if(m.home||m.away){
     const hName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
     const aName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+    const showLogos=hubLogoSize!=='off';
+    const hBadge=showLogos?getTeamBadgeMiniHTML(m.homeTeamRef||null, hubLogoSize):'';
+    const aBadge=showLogos?getTeamBadgeMiniHTML(m.awayTeamRef||null, hubLogoSize):'';
     if(m.away){
-      teamsHtml=`<span style="color:${m.homeColour}">${esc(hName)}</span>`+
-                `<span style="color:var(--text-dim);font-size:8px;margin:0 3px">VS</span>`+
-                `<span style="color:${m.awayColour}">${esc(aName)}</span>`;
+      teamsHtml=hBadge+
+                `<span style="color:${m.homeColour}">${esc(hName)}</span>`+
+                `<span style="color:var(--text-dim);font-size:8px;margin:0 2px">VS</span>`+
+                `<span style="color:${m.awayColour}">${esc(aName)}</span>`+
+                aBadge;
     } else {
-      teamsHtml=`<span style="color:${m.homeColour}">${esc(hName)}</span>`;
+      teamsHtml=hBadge+`<span style="color:${m.homeColour}">${esc(hName)}</span>`;
     }
   }
 
