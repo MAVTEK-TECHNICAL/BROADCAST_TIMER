@@ -647,18 +647,32 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-info-grid{ display:grid;grid-template-columns:auto 1fr;gap:1px 6px;padding:4px 5px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto; }
 .hub-info-key{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.5; }
 .hub-info-val{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5; }
-/* Schedule Import */
+/* Sidebar schedule import button */
 .sb-import-sched{ display:block;width:100%;padding:7px 14px;background:transparent;border:none;border-top:1px solid var(--border);color:var(--text-dim);font-family:var(--display);font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;text-align:center; }
 .sb-import-sched:hover{ color:var(--purple);background:rgba(155,89,182,.08); }
-.modal-textarea{ background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:8px 10px;outline:none;width:100%;resize:vertical;min-height:120px;line-height:1.5; }
+/* Modal textarea */
+.modal-textarea{ background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:8px 10px;outline:none;width:100%;resize:vertical;min-height:100px;line-height:1.5; }
 .modal-textarea:focus{ border-color:var(--accent); }
-.sched-preview{ max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:var(--surface3);display:flex;flex-direction:column;gap:0; }
-.sched-preview:empty{ display:none; }
-.sched-preview-row{ display:flex;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border); }
-.sched-preview-row:last-child{ border-bottom:none; }
-.sched-preview-num{ font-family:var(--mono);font-size:10px;color:var(--accent);min-width:18px;flex-shrink:0; }
-.sched-preview-game{ font-family:var(--ui);font-size:12px;font-weight:600;color:var(--text); }
-.sched-preview-meta{ font-family:var(--mono);font-size:10px;color:var(--text-dim); }
+/* Schedule import — drop zone */
+.sched-drop-zone{ border:2px dashed var(--border-bright);border-radius:6px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;color:var(--text-dim);font-family:var(--display);font-size:11px;letter-spacing:2px;text-transform:uppercase;user-select:none; }
+.sched-drop-zone:hover,.sched-drop-zone.drag-over{ border-color:var(--purple);color:var(--purple);background:rgba(155,89,182,.07); }
+.sched-drop-zone.loaded{ border-color:var(--green);color:var(--green);background:rgba(0,255,136,.04);cursor:default; }
+.sched-drop-zone.loading{ opacity:.5;pointer-events:none; }
+/* Schedule import — checklist table */
+.sched-table-wrap{ border:1px solid var(--border);border-radius:4px;overflow:hidden;display:flex;flex-direction:column; }
+.sched-table-controls{ display:flex;align-items:center;gap:10px;padding:5px 10px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;min-height:34px; }
+.sched-table-scroll{ overflow:auto;max-height:260px; }
+.sched-table{ width:100%;border-collapse:collapse; }
+.sched-table th{ background:var(--surface3);color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:5px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border-bright);position:sticky;top:0;z-index:1;font-family:var(--display);font-size:10px;font-weight:600; }
+.sched-table td{ padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;color:var(--text-dim);font-family:var(--mono);font-size:10px; }
+.sched-table tr.sched-row-sel td{ background:rgba(155,89,182,.1); }
+.sched-table tr.sched-row:hover td{ background:var(--surface2); }
+.sched-td-game{ color:var(--text) !important;font-weight:600; }
+.sched-td-num{ color:var(--border-bright) !important; }
+/* Day filter chips */
+.sched-day-chip{ background:transparent;border:1px solid var(--border-bright);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;white-space:nowrap; }
+.sched-day-chip:hover{ border-color:var(--purple);color:var(--purple); }
+.sched-day-chip.active{ background:var(--purple);border-color:var(--purple);color:#fff; }
 </style>
 </head>
 <body>
@@ -1020,24 +1034,54 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
 <!-- MODAL: Import Schedule -->
 <div class="modal-overlay hidden" id="modal-sched-import">
-  <div class="modal" style="width:500px;max-width:96vw;">
+  <div class="modal" style="width:min(820px,96vw);">
     <div class="modal-title" style="color:var(--purple)">IMPORT SCHEDULE</div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);line-height:1.6;margin-top:-8px">
-      Copy rows from your schedule spreadsheet and paste below.<br>Include the header row (DAY, GAME SCHEDULE, LOCATION…).
+
+    <!-- Drop zone -->
+    <div class="sched-drop-zone" id="sched-drop-zone">
+      <input type="file" id="sched-pdf-input" accept=".pdf" style="display:none" onchange="handleScheduleFileInput(event)" />
+      <div style="font-size:22px;margin-bottom:6px;opacity:.7">⬇</div>
+      <div id="sched-drop-label">Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span></div>
     </div>
-    <div class="modal-field">
-      <label>Day Filter</label>
-      <input class="modal-input" id="sched-import-day" type="text" placeholder="e.g. Sun, 22 Mar" style="font-family:var(--mono);font-size:13px;" />
+
+    <!-- TSV paste fallback -->
+    <details id="sched-paste-details">
+      <summary style="font-family:var(--mono);font-size:10px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;padding:2px 0;user-select:none">or paste TSV / tab-separated data</summary>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+        <textarea class="modal-textarea" id="sched-import-text" placeholder="Copy rows from your schedule spreadsheet (include header row: DAY, GAME SCHEDULE, LOCATION…)" rows="5"></textarea>
+        <button class="btn btn-sm" onclick="parseScheduleImport()" style="align-self:flex-start;padding:6px 16px;font-size:11px">PARSE TSV</button>
+      </div>
+    </details>
+
+    <!-- Day filter -->
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="modal-field" style="flex:1">
+        <label>Filter by Day <span style="font-weight:400;opacity:.55;text-transform:none;letter-spacing:0;font-size:10px">(leave blank to show all)</span></label>
+        <input class="modal-input" id="sched-import-day" type="text" placeholder="e.g. Sun, 22 Mar" style="font-family:var(--mono);font-size:13px;" oninput="schedApplyDayFilter()" />
+      </div>
     </div>
-    <div class="modal-field">
-      <label>Paste Schedule Data (TSV / tab-separated from spreadsheet)</label>
-      <textarea class="modal-textarea" id="sched-import-text" placeholder="Paste here…" rows="6"></textarea>
+
+    <!-- Checklist table -->
+    <div class="sched-table-wrap hidden" id="sched-table-wrap">
+      <div class="sched-table-controls">
+        <label style="display:flex;align-items:center;gap:5px;font-family:var(--display);font-size:10px;letter-spacing:1.5px;color:var(--text-dim);cursor:pointer;text-transform:uppercase;flex-shrink:0">
+          <input type="checkbox" id="sched-check-all" onchange="schedCheckAll(this.checked)" />
+          All
+        </label>
+        <div id="sched-day-chips" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+        <span id="sched-count-label" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0"></span>
+      </div>
+      <div class="sched-table-scroll">
+        <table class="sched-table">
+          <thead id="sched-table-head"></thead>
+          <tbody id="sched-table-body"></tbody>
+        </table>
+      </div>
     </div>
-    <button class="btn btn-sm" onclick="parseScheduleImport()" style="align-self:flex-start;padding:6px 16px;font-size:11px;letter-spacing:1.5px;">PARSE</button>
-    <div class="sched-preview" id="sched-import-preview"></div>
+
     <div class="modal-buttons">
       <button class="btn btn-cancel" onclick="closeModal('modal-sched-import')">CANCEL</button>
-      <button class="btn btn-confirm" id="sched-import-btn" onclick="confirmScheduleImport()" disabled style="background:var(--purple);min-width:180px">IMPORT</button>
+      <button class="btn btn-confirm" id="sched-import-btn" onclick="confirmScheduleImport()" disabled style="background:var(--purple);min-width:200px">IMPORT</button>
     </div>
   </div>
 </div>
@@ -2164,107 +2208,352 @@ function setEmAlign(a){
 }
 
 // ── SCHEDULE IMPORT (BULK) ───────────────────────────────
-function openImportSchedule(){
-  document.getElementById('sched-import-text').value='';
-  document.getElementById('sched-import-day').value='';
-  document.getElementById('sched-import-preview').innerHTML='';
-  document.getElementById('sched-import-btn').textContent='IMPORT';
-  document.getElementById('sched-import-btn').disabled=true;
-  window._schedImportMatches=[];
-  document.getElementById('modal-sched-import').classList.remove('hidden');
-  closeSidebar();
-  setTimeout(()=>document.getElementById('sched-import-day').focus(),80);
+
+// Lazy-load PDF.js from CDN
+async function loadPDFJS(){
+  if(window.pdfjsLib) return;
+  await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc=
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      res();
+    };
+    s.onerror=rej;
+    document.head.appendChild(s);
+  });
 }
 
-function parseScheduleImport(){
-  const text=document.getElementById('sched-import-text').value.trim();
-  const dayFilter=document.getElementById('sched-import-day').value.trim().toLowerCase();
-  const preview=document.getElementById('sched-import-preview');
+function handleScheduleFileInput(e){
+  const f=e.target.files[0];
+  if(f) handleScheduleFile(f);
+  e.target.value=''; // reset so same file can be re-dropped
+}
 
-  if(!text){
-    preview.innerHTML='<span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">Paste schedule data above then click PARSE.</span>';
+async function handleScheduleFile(file){
+  if(!file || file.type!=='application/pdf'){
+    toast('Please drop a PDF file');
+    return;
+  }
+  const zone=document.getElementById('sched-drop-zone');
+  const label=document.getElementById('sched-drop-label');
+  zone.className='sched-drop-zone loading';
+  label.textContent=`Reading ${file.name}…`;
+
+  try {
+    await loadPDFJS();
+    const buffer=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+
+    // Collect all text items with positions from every page
+    const allItems=[];
+    for(let p=1;p<=pdf.numPages;p++){
+      const page=await pdf.getPage(p);
+      const vp=page.getViewport({scale:1});
+      const content=await page.getTextContent();
+      content.items.forEach(item=>{
+        const s=item.str.trim();
+        if(!s) return;
+        allItems.push({
+          str:s,
+          x:Math.round(item.transform[4]),
+          y:Math.round(vp.height - item.transform[5]), // flip so top=0
+          w:Math.round(item.width||0),
+        });
+      });
+    }
+
+    // Sort by y then x
+    allItems.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
+
+    // Group items into rows by y-proximity
+    const ROW_TOL=6;
+    const rowGroups=[];
+    for(const item of allItems){
+      const last=rowGroups[rowGroups.length-1];
+      if(last && Math.abs(item.y-last.refY)<=ROW_TOL){
+        last.items.push(item);
+      } else {
+        rowGroups.push({refY:item.y, items:[item]});
+      }
+    }
+    rowGroups.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
+
+    // Detect the header row (contains "DAY" and something with "GAME")
+    let headerRowIdx=-1, colDefs=null;
+    for(let ri=0;ri<rowGroups.length;ri++){
+      const strs=rowGroups[ri].items.map(it=>it.str.toUpperCase());
+      if(strs.includes('DAY') && strs.some(s=>s.includes('GAME'))){
+        headerRowIdx=ri;
+        // Build column definitions — merge adjacent items that are very close
+        colDefs=[];
+        const hi=rowGroups[ri].items;
+        let ci=0;
+        while(ci<hi.length){
+          const cur=hi[ci];
+          let name=cur.str.toUpperCase().trim();
+          let endX=cur.x+cur.w;
+          // Merge next item if it touches/overlaps (multi-word header like "GAME SCHEDULE")
+          while(ci+1<hi.length && hi[ci+1].x - endX < 18){
+            ci++;
+            name+=' '+hi[ci].str.toUpperCase().trim();
+            endX=hi[ci].x+hi[ci].w;
+          }
+          colDefs.push({name:name.trim(), x:cur.x, endX});
+          ci++;
+        }
+        break;
+      }
+    }
+
+    // If no header found, use hard-coded default column x-positions
+    if(!colDefs){
+      colDefs=[
+        {name:'DAY',x:0},{name:'R',x:55},{name:'GAME SCHEDULE',x:100},
+        {name:'LOCATION',x:200},{name:'FMT',x:310},{name:'HUB',x:355},
+        {name:'STATE',x:415},{name:'HOST',x:460},{name:'TRUCK',x:535},
+        {name:'MAIN',x:578},{name:'BACKUP',x:638},
+      ];
+    }
+
+    // Helper: find col index by name fragment
+    const colIdx=frag=>colDefs.findIndex(c=>c.name.includes(frag));
+    const dayColI  =colIdx('DAY');
+    const gameColI =colIdx('GAME');
+    const locColI  =colIdx('LOCATION');
+    const hubColI  =colIdx('HUB');
+    const hostColI =colIdx('HOST');
+    const truckColI=colIdx('TRUCK');
+    const mainColI =colIdx('MAIN');
+    const backupColI=colIdx('BACKUP');
+
+    // Parse data rows, mapping items to columns by nearest x
+    const matches=[];
+    const startI=Math.max(0, headerRowIdx+1);
+    for(let ri=startI;ri<rowGroups.length;ri++){
+      const cells=new Array(colDefs.length).fill('');
+      rowGroups[ri].items.forEach(item=>{
+        let bestI=0, bestD=Math.abs(item.x-colDefs[0].x);
+        for(let ci=1;ci<colDefs.length;ci++){
+          const d=Math.abs(item.x-colDefs[ci].x);
+          if(d<bestD){ bestD=d; bestI=ci; }
+        }
+        cells[bestI]=cells[bestI]?cells[bestI]+' '+item.str:item.str;
+      });
+      const day =dayColI >=0?cells[dayColI].trim() :'';
+      const game=gameColI>=0?cells[gameColI].trim():'';
+      if(!game) continue;
+      matches.push({
+        day,game,
+        location:locColI  >=0?cells[locColI].trim()  :'',
+        hub:     hubColI  >=0?cells[hubColI].trim()  :'',
+        host:    hostColI >=0?cells[hostColI].trim() :'',
+        truck:   truckColI>=0?cells[truckColI].trim():'',
+        main:    mainColI >=0?cells[mainColI].trim() :'',
+        backup:  backupColI>=0?cells[backupColI].trim():'',
+      });
+    }
+
+    window._schedAllMatches=matches;
+    zone.className='sched-drop-zone loaded';
+    label.textContent=`✓ ${file.name} — ${matches.length} match${matches.length!==1?'es':''} found`;
+    renderScheduleTable(matches);
+
+  } catch(err){
+    console.error('PDF parse error:',err);
+    zone.className='sched-drop-zone';
+    document.getElementById('sched-drop-label').innerHTML=
+      `Error reading PDF — <span style="text-decoration:underline;cursor:pointer" onclick="document.getElementById('sched-pdf-input').click()">try again</span> or use TSV paste`;
+    toast('PDF parse error');
+  }
+}
+
+function renderScheduleTable(matches){
+  const wrap=document.getElementById('sched-table-wrap');
+  const thead=document.getElementById('sched-table-head');
+  const tbody=document.getElementById('sched-table-body');
+
+  if(!matches.length){
+    wrap.classList.add('hidden');
+    document.getElementById('sched-import-btn').disabled=true;
     return;
   }
 
-  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(!lines.length){ preview.innerHTML='<span style="color:var(--red)">No data found.</span>'; return; }
+  wrap.classList.remove('hidden');
 
-  // Detect separator (tab vs comma)
+  // Build day filter chips from unique days in the data
+  const days=[...new Set(matches.map(m=>m.day).filter(Boolean))];
+  const chips=document.getElementById('sched-day-chips');
+  chips.innerHTML=days.map(d=>`<button class="sched-day-chip" onclick="schedToggleDayChip(this,'${d.replace(/'/g,"\\'")}',event)">${esc(d)}</button>`).join('');
+
+  // Header
+  thead.innerHTML=`<tr>
+    <th style="width:28px"><input type="checkbox" id="sched-check-all" onchange="schedCheckAll(this.checked)" /></th>
+    <th>#</th><th>Day</th><th>Game Schedule</th><th>Location</th>
+    <th>Host</th><th>Hub</th><th>Truck</th><th>Main</th><th>Backup</th>
+  </tr>`;
+
+  // Rows — all checked by default
+  tbody.innerHTML=matches.map((m,i)=>`
+    <tr class="sched-row sched-row-sel" data-idx="${i}">
+      <td><input type="checkbox" class="sched-row-chk" checked onchange="schedRowCheck(${i},this.checked)" /></td>
+      <td class="sched-td-num">${i+1}</td>
+      <td>${esc(m.day)}</td>
+      <td class="sched-td-game">${esc(m.game)}</td>
+      <td>${esc(m.location)}</td>
+      <td>${esc(m.host)}</td>
+      <td>${esc(m.hub)}</td>
+      <td>${esc(m.truck)}</td>
+      <td>${esc(m.main)}</td>
+      <td>${esc(m.backup)}</td>
+    </tr>`).join('');
+
+  document.getElementById('sched-check-all').checked=true;
+  schedUpdateBtn();
+}
+
+function schedCheckAll(checked){
+  document.querySelectorAll('.sched-row').forEach(row=>{
+    if(row.style.display==='none') return; // respect hidden (filtered) rows
+    const cb=row.querySelector('.sched-row-chk');
+    if(cb){ cb.checked=checked; row.classList.toggle('sched-row-sel',checked); }
+  });
+  schedUpdateBtn();
+}
+
+function schedRowCheck(idx,checked){
+  const row=document.querySelector(`.sched-row[data-idx="${idx}"]`);
+  if(row) row.classList.toggle('sched-row-sel',checked);
+  const all=[...document.querySelectorAll('.sched-row:not([style*="display:none"]) .sched-row-chk')];
+  const allCk=all.every(cb=>cb.checked), anyCk=all.some(cb=>cb.checked);
+  const masterCk=document.getElementById('sched-check-all');
+  if(masterCk){ masterCk.checked=allCk; masterCk.indeterminate=!allCk&&anyCk; }
+  schedUpdateBtn();
+}
+
+function schedToggleDayChip(el,day,e){
+  e.stopPropagation();
+  const wasActive=el.classList.contains('active');
+  // Deactivate all chips first
+  document.querySelectorAll('.sched-day-chip').forEach(c=>c.classList.remove('active'));
+  if(!wasActive){
+    el.classList.add('active');
+    // Check only rows matching this day
+    document.querySelectorAll('.sched-row').forEach(row=>{
+      const m=(window._schedAllMatches||[])[parseInt(row.dataset.idx)];
+      const match=m&&m.day===day;
+      row.style.display=match?'':'none';
+      const cb=row.querySelector('.sched-row-chk');
+      if(cb){ cb.checked=match; row.classList.toggle('sched-row-sel',match); }
+    });
+  } else {
+    // Show all rows
+    document.querySelectorAll('.sched-row').forEach(row=>{
+      row.style.display='';
+    });
+  }
+  const masterCk=document.getElementById('sched-check-all');
+  if(masterCk){ masterCk.checked=false; masterCk.indeterminate=true; }
+  schedUpdateBtn();
+}
+
+function schedApplyDayFilter(){
+  const filter=document.getElementById('sched-import-day').value.trim().toLowerCase();
+  if(!filter){ document.querySelectorAll('.sched-row').forEach(r=>r.style.display=''); return; }
+  document.querySelectorAll('.sched-row').forEach(row=>{
+    const m=(window._schedAllMatches||[])[parseInt(row.dataset.idx)];
+    row.style.display=(m&&m.day.toLowerCase().includes(filter))?'':'none';
+  });
+  schedUpdateBtn();
+}
+
+function schedUpdateBtn(){
+  const selected=[...document.querySelectorAll('.sched-row-chk')].filter(cb=>cb.checked).length;
+  const btn=document.getElementById('sched-import-btn');
+  btn.disabled=selected===0;
+  btn.textContent=selected>0?`IMPORT ${selected} MATCH${selected!==1?'ES':''}`:'IMPORT';
+  document.getElementById('sched-count-label').textContent=selected?`${selected} selected`:'';
+}
+
+function openImportSchedule(){
+  document.getElementById('sched-import-text').value='';
+  document.getElementById('sched-import-day').value='';
+  document.getElementById('sched-table-wrap').classList.add('hidden');
+  document.getElementById('sched-import-btn').textContent='IMPORT';
+  document.getElementById('sched-import-btn').disabled=true;
+  const zone=document.getElementById('sched-drop-zone');
+  zone.className='sched-drop-zone';
+  document.getElementById('sched-drop-label').innerHTML=
+    `Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span>`;
+  window._schedAllMatches=[];
+  document.getElementById('modal-sched-import').classList.remove('hidden');
+  closeSidebar();
+  // Wire drag-and-drop on the zone
+  zone.ondragover=e=>{ e.preventDefault(); zone.classList.add('drag-over'); };
+  zone.ondragleave=e=>{ if(!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); };
+  zone.ondrop=e=>{ e.preventDefault(); zone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleScheduleFile(f); };
+  zone.onclick=()=>document.getElementById('sched-pdf-input').click();
+}
+
+// TSV paste fallback parser
+function parseScheduleImport(){
+  const text=document.getElementById('sched-import-text').value.trim();
+  if(!text){ toast('Paste TSV data first, or drop a PDF above'); return; }
+
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ toast('No data found'); return; }
+
   const sep=lines[0].includes('\t')?'\t':',';
   const firstCols=lines[0].split(sep).map(c=>c.trim().replace(/"/g,'').toUpperCase());
+  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,dataStart=0;
 
-  // Column index map
-  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10;
-  let dataStart=0;
-
-  // Auto-detect header row
   if(firstCols.some(c=>c==='DAY'||c.includes('GAME'))){
     dataStart=1;
     const fi=h=>firstCols.findIndex(c=>c.includes(h));
-    dayCol  = fi('DAY');
-    gameCol = fi('GAME');
-    locCol  = fi('LOCATION');
-    hubCol  = fi('HUB');
-    hostCol = fi('HOST');
-    truckCol= fi('TRUCK');
-    mainCol = fi('MAIN');
-    backupCol=fi('BACKUP');
+    dayCol=fi('DAY'); gameCol=fi('GAME'); locCol=fi('LOCATION');
+    hubCol=fi('HUB'); hostCol=fi('HOST'); truckCol=fi('TRUCK');
+    mainCol=fi('MAIN'); backupCol=fi('BACKUP');
   }
 
-  const col=(cols,i)=>i>=0&&i<cols.length ? cols[i].replace(/"/g,'').trim() : '';
-
+  const col=(cols,i)=>i>=0&&i<cols.length?cols[i].replace(/"/g,'').trim():'';
   const matches=[];
   for(let i=dataStart;i<lines.length;i++){
     const cols=lines[i].split(sep);
-    const day=col(cols,dayCol);
-    if(dayFilter && !day.toLowerCase().includes(dayFilter)) continue;
     const game=col(cols,gameCol);
     if(!game) continue;
     matches.push({
-      day,
-      game,
-      location: col(cols,locCol),
-      hub:      col(cols,hubCol),
-      host:     col(cols,hostCol),
-      truck:    col(cols,truckCol),
-      main:     col(cols,mainCol),
-      backup:   col(cols,backupCol),
+      day:col(cols,dayCol), game,
+      location:col(cols,locCol), hub:col(cols,hubCol),
+      host:col(cols,hostCol),   truck:col(cols,truckCol),
+      main:col(cols,mainCol),   backup:col(cols,backupCol),
     });
   }
 
-  window._schedImportMatches=matches;
-  const btn=document.getElementById('sched-import-btn');
-
-  if(!matches.length){
-    preview.innerHTML=`<div style="font-family:var(--mono);font-size:11px;color:var(--red)">No matches found${dayFilter?` for "<b>${dayFilter}</b>"`:''}.<br>Check the day filter matches exactly, e.g. "Sun, 22 Mar".</div>`;
-    btn.textContent='IMPORT'; btn.disabled=true; return;
-  }
-
-  preview.innerHTML=matches.map((m,i)=>`
-    <div class="sched-preview-row">
-      <span class="sched-preview-num">${i+1}.</span>
-      <div>
-        <div class="sched-preview-game">${esc(m.game)}</div>
-        <div class="sched-preview-meta">${[m.host,m.hub,m.location].filter(Boolean).join(' · ')}</div>
-      </div>
-    </div>`).join('');
-
-  btn.textContent=`IMPORT ${matches.length} MATCH${matches.length!==1?'ES':''}`;
-  btn.disabled=false;
+  window._schedAllMatches=matches;
+  if(!matches.length){ toast('No matches found — check column format'); return; }
+  renderScheduleTable(matches);
 }
 
 function detectSportFromHost(host,game){
   const h=(host||'').toUpperCase(), g=(game||'').toUpperCase();
-  if(h.includes('NETBALL')||g.includes('NETBALL')) return 'Netball';
-  if(h.includes('AFL')||h.includes('CH7')||h.includes('FOX AFL')) return 'AFL';
-  if(h.includes('GOLF AUS')||g.toUpperCase().includes('WPGA')||g.toUpperCase().includes('PGA')) return '';
+  if(h.includes('NETBALL')) return 'Netball';
+  if(h.includes('AFL')||h.includes('CH7')) return 'AFL';
   return '';
 }
 
 function confirmScheduleImport(){
-  const matches=window._schedImportMatches||[];
-  if(!matches.length) return;
-  const count=Math.min(matches.length,MAX_MATCHES);
+  // Collect only checked rows (respecting which rows are currently visible/selected)
+  const rows=[...document.querySelectorAll('.sched-row')];
+  const all=window._schedAllMatches||[];
+  const selected=rows
+    .filter(r=>{ const cb=r.querySelector('.sched-row-chk'); return cb&&cb.checked; })
+    .map(r=>all[parseInt(r.dataset.idx)])
+    .filter(Boolean);
+
+  if(!selected.length) return;
+  const count=Math.min(selected.length,MAX_MATCHES);
+  const matches=selected.slice(0,count);
 
   // Reset all match state
   matchMeta    = Array.from({length:MAX_MATCHES},(_,i)=>_defMeta(i));
@@ -2273,10 +2562,9 @@ function confirmScheduleImport(){
   matchVisible = Array(MAX_MATCHES).fill(false);
   matchEnabled = Array(MAX_MATCHES).fill(false);
 
-  for(let i=0;i<count;i++){
+  for(let i=0;i<matches.length;i++){
     const m=matches[i];
     const sport=detectSportFromHost(m.host,m.game);
-    // Split game schedule into home/away
     const parts=m.game.split(/\s+(?:vs?|[-–])\s+/i).map(s=>s.trim()).filter(Boolean);
     const homeRaw=parts[0]||m.game;
     const awayRaw=parts.length>1?parts[parts.length-1]:'';
@@ -2284,38 +2572,27 @@ function confirmScheduleImport(){
     const awayTeam=awayRaw?fuzzyMatchTeam(awayRaw,sport):null;
     const homeName=homeTeam?homeTeam.name.toUpperCase():homeRaw.toUpperCase();
     const awayName=awayTeam?awayTeam.name.toUpperCase():awayRaw.toUpperCase();
-
     matchMeta[i]={
-      ..._defMeta(i),
-      label:`MATCH ${i+1}`,
-      home:homeName,
-      away:awayName,
-      sport,
+      ..._defMeta(i), label:`MATCH ${i+1}`,
+      home:homeName, away:awayName, sport,
       homeTeamRef:findTeamRef(sport,homeName),
       awayTeamRef:findTeamRef(sport,awayName),
       location:m.location,
-      host:m.host.toUpperCase(),
-      hub:m.hub.toUpperCase(),
-      truck:m.truck.toUpperCase(),
-      main:m.main.toUpperCase(),
-      backup:m.backup.toUpperCase(),
+      host:(m.host||'').toUpperCase(), hub:(m.hub||'').toUpperCase(),
+      truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
+      backup:(m.backup||'').toUpperCase(),
     };
-    matchVisible[i]=true;
-    matchEnabled[i]=true;
+    matchVisible[i]=true; matchEnabled[i]=true;
   }
 
-  // Sync operator view (only cols 0-2 exist there)
   [0,1,2].forEach(i=>{
     const col=document.getElementById(`match-col-${i}`);
     if(col) col.classList.toggle('hidden-match',!matchVisible[i]);
   });
   updateAddMatchBtn();
-
   closeModal('modal-sched-import');
-  switchView('hub');
-  renderAll();
-  scheduleSave();
-  toast(`${count} MATCH${count!==1?'ES':''} IMPORTED`);
+  switchView('hub'); renderAll(); scheduleSave();
+  toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
 }
 
 // ── SCHEDULE PARSER ──────────────────────────────────────
