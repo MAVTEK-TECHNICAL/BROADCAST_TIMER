@@ -2296,7 +2296,7 @@ async function handleScheduleFile(file){
     allItems.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
 
     // Group items into rows by y-proximity
-    const ROW_TOL=6;
+    const ROW_TOL=6; // conservative — keeps distinct rows separate
     const rowGroups=[];
     for(const item of allItems){
       const last=rowGroups[rowGroups.length-1];
@@ -2359,18 +2359,42 @@ async function handleScheduleFile(file){
     const arColI     =colIdx('CAM 2 AR')<0?colIdx('AR'):colIdx('CAM 2 AR');
     const trackerColI=colIdx('TRACKER');
 
-    // Parse data rows, mapping items to columns by nearest x
-    const matches=[];
+    // Two-pass extraction:
+    // Pass 1 – separate "anchor" rows (have items at DAY/GAME x range) from "floaters"
+    //          (fragments like multi-line cell spillover that have no game text)
+    // Pass 2 – adopt each floater into its nearest anchor, then extract cells with
+    //          per-column (y,x) sort so multi-line values read top→bottom correctly
     const startI=Math.max(0, headerRowIdx+1);
+    const anchorXMin=(colDefs[dayColI]?.x||30)-20;
+    const anchorXMax=(colDefs[gameColI]?.x||92)+80;
+    const anchorRows=[], floaters=[];
     for(let ri=startI;ri<rowGroups.length;ri++){
-      const cells=new Array(colDefs.length).fill('');
-      rowGroups[ri].items.forEach(item=>{
+      const rg=rowGroups[ri];
+      const isAnchor=rg.items.some(it=>it.x>=anchorXMin&&it.x<=anchorXMax);
+      if(isAnchor) anchorRows.push({refY:rg.refY, allItems:[...rg.items]});
+      else         floaters.push(rg);
+    }
+    for(const fl of floaters){
+      if(!anchorRows.length) continue;
+      let best=anchorRows[0], bestD=Math.abs(fl.refY-best.refY);
+      for(const a of anchorRows){ const d=Math.abs(fl.refY-a.refY); if(d<bestD){bestD=d;best=a;} }
+      best.allItems.push(...fl.items);
+    }
+
+    const matches=[];
+    for(const row of anchorRows){
+      const cellItems=Array.from({length:colDefs.length},()=>[]);
+      row.allItems.forEach(item=>{
         let bestI=0, bestD=Math.abs(item.x-colDefs[0].x);
         for(let ci=1;ci<colDefs.length;ci++){
           const d=Math.abs(item.x-colDefs[ci].x);
           if(d<bestD){ bestD=d; bestI=ci; }
         }
-        cells[bestI]=cells[bestI]?cells[bestI]+' '+item.str:item.str;
+        cellItems[bestI].push(item);
+      });
+      const cells=cellItems.map(items=>{
+        items.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
+        return items.map(i=>i.str).join(' ');
       });
       const day =dayColI >=0?cells[dayColI].trim() :'';
       // Strip any leading round number that bled in from the R column (e.g. "2 GIA v VIX" → "GIA v VIX")
