@@ -774,6 +774,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="hlb-large"  onclick="setHubLogoSize('large')">L</button>
             </div>
           </div>
+          <div class="opts-row opts-view-hub hidden-view">
+            <span class="opts-label">LOGO BG</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="lbg-hub-on"  onclick="setLogoBg(true)">ON</button>
+              <button class="nmb"        id="lbg-hub-off" onclick="setLogoBg(false)">OFF</button>
+            </div>
+          </div>
           <div class="opts-row opts-view-op">
             <span class="opts-label">TEAMS</span>
             <div class="name-mode-btns">
@@ -789,6 +796,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
               <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
               <button class="nmb"        id="nlb-xl"     onclick="setLogoSize('xl')">XL</button>
+            </div>
+          </div>
+          <div class="opts-row opts-view-op">
+            <span class="opts-label">LOGO BG</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="lbg-op-on"  onclick="setLogoBg(true)">ON</button>
+              <button class="nmb"        id="lbg-op-off" onclick="setLogoBg(false)">OFF</button>
             </div>
           </div>
         </div>
@@ -1165,6 +1179,7 @@ let hubTz       = 'Australia/Sydney';
 let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let hubLogoSize     = 'off';  // 'off' | 'small' | 'medium' | 'large'
+let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no bg
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
@@ -1413,6 +1428,7 @@ function buildPayload(name){
       teamDisplayMode,
       logoSizeMode,
       hubLogoSize,
+      logoBgMode,
       hubCols,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
@@ -1428,6 +1444,7 @@ function applyState(s){
   if(s.teamDisplayMode){ teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
   if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
+  if(s.logoBgMode!==undefined){ setLogoBg(s.logoBgMode, true); }
   if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
@@ -2027,6 +2044,19 @@ function setHubLogoSize(mode, silent){
   if(!silent) scheduleSave();
 }
 
+// ── LOGO BACKGROUND MODE ─────────────────────────────────
+function setLogoBg(val, silent){
+  logoBgMode=val;
+  // Sync both operator and hub cog buttons
+  ['op','hub'].forEach(v=>{
+    document.getElementById(`lbg-${v}-on`)?.classList.toggle('active',  val===true);
+    document.getElementById(`lbg-${v}-off`)?.classList.toggle('active', val===false);
+  });
+  renderHeaders();
+  if(viewMode==='hub') renderHubGrid();
+  if(!silent) scheduleSave();
+}
+
 // ── NAME DISPLAY MODE ────────────────────────────────────
 function setNameMode(mode, silent){
   teamDisplayMode=mode;
@@ -2107,12 +2137,18 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
   const szCls=sz==='medium'?' logo-md':sz==='large'?' logo-lg':sz==='xl'?' logo-xl':'';
   if(t.logo){
     if(t.logo.includes('wikimedia.org')){
-      // AFL: transparent badge on team colour, contained
-      return `<span class="team-badge-mini badge-logo${szCls}" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
+      // AFL: transparent badge PNG — with or without coloured tile bg
+      if(logoBgMode){
+        return `<span class="team-badge-mini badge-logo${szCls}" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
+      } else {
+        return `<span class="team-badge-mini badge-logo${szCls}" style="background-image:url('${t.logo}')"></span>`;
+      }
     }
-    // Netball: full-bleed banner
-    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');border:1.5px solid ${t.primary}"></span>`;
+    // Netball: full-bleed banner — just strip the border when bg is off
+    const border=logoBgMode?`border:1.5px solid ${t.primary};`:'';
+    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');${border}"></span>`;
   }
+  // Abbr tile: always needs the bg to stay readable
   const tc=_badgeTextColor(t);
   return `<span class="team-badge-mini${szCls}" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
 }
