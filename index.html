@@ -645,8 +645,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 }
 .hub-add-card:hover{ border-color:var(--green);color:var(--green); }
 .hub-info-grid{ display:grid;grid-template-columns:auto 1fr;gap:1px 6px;padding:4px 5px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto; }
-.hub-info-key{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.5; }
-.hub-info-val{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5; }
+.hub-info-key{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.5;text-align:left; }
+.hub-info-val{ font-family:var(--mono);font-size:calc(7.5px * var(--hub-fs,1));color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;text-align:right; }
+.hub-info-spacer{ grid-column:1/-1;border-top:1px solid rgba(255,255,255,.07);margin:2px 0; }
 /* Sidebar schedule import button */
 .sb-import-sched{ display:block;width:100%;padding:7px 14px;background:transparent;border:none;border-top:1px solid var(--border);color:var(--text-dim);font-family:var(--display);font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;text-align:center; }
 .sb-import-sched:hover{ color:var(--purple);background:rgba(155,89,182,.08); }
@@ -1002,12 +1003,20 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <input class="modal-input" id="em-truck" type="text" placeholder="e.g. HG31" style="font-family:var(--mono);font-size:12px;" />
       </div>
       <div class="modal-field">
-        <label>Main</label>
+        <label>VIZ Main</label>
         <input class="modal-input" id="em-main" type="text" placeholder="e.g. AHS 01" style="font-family:var(--mono);font-size:12px;" />
       </div>
       <div class="modal-field">
-        <label>Backup</label>
+        <label>VIZ Backup</label>
         <input class="modal-input" id="em-backup" type="text" placeholder="e.g. AHS 03" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>AR</label>
+        <input class="modal-input" id="em-ar" type="text" placeholder="e.g. CAM 2 AR" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>Tracker</label>
+        <input class="modal-input" id="em-tracker" type="text" placeholder="e.g. Tracker" style="font-family:var(--mono);font-size:12px;" />
       </div>
     </div>
     <div class="modal-buttons">
@@ -1141,7 +1150,7 @@ let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:''}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:'',ar:'',tracker:''}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1906,6 +1915,8 @@ function openEditMatch(i){
   document.getElementById('em-truck').value=m.truck||'';
   document.getElementById('em-main').value=m.main||'';
   document.getElementById('em-backup').value=m.backup||'';
+  document.getElementById('em-ar').value=m.ar||'';
+  document.getElementById('em-tracker').value=m.tracker||'';
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
@@ -1937,6 +1948,8 @@ function confirmEditMatch(){
     truck:    document.getElementById('em-truck').value.trim().toUpperCase(),
     main:     document.getElementById('em-main').value.trim().toUpperCase(),
     backup:   document.getElementById('em-backup').value.trim().toUpperCase(),
+    ar:       document.getElementById('em-ar').value.trim(),
+    tracker:  document.getElementById('em-tracker').value.trim(),
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
 }
@@ -2166,17 +2179,25 @@ function buildHubCard(i,now){
     </div>`;
   }).join('');
 
-  // Info grid (schedule data)
-  const infoFields=[
-    ['LOC', m.location],
-    ['HOST',m.host],
-    ['HUB', m.hub],
-    ['TRK', m.truck],
-    ['MAIN',m.main],
-    ['BAK', m.backup],
-  ].filter(([,v])=>v);
-  const infoHtml=infoFields.length
-    ? `<div class="hub-info-grid">${infoFields.map(([k,v])=>`<span class="hub-info-key">${k}</span><span class="hub-info-val">${esc(v)}</span>`).join('')}</div>`
+  // Info grid (schedule data) — order: HUB, TRUCK, HOST, LOC, [spacer], VIZ MAIN, VIZ BACK, AR, TRACKER
+  const hubResolved=resolveHubCode(m.hub);
+  const infoRows=[
+    ['HUB',      hubResolved],
+    ['TRUCK',    m.truck],
+    ['HOST',     m.host],
+    ['LOC',      m.location],
+    null,
+    ['VIZ MAIN', m.main],
+    ['VIZ BACK', m.backup],
+    ['AR',       m.ar],
+    ['TRACKER',  m.tracker],
+  ];
+  const hasAny=infoRows.some(r=>r&&r[1]);
+  const infoHtml=hasAny
+    ? `<div class="hub-info-grid">${infoRows.map(r=>{
+        if(!r) return `<div class="hub-info-spacer"></div>`;
+        return `<span class="hub-info-key">${r[0]}</span><span class="hub-info-val">${esc(r[1])||'-'}</span>`;
+      }).join('')}</div>`
     : '';
 
   // Operate button only for matches 0-2 (OPERATOR view can show them)
@@ -2326,8 +2347,10 @@ async function handleScheduleFile(file){
     const hubColI  =colIdx('HUB');
     const hostColI =colIdx('HOST');
     const truckColI=colIdx('TRUCK');
-    const mainColI =colIdx('MAIN');
-    const backupColI=colIdx('BACKUP');
+    const mainColI   =colIdx('MAIN');
+    const backupColI =colIdx('BACKUP');
+    const arColI     =colIdx('CAM 2 AR')<0?colIdx('AR'):colIdx('CAM 2 AR');
+    const trackerColI=colIdx('TRACKER');
 
     // Parse data rows, mapping items to columns by nearest x
     const matches=[];
@@ -2352,8 +2375,10 @@ async function handleScheduleFile(file){
         hub:     hubColI  >=0?cells[hubColI].trim()  :'',
         host:    hostColI >=0?cells[hostColI].trim() :'',
         truck:   truckColI>=0?cells[truckColI].trim():'',
-        main:    mainColI >=0?cells[mainColI].trim() :'',
-        backup:  backupColI>=0?cells[backupColI].trim():'',
+        main:    mainColI   >=0?cells[mainColI].trim()   :'',
+        backup:  backupColI >=0?cells[backupColI].trim() :'',
+        ar:      arColI     >=0?cells[arColI].trim()     :'',
+        tracker: trackerColI>=0?cells[trackerColI].trim():'',
       });
     }
 
@@ -2393,7 +2418,7 @@ function renderScheduleTable(matches){
   thead.innerHTML=`<tr>
     <th style="width:28px"><input type="checkbox" id="sched-check-all" onchange="schedCheckAll(this.checked)" /></th>
     <th>#</th><th>Day</th><th>Game Schedule</th><th>Location</th>
-    <th>Host</th><th>Hub</th><th>Truck</th><th>Main</th><th>Backup</th>
+    <th>Host</th><th>Hub</th><th>Truck</th><th>VIZ Main</th><th>VIZ Backup</th><th>AR</th><th>Tracker</th>
   </tr>`;
 
   // Rows — all checked by default
@@ -2409,6 +2434,8 @@ function renderScheduleTable(matches){
       <td>${esc(m.truck)}</td>
       <td>${esc(m.main)}</td>
       <td>${esc(m.backup)}</td>
+      <td>${esc(m.ar)}</td>
+      <td>${esc(m.tracker)}</td>
     </tr>`).join('');
 
   document.getElementById('sched-check-all').checked=true;
@@ -2508,7 +2535,7 @@ function parseScheduleImport(){
 
   const sep=lines[0].includes('\t')?'\t':',';
   const firstCols=lines[0].split(sep).map(c=>c.trim().replace(/"/g,'').toUpperCase());
-  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,dataStart=0;
+  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,arCol=-1,trackerCol=-1,dataStart=0;
 
   if(firstCols.some(c=>c==='DAY'||c.includes('GAME'))){
     dataStart=1;
@@ -2516,6 +2543,7 @@ function parseScheduleImport(){
     dayCol=fi('DAY'); gameCol=fi('GAME'); locCol=fi('LOCATION');
     hubCol=fi('HUB'); hostCol=fi('HOST'); truckCol=fi('TRUCK');
     mainCol=fi('MAIN'); backupCol=fi('BACKUP');
+    arCol=fi('AR')<0?fi('CAM 2 AR'):fi('AR'); trackerCol=fi('TRACKER');
   }
 
   const col=(cols,i)=>i>=0&&i<cols.length?cols[i].replace(/"/g,'').trim():'';
@@ -2529,6 +2557,7 @@ function parseScheduleImport(){
       location:col(cols,locCol), hub:col(cols,hubCol),
       host:col(cols,hostCol),   truck:col(cols,truckCol),
       main:col(cols,mainCol),   backup:col(cols,backupCol),
+      ar:col(cols,arCol),       tracker:col(cols,trackerCol),
     });
   }
 
@@ -2583,6 +2612,7 @@ function confirmScheduleImport(){
       host:(m.host||'').toUpperCase(), hub:(m.hub||'').toUpperCase(),
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
       backup:(m.backup||'').toUpperCase(),
+      ar:m.ar||'', tracker:m.tracker||'',
     };
     matchVisible[i]=true; matchEnabled[i]=true;
   }
@@ -2632,6 +2662,26 @@ const SCHED_TEAMS = {
     {abbr:'WNT', name:'West Coast Fever',            alt:['FVR','FEV','FEVER']},
   ],
 };
+
+function resolveHubCode(raw){
+  if(!raw) return '';
+  const s=raw.trim().toUpperCase();
+  // FF patterns: FF CR01/2 → FF01+FF02, FF CR01 → FF01
+  const ffRange=s.match(/^FF\s*CR\s*0?(\d+)\s*\/\s*0?(\d+)/);
+  if(ffRange){
+    const fmt=n=>`FF${String(n).padStart(2,'0')}`;
+    return `${fmt(parseInt(ffRange[1]))}+${fmt(parseInt(ffRange[2]))}`;
+  }
+  const ffSingle=s.match(/^FF\s*(?:CR\s*)?0?(\d+)/);
+  if(ffSingle) return `FF${String(parseInt(ffSingle[1])).padStart(2,'0')}`;
+  // AHS patterns: AHS CR08 → AHS 8, AHS CR 05 → AHS 5
+  const ahsMatch=s.match(/^AHS\s*(?:CR\s*)?0?(\d+)/);
+  if(ahsMatch) return `AHS ${parseInt(ahsMatch[1])}`;
+  // AHM patterns: AHM02 → AHM 2, AHM 2 → AHM 2
+  const ahmMatch=s.match(/^AHM\s*(?:CR\s*)?0?(\d+)/);
+  if(ahmMatch) return `AHM ${parseInt(ahmMatch[1])}`;
+  return s;
+}
 
 function fuzzyMatchTeam(token, sport){
   if(!token) return null;
