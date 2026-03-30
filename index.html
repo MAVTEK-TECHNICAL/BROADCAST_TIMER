@@ -1184,6 +1184,7 @@ const SPORTS_DATA = {
   ],
   Netball:[
     {name:'Adelaide Thunderbirds',    short:'Thunderbirds', abbr:'THU', primary:'#e34f7a', secondary:'#92204d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/TBIRDS-1200x800.jpg.webp?itok=O7A73J8Y'},
+    {name:'Collingwood Magpies',      short:'Magpies',      abbr:'COL', primary:'#000000', secondary:'#FFFFFF', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2024-02/1200x800_Teamlogo_CollingwoodMagpies.png.webp'},
     {name:'GIANTS Netball',           short:'GIANTS',       abbr:'GIA', primary:'#e36c02', secondary:'#85250c', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/GIANTS-1200x800.jpg.webp?itok=9ImirMnW'},
     {name:'Melbourne Mavericks',      short:'Mavericks',    abbr:'MAV', primary:'#3d57a7', secondary:'#11215d', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2023-09/MelbourneMavericks_1200x800_TeamLogo.png.webp?itok=ad8NNeQK'},
     {name:'Melbourne Vixens',         short:'Vixens',       abbr:'VIX', primary:'#016782', secondary:'#02001e', logo:'https://netball.com.au/sites/netballnation/files/styles/maximum_900w_convert_to_webp/public/2019-06/VIXENS-1200x800.jpg.webp?itok=f-d5rvUS'},
@@ -2636,11 +2637,15 @@ function confirmScheduleImport(){
     const awayTeam=awayRaw?fuzzyMatchTeam(awayRaw,sport):null;
     const homeName=homeTeam?homeTeam.name.toUpperCase():homeRaw.toUpperCase();
     const awayName=awayTeam?awayTeam.name.toUpperCase():awayRaw.toUpperCase();
+    const homeRef=findTeamRef(sport,homeName);
+    const awayRef=findTeamRef(sport,awayName);
+    const teamPrimary=(ref)=>ref&&SPORTS_DATA[sport]?.[ref.idx]?.primary;
     matchMeta[i]={
       ..._defMeta(i), label:`MATCH ${i+1}`,
       home:homeName, away:awayName, sport,
-      homeTeamRef:findTeamRef(sport,homeName),
-      awayTeamRef:findTeamRef(sport,awayName),
+      homeTeamRef:homeRef, awayTeamRef:awayRef,
+      homeColour:teamPrimary(homeRef)||'#00d4ff',
+      awayColour:teamPrimary(awayRef)||'#ff6b35',
       location:m.location,
       host:(m.host||'').toUpperCase(), hub:(m.hub||'').toUpperCase(),
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
@@ -2664,35 +2669,35 @@ function confirmScheduleImport(){
 // Team database: abbr = primary abbreviation, alt = other known codes
 const SCHED_TEAMS = {
   AFL:[
-    {abbr:'ADE', name:'Adelaide Crows',      alt:['ADEL']},
-    {abbr:'BRI', name:'Brisbane Lions',       alt:['BRIS','LION']},
-    {abbr:'CAR', name:'Carlton',              alt:[]},
-    {abbr:'COL', name:'Collingwood',          alt:['COLL']},
-    {abbr:'ESS', name:'Essendon',             alt:[]},
-    {abbr:'FRE', name:'Fremantle',            alt:[]},
-    {abbr:'GCS', name:'Gold Coast Suns',      alt:['GC','GCK']},
-    {abbr:'GWS', name:'GWS Giants',           alt:['GIA','GIANTS','GWSG']},
-    {abbr:'HAW', name:'Hawthorn',             alt:[]},
-    {abbr:'MEL', name:'Melbourne',            alt:['MELB','DEES']},
-    {abbr:'NM',  name:'North Melbourne',      alt:['NMFC','NTH','NORTH']},
-    {abbr:'PTA', name:'Port Adelaide',        alt:['PORT','PADL','PA']},
-    {abbr:'RIC', name:'Richmond',             alt:['RICH']},
-    {abbr:'STK', name:'St Kilda',             alt:['SKT']},
-    {abbr:'SYD', name:'Sydney Swans',         alt:['SWAN']},
-    {abbr:'WCE', name:'West Coast Eagles',    alt:['WC','WEST']},
-    {abbr:'WBD', name:'Western Bulldogs',     alt:['BULL','WB','WBULL']},
-    {abbr:'GEE', name:'Geelong Cats',         alt:['GEL','GEEL']},
+    {abbr:'ADE', name:'Adelaide Crows',      alt:['ADEL','ADL','CROWS']},
+    {abbr:'BRI', name:'Brisbane Lions',       alt:['BRIS','LION','BRIL']},
+    {abbr:'CAR', name:'Carlton',              alt:['CARL']},
+    {abbr:'COL', name:'Collingwood',          alt:['COLL','MAGP']},
+    {abbr:'ESS', name:'Essendon',             alt:['ESSE','BOMB']},
+    {abbr:'FRE', name:'Fremantle',            alt:['FREM','FREO','DOCC']},
+    {abbr:'GCS', name:'Gold Coast Suns',      alt:['GC','GCK','GCFC']},
+    {abbr:'GWS', name:'GWS Giants',           alt:['GIA','GIANTS','GWSG','GWS GIANTS']},
+    {abbr:'HAW', name:'Hawthorn',             alt:['HAWK']},
+    {abbr:'MEL', name:'Melbourne',            alt:['MELB','DEES','MELBD']},
+    {abbr:'NM',  name:'North Melbourne',      alt:['NMFC','NTH','NORTH','NMF']},
+    {abbr:'PTA', name:'Port Adelaide',        alt:['PORT','PADL','PA','PAP']},
+    {abbr:'RIC', name:'Richmond',             alt:['RICH','TIGG']},
+    {abbr:'STK', name:'St Kilda',             alt:['SKT','SAINTS','SK']},
+    {abbr:'SYD', name:'Sydney Swans',         alt:['SWAN','SYDS']},
+    {abbr:'WCE', name:'West Coast Eagles',    alt:['WC','WEST','EAGL']},
+    {abbr:'WBD', name:'Western Bulldogs',     alt:['BULL','WB','WBULL','DOGS']},
+    {abbr:'GEE', name:'Geelong Cats',         alt:['GEL','GEEL','CATS']},
   ],
   Netball:[
-    {abbr:'ADE', name:'Adelaide Thunderbirds',      alt:['TBRD','THU','THBRD']},
-    {abbr:'COL', name:'Collingwood Magpies',         alt:['MAG']},
-    {abbr:'GIA', name:'GIANTS Netball',              alt:['GWS','GIANT']},
-    {abbr:'MEL', name:'Melbourne Mavericks',         alt:['MAV','MAVS']},
-    {abbr:'NSW', name:'NSW Swifts',                  alt:['SWI','SWF','SWIFT']},
-    {abbr:'QLD', name:'Queensland Firebirds',        alt:['FBD','FBRD','FIRE']},
-    {abbr:'SSW', name:'Sunshine Coast Lightning',    alt:['LIG','LGTN','LIGHT']},
-    {abbr:'VIX', name:'Melbourne Vixens',            alt:[]},
-    {abbr:'WNT', name:'West Coast Fever',            alt:['FVR','FEV','FEVER']},
+    {abbr:'ADE', name:'Adelaide Thunderbirds', alt:['TBRD','THU','THBRD','TBIRD','THUNDER']},
+    {abbr:'COL', name:'Collingwood Magpies',   alt:['MAG','MAGP','COLL','COLM']},
+    {abbr:'GIA', name:'GIANTS Netball',        alt:['GWS','GIANT','GIA']},
+    {abbr:'MEL', name:'Melbourne Mavericks',   alt:['MAV','MAVS','MELM']},
+    {abbr:'NSW', name:'NSW Swifts',            alt:['SWI','SWF','SWIFT','SWIFTS']},
+    {abbr:'QLD', name:'Queensland Firebirds',  alt:['FBD','FBRD','FIRE','FIR','FBIRD','QFB']},
+    {abbr:'SSW', name:'Sunshine Coast Lightning', alt:['LIG','LGTN','LIGHT','LGHT','SCL']},
+    {abbr:'VIX', name:'Melbourne Vixens',      alt:['VIXEN','VIXN']},
+    {abbr:'WNT', name:'West Coast Fever',      alt:['FVR','FEV','FEVER','WCF','FEVR']},
   ],
 };
 
