@@ -1011,8 +1011,12 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <input class="modal-input" id="em-backup" type="text" placeholder="e.g. AHS 03" style="font-family:var(--mono);font-size:12px;" />
       </div>
       <div class="modal-field">
-        <label>AR</label>
-        <input class="modal-input" id="em-ar" type="text" placeholder="e.g. CAM 2 AR" style="font-family:var(--mono);font-size:12px;" />
+        <label>AR Ctrl</label>
+        <input class="modal-input" id="em-ar-ctrl" type="text" placeholder="e.g. CTL02" style="font-family:var(--mono);font-size:12px;" />
+      </div>
+      <div class="modal-field">
+        <label>AR Rend</label>
+        <input class="modal-input" id="em-ar-rend" type="text" placeholder="e.g. REN02" style="font-family:var(--mono);font-size:12px;" />
       </div>
       <div class="modal-field">
         <label>Tracker</label>
@@ -1150,7 +1154,7 @@ let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:'',ar:'',tracker:''}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1915,7 +1919,8 @@ function openEditMatch(i){
   document.getElementById('em-truck').value=m.truck||'';
   document.getElementById('em-main').value=m.main||'';
   document.getElementById('em-backup').value=m.backup||'';
-  document.getElementById('em-ar').value=m.ar||'';
+  document.getElementById('em-ar-ctrl').value=m.arCtrl||'';
+  document.getElementById('em-ar-rend').value=m.arRend||'';
   document.getElementById('em-tracker').value=m.tracker||'';
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
@@ -1948,7 +1953,8 @@ function confirmEditMatch(){
     truck:    document.getElementById('em-truck').value.trim().toUpperCase(),
     main:     document.getElementById('em-main').value.trim().toUpperCase(),
     backup:   document.getElementById('em-backup').value.trim().toUpperCase(),
-    ar:       document.getElementById('em-ar').value.trim(),
+    arCtrl:   document.getElementById('em-ar-ctrl').value.trim(),
+    arRend:   document.getElementById('em-ar-rend').value.trim(),
     tracker:  document.getElementById('em-tracker').value.trim(),
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
@@ -2179,7 +2185,7 @@ function buildHubCard(i,now){
     </div>`;
   }).join('');
 
-  // Info grid (schedule data) — order: HUB, TRUCK, HOST, LOC, [spacer], VIZ MAIN, VIZ BACK, AR, TRACKER
+  // Info grid (schedule data) — order: HUB, TRUCK, HOST, LOC, [spacer], VIZ MAIN, VIZ BACK, AR CTRL, AR REND, TRACKER
   const hubResolved=resolveHubCode(m.hub);
   const infoRows=[
     ['HUB',      hubResolved],
@@ -2187,9 +2193,10 @@ function buildHubCard(i,now){
     ['HOST',     m.host],
     ['LOC',      m.location],
     null,
-    ['VIZ MAIN', m.main],
-    ['VIZ BACK', m.backup],
-    ['AR',       m.ar],
+    ['VIZ MAIN', resolveVizEngine(m.main)],
+    ['VIZ BACK', resolveVizEngine(m.backup)],
+    ['AR CTRL',  m.arCtrl],
+    ['AR REND',  m.arRend],
     ['TRACKER',  m.tracker],
   ];
   const hasAny=infoRows.some(r=>r&&r[1]);
@@ -2377,7 +2384,7 @@ async function handleScheduleFile(file){
         truck:   truckColI>=0?cells[truckColI].trim():'',
         main:    mainColI   >=0?cells[mainColI].trim()   :'',
         backup:  backupColI >=0?cells[backupColI].trim() :'',
-        ar:      arColI     >=0?cells[arColI].trim()     :'',
+        ...parseArField(arColI>=0?cells[arColI].trim():''),
         tracker: trackerColI>=0?cells[trackerColI].trim():'',
       });
     }
@@ -2418,7 +2425,7 @@ function renderScheduleTable(matches){
   thead.innerHTML=`<tr>
     <th style="width:28px"><input type="checkbox" id="sched-check-all" onchange="schedCheckAll(this.checked)" /></th>
     <th>#</th><th>Day</th><th>Game Schedule</th><th>Location</th>
-    <th>Host</th><th>Hub</th><th>Truck</th><th>VIZ Main</th><th>VIZ Backup</th><th>AR</th><th>Tracker</th>
+    <th>Host</th><th>Hub</th><th>Truck</th><th>VIZ Main</th><th>VIZ Backup</th><th>AR Ctrl</th><th>AR Rend</th><th>Tracker</th>
   </tr>`;
 
   // Rows — all checked by default
@@ -2434,7 +2441,8 @@ function renderScheduleTable(matches){
       <td>${esc(m.truck)}</td>
       <td>${esc(m.main)}</td>
       <td>${esc(m.backup)}</td>
-      <td>${esc(m.ar)}</td>
+      <td>${esc(m.arCtrl)}</td>
+      <td>${esc(m.arRend)}</td>
       <td>${esc(m.tracker)}</td>
     </tr>`).join('');
 
@@ -2557,7 +2565,8 @@ function parseScheduleImport(){
       location:col(cols,locCol), hub:col(cols,hubCol),
       host:col(cols,hostCol),   truck:col(cols,truckCol),
       main:col(cols,mainCol),   backup:col(cols,backupCol),
-      ar:col(cols,arCol),       tracker:col(cols,trackerCol),
+      ...parseArField(col(cols,arCol)),
+      tracker:col(cols,trackerCol),
     });
   }
 
@@ -2612,7 +2621,7 @@ function confirmScheduleImport(){
       host:(m.host||'').toUpperCase(), hub:(m.hub||'').toUpperCase(),
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
       backup:(m.backup||'').toUpperCase(),
-      ar:m.ar||'', tracker:m.tracker||'',
+      arCtrl:m.arCtrl||'', arRend:m.arRend||'', tracker:m.tracker||'',
     };
     matchVisible[i]=true; matchEnabled[i]=true;
   }
@@ -2681,6 +2690,47 @@ function resolveHubCode(raw){
   const ahmMatch=s.match(/^AHM\s*(?:CR\s*)?0?(\d+)/);
   if(ahmMatch) return `AHM ${parseInt(ahmMatch[1])}`;
   return s;
+}
+
+function resolveVizEngine(raw){
+  if(!raw) return '';
+  const s=raw.trim();
+  const u=s.toUpperCase();
+  // FF list: "FF01, 02, 03" → "FF01, FF02, FF03" | "FF01" → "FF01"
+  if(/^FF/i.test(u)){
+    const parts=s.split(',').map(p=>p.trim());
+    const nums=parts.map(p=>{ const m=p.match(/\d+/); return m?String(parseInt(m[0])).padStart(2,'0'):null; }).filter(Boolean);
+    if(nums.length) return nums.map(n=>`FF${n}`).join(', ');
+  }
+  // AHS: "AHS 05" → "AHS ENG 05" | "AHS05" → "AHS ENG 05"
+  const ahsM=u.match(/^AHS\s*(?:ENG\s*)?0?(\d+)(.*)/);
+  if(ahsM){
+    const num=String(parseInt(ahsM[1])).padStart(2,'0');
+    const extra=ahsM[2].replace(/\(dual\s*output[s]?\)/i,'(2x)').trim();
+    return `AHS ENG ${num}${extra?' '+extra:''}`;
+  }
+  // AHM: "AHM 01 (Dual Outputs)" → "AHM ENG 01 (2x)" | "AHM01" → "AHM ENG 01"
+  const ahmM=u.match(/^AHM\s*(?:ENG\s*)?0?(\d+)(.*)/);
+  if(ahmM){
+    const num=String(parseInt(ahmM[1])).padStart(2,'0');
+    const extra=ahmM[2].replace(/\(dual\s*output[s]?\)/i,'(2x)').trim();
+    return `AHM ENG ${num}${extra?' '+extra:''}`;
+  }
+  return s;
+}
+
+function parseArField(raw){
+  if(!raw) return {arCtrl:'',arRend:''};
+  const s=raw.trim();
+  // "CTL02 & REN02" or "CTL02 & REN02" or "CTL 02 & REN 02"
+  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REN\s*(\w+)/i);
+  if(both) return {arCtrl:`CTL${both[1].toUpperCase()}`,arRend:`REN${both[2].toUpperCase()}`};
+  const ctlOnly=s.match(/CTL\s*(\w+)/i);
+  if(ctlOnly) return {arCtrl:`CTL${ctlOnly[1].toUpperCase()}`,arRend:''};
+  const renOnly=s.match(/REN\s*(\w+)/i);
+  if(renOnly) return {arCtrl:'',arRend:`REN${renOnly[1].toUpperCase()}`};
+  // Unknown — put in arCtrl
+  return {arCtrl:s,arRend:''};
 }
 
 function fuzzyMatchTeam(token, sport){
