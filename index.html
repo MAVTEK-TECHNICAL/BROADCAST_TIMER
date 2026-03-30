@@ -2294,8 +2294,9 @@ async function handleScheduleFile(file){
           const cur=hi[ci];
           let name=cur.str.toUpperCase().trim();
           let endX=cur.x+cur.w;
-          // Merge next item if it touches/overlaps (multi-word header like "GAME SCHEDULE")
-          while(ci+1<hi.length && hi[ci+1].x - endX < 18){
+          // Merge next item only if it's within the same word-group (e.g. "GAME SCHEDULE")
+          // Keep threshold tight (< 8) so adjacent columns like "R" and "GAME" don't merge
+          while(ci+1<hi.length && hi[ci+1].x - endX < 8){
             ci++;
             name+=' '+hi[ci].str.toUpperCase().trim();
             endX=hi[ci].x+hi[ci].w;
@@ -2342,7 +2343,8 @@ async function handleScheduleFile(file){
         cells[bestI]=cells[bestI]?cells[bestI]+' '+item.str:item.str;
       });
       const day =dayColI >=0?cells[dayColI].trim() :'';
-      const game=gameColI>=0?cells[gameColI].trim():'';
+      // Strip any leading round number that bled in from the R column (e.g. "2 GIA v VIX" → "GIA v VIX")
+      const game=(gameColI>=0?cells[gameColI].trim():'').replace(/^\d+\s+/,'').trim();
       if(!game) continue;
       matches.push({
         day,game,
