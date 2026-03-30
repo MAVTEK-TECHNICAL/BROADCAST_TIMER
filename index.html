@@ -308,6 +308,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   padding-bottom:8px;border-bottom:1px solid var(--border);
 }
 .opts-row{ display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.opts-row.hidden-view{ display:none; }
 .opts-label{ font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;white-space:nowrap; }
 
 .nav-sf-btn{
@@ -759,12 +760,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </button>
         <div class="opts-panel hidden" id="opts-panel">
           <div class="opts-panel-title">OPTIONS</div>
-          <div class="opts-row">
+          <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">HUB TZ</span>
             <select id="hub-tz" onchange="onHubTzChange()"></select>
           </div>
-          <div class="opts-divider"></div>
-          <div class="opts-row">
+          <div class="opts-row opts-view-op">
             <span class="opts-label">TEAMS</span>
             <div class="name-mode-btns">
               <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
@@ -772,7 +772,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="nmb-tri"   onclick="setNameMode('tri')">TRI</button>
             </div>
           </div>
-          <div class="opts-row">
+          <div class="opts-row opts-view-op">
             <span class="opts-label">LOGOS</span>
             <div class="name-mode-btns">
               <button class="nmb active" id="nlb-small"  onclick="setLogoSize('small')">S</button>
@@ -2102,6 +2102,9 @@ function switchView(mode){
   hv.style.display = mode==='hub'      ? '' : 'none';
   document.getElementById('vtb-op').classList.toggle('active',  mode==='operator');
   document.getElementById('vtb-hub').classList.toggle('active', mode==='hub');
+  // Sync options panel: show only rows relevant to the active view
+  document.querySelectorAll('.opts-view-hub').forEach(el=>el.classList.toggle('hidden-view', mode!=='hub'));
+  document.querySelectorAll('.opts-view-op').forEach(el=>el.classList.toggle('hidden-view', mode!=='operator'));
   if(mode==='hub') renderHubGrid();
 }
 
