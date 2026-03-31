@@ -432,7 +432,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .timer-remove{ display:none;background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0; }
 .timer-row.optional:hover .timer-remove{ display:block; }
 .hidden-match{ display:none; }
-#add-match-col{ display:flex;align-items:stretch;flex-shrink:0; }
+#add-match-col{ display:flex;flex-direction:column;align-items:stretch;gap:6px;flex-shrink:0; }
 .add-match-btn{ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:48px;background:transparent;border:2px dashed var(--border-bright);border-radius:6px;color:var(--text-dim);cursor:pointer;transition:all .2s;padding:12px 0; }
 .add-match-btn:hover{ border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.05); }
 .add-match-plus{ font-size:24px;font-weight:300;line-height:1;font-family:var(--mono); }
@@ -758,6 +758,39 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .sched-day-chip{ background:transparent;border:1px solid var(--border-bright);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;white-space:nowrap; }
 .sched-day-chip:hover{ border-color:var(--purple);color:var(--purple); }
 .sched-day-chip.active{ background:var(--purple);border-color:var(--purple);color:#fff; }
+
+/* ─── HUB TODAY BUTTON ─────────────────────────────────── */
+.hub-today-btn{
+  background:transparent;border:1px solid var(--border-bright);border-radius:4px;
+  color:var(--text-mid);font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:uppercase;
+}
+.hub-today-btn:hover{ border-color:var(--green);color:var(--green); }
+.hub-today-btn.active{ background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green); }
+.hub-layout-sep{ width:1px;height:20px;background:var(--border-bright);flex-shrink:0; }
+
+/* ─── OPERATOR DETAILS PANEL ───────────────────────────── */
+.op-details-panel{ background:var(--surface3);border-bottom:1px solid var(--border);padding:6px 10px;flex-shrink:0; }
+.op-details-panel.hidden{ display:none; }
+.op-info-grid{ display:grid;grid-template-columns:auto 1fr;gap:1px 8px; }
+.op-info-key{ font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.6; }
+.op-info-val{ font-family:var(--mono);font-size:9px;color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.6; }
+.op-details-empty{ font-family:var(--mono);font-size:9px;color:var(--border-bright);text-align:center;letter-spacing:1px;text-transform:uppercase;padding:2px 0; }
+.details-toggle-btn{ background:none;border:none;color:var(--text-dim);font-size:13px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;flex-shrink:0; }
+.details-toggle-btn:hover{ color:var(--accent); }
+.details-toggle-btn.active{ color:var(--accent); }
+
+/* ─── IMPORT FROM HUB ──────────────────────────────────── */
+.import-hub-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:2px dashed var(--purple);border-radius:6px;color:var(--purple);cursor:pointer;transition:all .2s;padding:8px 6px;font-family:var(--display);font-size:8px;letter-spacing:1.5px;text-transform:uppercase;width:48px;flex-shrink:0; }
+.import-hub-btn:hover{ background:rgba(155,89,182,.15);border-color:#b07dd0; }
+.import-hub-list{ display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto; }
+.import-hub-list::-webkit-scrollbar{ width:4px; }
+.import-hub-list::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+.import-match-item{ display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border-bright);border-radius:5px;cursor:pointer;transition:all .15s;text-align:left;width:100%; }
+.import-match-item:hover{ border-color:var(--purple);background:rgba(155,89,182,.1); }
+.import-match-label{ font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:2px;color:var(--accent);text-transform:uppercase; }
+.import-match-teams{ font-family:var(--mono);font-size:11px;color:var(--text);letter-spacing:.05em;text-transform:uppercase; }
+.import-match-date{ font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase; }
 </style>
 </head>
 <body>
@@ -925,67 +958,15 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <div id="cal-popup" class="cal-popup cal-hidden"></div>
 
     <div id="matches-grid">
-      <!-- Match 1 -->
-      <div class="match-col" id="match-col-0">
-        <div class="match-header">
-          <button class="remove-match-btn" onclick="removeMatch(0)">✕</button>
-          <div class="match-title-row">
-            <div class="match-label" id="match-label-0">MATCH 1</div>
-            <button class="edit-match-btn" onclick="opEditMatch(0)">✎</button>
-          </div>
-          <div class="match-teams" id="match-teams-0"></div>
-          <div class="match-local-time" id="match-clock-0">--:--:--</div>
-          <div class="match-date-line" id="match-date-0"></div>
-        </div>
-        <div class="timers-list" id="timers-0"></div>
-        <div class="timer-footer">
-          <button class="add-timer-btn" onclick="opAddTimer(0)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-0" onclick="opSortTimers(0)" title="Sort by time remaining">⇅ SORT</button>
-        </div>
-      </div>
-
-      <!-- Match 2 -->
-      <div class="match-col hidden-match" id="match-col-1">
-        <div class="match-header">
-          <button class="remove-match-btn" onclick="removeMatch(1)">✕</button>
-          <div class="match-title-row">
-            <div class="match-label" id="match-label-1">MATCH 2</div>
-            <button class="edit-match-btn" onclick="opEditMatch(1)">✎</button>
-          </div>
-          <div class="match-teams" id="match-teams-1"></div>
-          <div class="match-local-time" id="match-clock-1">--:--:--</div>
-          <div class="match-date-line" id="match-date-1"></div>
-        </div>
-        <div class="timers-list" id="timers-1"></div>
-        <div class="timer-footer">
-          <button class="add-timer-btn" onclick="opAddTimer(1)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-1" onclick="opSortTimers(1)" title="Sort by time remaining">⇅ SORT</button>
-        </div>
-      </div>
-
-      <!-- Match 3 -->
-      <div class="match-col hidden-match" id="match-col-2">
-        <div class="match-header">
-          <button class="remove-match-btn" onclick="removeMatch(2)">✕</button>
-          <div class="match-title-row">
-            <div class="match-label" id="match-label-2">MATCH 3</div>
-            <button class="edit-match-btn" onclick="opEditMatch(2)">✎</button>
-          </div>
-          <div class="match-teams" id="match-teams-2"></div>
-          <div class="match-local-time" id="match-clock-2">--:--:--</div>
-          <div class="match-date-line" id="match-date-2"></div>
-        </div>
-        <div class="timers-list" id="timers-2"></div>
-        <div class="timer-footer">
-          <button class="add-timer-btn" onclick="opAddTimer(2)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-2" onclick="opSortTimers(2)" title="Sort by time remaining">⇅ SORT</button>
-        </div>
-      </div>
-
+      <!-- Match columns are dynamically rendered by renderOpColumns() -->
       <div id="add-match-col">
-        <button class="add-match-btn" onclick="addMatch()">
+        <button class="add-match-btn" onclick="addMatch()" title="Add new blank match">
           <span class="add-match-plus">+</span>
           <span class="add-match-label">ADD<br>MATCH</span>
+        </button>
+        <button class="import-hub-btn" onclick="openImportModal()" title="Import existing match from schedule">
+          <span style="font-size:15px;line-height:1">⬇</span>
+          <span>HUB</span>
         </button>
       </div>
     </div>
@@ -1012,6 +993,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <span id="hub-range-end-lbl">ALL</span>
         </button>
         <button class="hub-range-clear" id="hub-range-end-clr" onclick="clearHubRange('end')" title="Clear end date" style="display:none">×</button>
+        <div class="hub-layout-sep"></div>
+        <button class="hub-today-btn" id="hub-today-btn" onclick="setHubToday()" title="Show only today's matches">TODAY</button>
         <span class="hub-active-badge" id="hub-active-count">0 ACTIVE</span>
       </div>
       <div id="hub-grid"></div>
@@ -1206,6 +1189,18 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   </div>
 </div>
 
+<!-- MODAL: Import Match from Hub -->
+<div class="modal-overlay hidden" id="modal-import-hub">
+  <div class="modal" style="width:min(480px,96vw)">
+    <div class="modal-title" style="color:var(--purple)">IMPORT FROM HUB</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-bottom:10px;text-transform:uppercase;">Select a match to add to the current operator view</div>
+    <div class="import-hub-list" id="import-hub-list"></div>
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn btn-cancel" onclick="closeModal('modal-import-hub')">CANCEL</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Import Schedule -->
 <div class="modal-overlay hidden" id="modal-sched-import">
   <div class="modal" style="width:min(820px,96vw);">
@@ -1327,8 +1322,9 @@ let hubRangeStart = null; // hub view date range start (ISO string or null = no 
 let hubRangeEnd   = null; // hub view date range end   (ISO string or null = no upper bound)
 let _calPopupYM   = null;  // {year,month} currently displayed in popup
 // Operator view: maps display column (0/1/2) → actual match slot index (0-15)
-let opSlotMap    = [0, 1, 2];
-let opSlotActive = [true, false, false]; // which op columns currently have a match
+let opSlotMap    = []; // dynamically sized: real slot indices currently shown in operator view
+let opDetailsExpanded = {}; // keyed by real slot index — true if details panel is open
+let hubTodayMode = false;   // true = hub range tracks calendarDate (shows only today)
 
 // Returns true when match i should be visible given current date filter
 function isMatchVisible(i){
@@ -1512,7 +1508,7 @@ document.addEventListener('keydown', e=>{
     else if (!document.getElementById('modal-sf-name').classList.contains('hidden'))   confirmNewShowfile();
   }
   if (e.key==='Escape'){
-    ['modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name','modal-sched-import'].forEach(closeModal);
+    ['modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name','modal-sched-import','modal-import-hub'].forEach(closeModal);
     closeSidebar();
   }
   if ((e.metaKey||e.ctrlKey) && e.key==='s'){
@@ -1651,6 +1647,7 @@ function buildPayload(name){
       calendarDate,
       hubRangeStart,
       hubRangeEnd,
+      hubTodayMode,
       matchTzs:    matchTzs.slice(0,serLen),
       matchVisible:matchVisible.slice(0,serLen),
       matchEnabled:matchEnabled.slice(0,serLen),
@@ -1672,8 +1669,10 @@ function applyState(s){
   if(s.calendarDate)   { calendarDate=s.calendarDate; }
   hubRangeStart = s.hubRangeStart||null;
   hubRangeEnd   = s.hubRangeEnd  ||null;
+  hubTodayMode  = !!s.hubTodayMode;
   // Legacy: if old save had hubShowAllDays=false treat as no range
   _updateHubRangeUI();
+  _updateHubTodayBtn();
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
@@ -1965,47 +1964,45 @@ function timerDragEnd(e){
 }
 
 function renderHeaders(){
-  [0,1,2].forEach(i=>{
+  for(let i=0; i<opSlotMap.length; i++){
     const m=matchMeta[opSlotMap[i]]; // translate column → real match slot
-    // Operator column label: day-relative position (MATCH 1/2/3) unless user set a custom name
+    // Operator column label: day-relative position (MATCH 1/2/…) unless user set a custom name
     const isAuto=/^MATCH\s+\d+$/i.test((m.label||'').trim());
-    document.getElementById(`match-label-${i}`).textContent = (isAuto||!m.label) ? `MATCH ${i+1}` : m.label;
+    const labelEl=document.getElementById(`match-label-${i}`);
+    if(labelEl) labelEl.textContent = (isAuto||!m.label) ? `MATCH ${i+1}` : m.label;
     const el=document.getElementById(`match-teams-${i}`);
+    if(!el) continue;
     if(m.home||m.away){
       const soloMode = m.home && !m.away; // single-team event (e.g. golf tournament)
       const hBadge=getTeamBadgeMiniHTML(m.homeTeamRef||null);
       const homeName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
       if(soloMode){
-        // Show home team / logo only — no VS, no away side
         if(logoSizeMode==='xl' && hBadge){
-          // XL: logo only (badge exists)
           el.innerHTML=`${hBadge}`;
         } else {
-          // All other sizes, or XL with no logo — always show name
           el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
         }
       } else {
         const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
         const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
         if(logoSizeMode==='xl' && (hBadge||aBadge)){
-          // XL: show badges + VS; fall back to name for any side missing a logo
           const hPart=hBadge||`<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
           const aPart=aBadge||`<span style="color:${m.awayColour}">${esc(awayName)}</span>`;
           el.innerHTML=`${hPart}<span class="team-vs">VS</span>${aPart}`;
         } else {
-          // Non-XL, or XL where neither team has a logo — show names
           el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
         }
       }
     } else {
       el.innerHTML='';
     }
-  });
+    _renderOpDetails(i); // refresh details panel
+  }
   _fitOpTeamsRows();
 }
 
 function renderTimers(){
-  for(let mi=0;mi<3;mi++){
+  for(let mi=0;mi<opSlotMap.length;mi++){
     const si=opSlotMap[mi]; // real match slot index for this display column
     const list=document.getElementById(`timers-${mi}`);
     const now=Date.now();
@@ -2079,7 +2076,7 @@ function startClock(){
   function tick(){
     document.getElementById('hub-clock').textContent  = getTimeInTz(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
-    [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[opSlotMap[i]]); });
+    opSlotMap.forEach((si,i)=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[si]); });
     if(viewMode==='operator') renderTimers();
     else updateHubCountdowns();
   }
@@ -2112,13 +2109,11 @@ function addHubMatch(){
   toast('SCHEDULE FULL');
 }
 function removeMatch(col){
-  // Operator view only: hides this column without deleting match data.
+  // Operator view only: removes this column from the current view without deleting match data.
   // Match remains in the schedule and will re-appear when navigating back to its day.
-  const keep=[...opSlotActive.map((a,c)=>a&&c!==col?opSlotMap[c]:-1).filter(s=>s>=0)];
-  opSlotMap   =[keep[0]??0, keep[1]??0, keep[2]??0];
-  opSlotActive=[keep.length>=1, keep.length>=2, keep.length>=3];
-  [0,1,2].forEach(c=>document.getElementById(`match-col-${c}`)?.classList.toggle('hidden-match',!opSlotActive[c]));
-  updateAddMatchBtn(); renderAll();
+  if(col>=0 && col<opSlotMap.length) opSlotMap.splice(col, 1);
+  renderOpColumns();
+  renderAll();
   // No scheduleSave() — this is a transient view change, not a data change
 }
 // Operator column wrappers — translate display column (0/1/2) → real match slot via opSlotMap
@@ -2138,7 +2133,74 @@ function removeHubMatch(i){
   _rebuildOpSlotMap(); // in case this slot was in the op view
   scheduleSave(); renderHubGrid();
 }
-function updateAddMatchBtn(){ document.getElementById('add-match-col').classList.toggle('hidden', opSlotActive[1]&&opSlotActive[2]); }
+function updateAddMatchBtn(){ document.getElementById('add-match-col')?.classList.remove('hidden'); }
+
+// ── OP DETAILS TOGGLE ──────────────────────────────────────
+function toggleOpDetails(col){
+  const si = opSlotMap[col];
+  if(si===undefined) return;
+  opDetailsExpanded[si] = !opDetailsExpanded[si];
+  const panel = document.getElementById(`op-details-${col}`);
+  const btn   = document.getElementById(`details-btn-${col}`);
+  if(panel){ panel.classList.toggle('hidden', !opDetailsExpanded[si]); }
+  if(btn)  { btn.classList.toggle('active', !!opDetailsExpanded[si]); }
+  if(opDetailsExpanded[si]) _renderOpDetails(col);
+}
+function _renderOpDetails(col){
+  const si = opSlotMap[col];
+  const panel = document.getElementById(`op-details-${col}`);
+  if(!panel || !opDetailsExpanded[si]) return;
+  const m = matchMeta[si];
+  const rows = [
+    ['LOC',      m.location],
+    ['HUB',      resolveHubCode(m.hub)],
+    ['TRUCK',    m.truck],
+    ['HOST',     m.host],
+    ['VIZ MAIN', resolveVizEngine(m.main)],
+    ['VIZ BACK', resolveVizEngine(m.backup)],
+    ['AR CTRL',  m.arCtrl],
+    ['AR REND',  m.arRend],
+    ['TRACKER',  m.tracker],
+  ].filter(r => r[1]);
+  if(rows.length===0){
+    panel.innerHTML='<div class="op-details-empty">NO SCHEDULE DATA</div>';
+  } else {
+    panel.innerHTML=`<div class="op-info-grid">${rows.map(r=>`<span class="op-info-key">${r[0]}</span><span class="op-info-val">${esc(r[1])}</span>`).join('')}</div>`;
+  }
+}
+
+// ── IMPORT FROM HUB ───────────────────────────────────────
+function openImportModal(){
+  const currentSet = new Set(opSlotMap);
+  const available = [];
+  for(let i=0; i<MAX_MATCHES; i++){
+    if(matchVisible[i] && !currentSet.has(i)){
+      const d = matchMeta[i].isoDate;
+      if(!d || d===calendarDate) available.push(i);
+    }
+  }
+  if(available.length===0){ toast('NO OTHER MATCHES AVAILABLE FOR THIS DAY'); return; }
+  let pos=0;
+  const list = document.getElementById('import-hub-list');
+  list.innerHTML = available.map(si => {
+    pos++;
+    const m = matchMeta[si];
+    const label = _hubCardLabel(m, pos);
+    const teamsText = m.home ? (m.away ? `${m.home} VS ${m.away}` : m.home) : '';
+    return `<button class="import-match-item" onclick="importMatchToOp(${si})">
+      <div class="import-match-label">${esc(label)}</div>
+      ${teamsText ? `<div class="import-match-teams">${esc(teamsText)}</div>` : ''}
+      ${m.isoDate ? `<div class="import-match-date">${_isoDisplay(m.isoDate)}</div>` : ''}
+    </button>`;
+  }).join('');
+  document.getElementById('modal-import-hub').classList.remove('hidden');
+}
+function importMatchToOp(slotIdx){
+  opSlotMap.push(slotIdx);
+  closeModal('modal-import-hub');
+  renderOpColumns();
+  renderAll();
+}
 
 // ── MODALS ───────────────────────────────────────────────
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
@@ -2276,8 +2338,9 @@ function confirmEditMatch(){
     if(hiddenSel) hiddenSel.value=newTz;
     matchTimers[ctx.i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,newTz); });
   }
+  const _prevMeta = matchMeta[ctx.i]; // preserve fields not in the edit form
   matchMeta[ctx.i]={
-    label:(document.getElementById('em-label').value.trim().toUpperCase())||matchMeta[ctx.i].label,
+    label:(document.getElementById('em-label').value.trim().toUpperCase())||_prevMeta.label,
     home,
     away,
     homeColour:document.getElementById('em-home-c').value,
@@ -2296,6 +2359,8 @@ function confirmEditMatch(){
     arCtrl:   document.getElementById('em-ar-ctrl').value.trim(),
     arRend:   document.getElementById('em-ar-rend').value.trim(),
     tracker:  document.getElementById('em-tracker').value.trim(),
+    isoDate:  _prevMeta.isoDate || '', // PRESERVE — not in edit form, must not be lost
+    day:      _prevMeta.day     || '', // PRESERVE — original raw day string from PDF import
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
 }
@@ -2539,7 +2604,7 @@ function _fitHubTeamsRows(){
 // Font starts at 24px; minimum floor is 10px to stay legible on monitor.
 function _fitOpTeamsRows(){
   requestAnimationFrame(()=>{
-    [0,1,2].forEach(i=>{
+    opSlotMap.forEach((_,i)=>{
       const el=document.getElementById(`match-teams-${i}`);
       if(!el) return;
 
@@ -2621,7 +2686,7 @@ function parseDayToISO(dayStr, refISO){
   return '';
 }
 
-// Rebuild which match slots are shown in the 3 operator columns for the current day
+// Rebuild which match slots are shown in operator columns for the current day (dynamic — any count)
 function _rebuildOpSlotMap(){
   const slots=[];
   for(let i=0;i<MAX_MATCHES;i++){
@@ -2630,22 +2695,57 @@ function _rebuildOpSlotMap(){
       if(!d||d===calendarDate) slots.push(i); // no date = always visible (backward compat)
     }
   }
-  opSlotMap   =[slots[0]??0, slots[1]??0, slots[2]??0];
-  opSlotActive=[slots.length>=1, slots.length>=2, slots.length>=3];
-  [0,1,2].forEach(col=>{
-    document.getElementById(`match-col-${col}`)?.classList.toggle('hidden-match',!opSlotActive[col]);
-  });
+  opSlotMap = slots; // dynamic — all matches for the day
+  renderOpColumns();
   updateAddMatchBtn();
+}
+
+// Dynamically rebuild the operator column DOM to match current opSlotMap
+function renderOpColumns(){
+  const grid = document.getElementById('matches-grid');
+  if(!grid) return;
+  const addCol = document.getElementById('add-match-col');
+  // Remove all existing match columns
+  grid.querySelectorAll('.match-col').forEach(el => el.remove());
+  // Create one column per slot in opSlotMap
+  opSlotMap.forEach((si, col) => {
+    const div = document.createElement('div');
+    div.className = 'match-col';
+    div.id = `match-col-${col}`;
+    const detailsOpen = opDetailsExpanded[si] ? '' : ' hidden';
+    div.innerHTML = `
+      <div class="match-header">
+        <button class="remove-match-btn" onclick="removeMatch(${col})" title="Remove from view">✕</button>
+        <div class="match-title-row">
+          <div class="match-label" id="match-label-${col}">MATCH ${col+1}</div>
+          <button class="edit-match-btn" onclick="opEditMatch(${col})" title="Edit match">✎</button>
+          <button class="details-toggle-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡</button>
+        </div>
+        <div class="match-teams" id="match-teams-${col}"></div>
+        <div class="match-local-time" id="match-clock-${col}">--:--:--</div>
+        <div class="match-date-line" id="match-date-${col}">${_isoDisplay(calendarDate)}</div>
+      </div>
+      <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
+      <div class="timers-list" id="timers-${col}"></div>
+      <div class="timer-footer">
+        <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
+        <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
+      </div>`;
+    grid.insertBefore(div, addCol);
+  });
 }
 
 // Apply calendarDate: refresh label, date lines, visibility, hub grid
 function _applyCalendarDate(silent){
   document.getElementById('cal-date-label').textContent=_isoDisplay(calendarDate);
-  [0,1,2].forEach(i=>{
+  _rebuildOpSlotMap(); // recalculates opSlotMap + calls renderOpColumns (rebuilds DOM)
+  // Update date lines for all active columns (after renderOpColumns creates them)
+  opSlotMap.forEach((_,i)=>{
     const el=document.getElementById(`match-date-${i}`);
     if(el) el.textContent=_isoDisplay(calendarDate);
   });
-  _rebuildOpSlotMap(); // recalculates opSlotMap + shows/hides op columns
+  // If hubTodayMode is active, track the new day in the hub range
+  if(hubTodayMode){ hubRangeStart=hubRangeEnd=calendarDate; _updateHubRangeUI(); }
   renderAll();         // refresh headers+timers (op) or hub grid
   if(!silent) scheduleSave();
 }
@@ -2705,8 +2805,8 @@ function _renderCalPopup(){
 
 function selectCalendarDate(iso){
   if(_calPickerMode==='hub-start'){
+    hubTodayMode=false; _updateHubTodayBtn(); // manual range change disengages TODAY mode
     hubRangeStart=iso;
-    // If end is before start, clear it
     if(hubRangeEnd && hubRangeEnd < hubRangeStart) hubRangeEnd=null;
     closeCalendar();
     _calPickerMode='cal';
@@ -2714,8 +2814,8 @@ function selectCalendarDate(iso){
     renderHubGrid();
     scheduleSave();
   } else if(_calPickerMode==='hub-end'){
+    hubTodayMode=false; _updateHubTodayBtn();
     hubRangeEnd=iso;
-    // If start is after end, clear it
     if(hubRangeStart && hubRangeStart > hubRangeEnd) hubRangeStart=null;
     closeCalendar();
     _calPickerMode='cal';
@@ -2771,7 +2871,25 @@ function openHubRangePicker(which, event){
   popup.classList.remove('cal-hidden');
 }
 
+function setHubToday(){
+  hubTodayMode = !hubTodayMode;
+  if(hubTodayMode){
+    hubRangeStart = hubRangeEnd = calendarDate;
+  } else {
+    hubRangeStart = hubRangeEnd = null;
+  }
+  _updateHubRangeUI();
+  _updateHubTodayBtn();
+  renderHubGrid();
+  scheduleSave();
+}
+function _updateHubTodayBtn(){
+  document.getElementById('hub-today-btn')?.classList.toggle('active', hubTodayMode);
+}
+
 function clearHubRange(which){
+  hubTodayMode = false; // manual clear disengages TODAY mode
+  _updateHubTodayBtn();
   if(which==='start') hubRangeStart=null;
   else                hubRangeEnd=null;
   _updateHubRangeUI();
@@ -2929,8 +3047,8 @@ function buildHubCard(i,now,displayNum){
       }).join('')}</div>`
     : '';
 
-  // Operate button only for matches 0-2 (OPERATOR view can show them)
-  const opBtn = i<3 ? `<button class="hub-card-btn op" onclick="operateMatch(${i})" title="Switch to OPERATOR">OP</button>` : '';
+  // All matches can now be operated (operator view supports dynamic column count)
+  const opBtn = `<button class="hub-card-btn op" onclick="operateMatch(${i})" title="Switch to OPERATOR">OP</button>`;
   const remBtn = i>0 ? `<button class="hub-card-btn rem" onclick="removeHubMatch(${i})" title="Remove match">✕</button>` : '';
 
   const card=document.createElement('div');
