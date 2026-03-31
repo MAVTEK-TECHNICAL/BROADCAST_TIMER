@@ -2329,37 +2329,47 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
 // hub-card-head width (the true clip boundary). If content overflows, progressively
 // tighten: letter-spacing → gap → font-size on TEXT spans only.
 // Badges (.team-badge-mini) are never resized — logos always stay intact.
+//
+// NOTE: hub-teams is overflow:visible so logos can use the card padding zone.
+// overflow:visible makes scrollWidth == clientWidth (browser doesn't track non-scroll
+// overflow), so we temporarily flip to overflow:hidden to force a true reading.
 function _fitHubTeamsRows(){
   requestAnimationFrame(()=>{
     document.querySelectorAll('#hub-grid .hub-teams').forEach(el=>{
+      // Helper: temporarily force overflow:hidden so scrollWidth reports true content width
+      const measure=()=>{
+        el.style.overflow='hidden';
+        const w=el.scrollWidth;
+        el.style.overflow='';
+        return w;
+      };
+
       // Reset any previous overrides
       el.style.letterSpacing='';
       el.style.gap='';
-      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>{
-        s.style.fontSize='';
-      });
+      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>s.style.fontSize='');
 
-      // Available width = hub-card-head clientWidth (overflow:hidden clips here).
-      // hub-teams is overflow:visible so its content can use the 7px padding zone.
+      // Available width = hub-card-head clientWidth (overflow:hidden clips here)
       const avail=el.parentElement.clientWidth;
-      if(el.scrollWidth<=avail) return;
+      if(measure()<=avail) return;
 
       // 1. Remove letter-spacing
       el.style.letterSpacing='0';
-      if(el.scrollWidth<=avail) return;
+      if(measure()<=avail) return;
 
       // 2. Tighten gap
       el.style.gap='1px';
-      if(el.scrollWidth<=avail) return;
+      if(measure()<=avail) return;
       el.style.gap='0';
-      if(el.scrollWidth<=avail) return;
+      if(measure()<=avail) return;
 
       // 3. Shrink text spans only (not badges) down to 7px minimum
       const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini)')];
       let fs=parseFloat(getComputedStyle(el).fontSize);
-      while(el.scrollWidth>avail && fs>7){
+      while(fs>7){
         fs=Math.max(7, fs-0.5);
         textSpans.forEach(s=>s.style.fontSize=`${fs}px`);
+        if(measure()<=avail) break;
       }
     });
   });
