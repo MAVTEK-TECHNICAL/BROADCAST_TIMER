@@ -76,7 +76,7 @@ function boot() {
   --accent:#00d4ff; --accent2:#ff6b35;
   --green:#00ff88; --red:#ff3355; --yellow:#ffd600; --purple:#9b59b6;
   --text:#e8ecf4; --text-dim:#6b7390; --text-mid:#9ba3bf;
-  --brand-color:#00d4ff;
+  --brand-color:#ff6b35;
   --mono:'Share Tech Mono',monospace;
   --display:'Oswald',sans-serif;
   --ui:'Rajdhani',sans-serif;
@@ -474,6 +474,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .btn-sm{ background:transparent;border-color:var(--border-bright);color:var(--text-mid); }
 .btn-sm:hover{ border-color:var(--accent);color:var(--accent); }
 .modal-divider{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:-4px; }
+/* ─── EDIT MATCH — WIDE 3-COLUMN MODAL ─────────────────────── */
+.em-wide-modal{ width:min(92vw,960px)!important;max-width:none!important; }
+.em-3col{ display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;align-items:start; }
+.em-col{ padding:0 18px;border-right:1px solid var(--border); }
+.em-col:first-child{ padding-left:0; }
+.em-col:last-child{ padding-right:0;border-right:none; }
+.em-col-center{ }
+.em-col-title{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px; }
 .time-picker-row{ display:flex;flex-direction:row;align-items:center;gap:10px; }
 .time-text{ flex:1;font-family:var(--mono)!important;font-size:28px!important;padding:10px 14px!important;letter-spacing:4px;text-align:center;min-width:0; }
 .time-text::placeholder{ color:var(--border-bright);letter-spacing:3px; }
@@ -769,16 +777,40 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-today-btn.active{ background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green); }
 .hub-layout-sep{ width:1px;height:20px;background:var(--border-bright);flex-shrink:0; }
 
-/* ─── OPERATOR DETAILS PANEL ───────────────────────────── */
-.op-details-panel{ background:var(--surface3);border-bottom:1px solid var(--border);padding:6px 10px;flex-shrink:0; }
+/* ─── OPERATOR DETAILS PANEL (bottom of column, above footer) ─ */
+.op-details-panel{
+  background:var(--surface3);border-top:1px solid var(--border);
+  padding:6px 10px;flex-shrink:0;max-height:180px;overflow-y:auto;
+}
 .op-details-panel.hidden{ display:none; }
 .op-info-grid{ display:grid;grid-template-columns:auto 1fr;gap:1px 8px; }
 .op-info-key{ font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;line-height:1.6; }
 .op-info-val{ font-family:var(--mono);font-size:9px;color:var(--text-mid);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.6; }
 .op-details-empty{ font-family:var(--mono);font-size:9px;color:var(--border-bright);text-align:center;letter-spacing:1px;text-transform:uppercase;padding:2px 0; }
-.details-toggle-btn{ background:none;border:none;color:var(--text-dim);font-size:13px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;flex-shrink:0; }
-.details-toggle-btn:hover{ color:var(--accent); }
-.details-toggle-btn.active{ color:var(--accent); }
+/* DETAILS button in footer — off: dashed (like SORT); on: purple fill */
+.details-footer-btn{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  background:transparent;border:1px dashed var(--border-bright);border-radius:4px;
+  color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;
+  text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap;
+}
+.details-footer-btn:hover{ border-color:var(--purple);color:var(--purple); }
+.details-footer-btn.active{ background:var(--purple);border-color:var(--purple);border-style:solid;color:#fff; }
+
+/* ─── COMPACT TIMER ROWS (narrow columns, many matches) ── */
+.match-col.compact .timer-row{
+  grid-template-columns:1fr auto 20px;
+  grid-template-rows:auto auto;
+  grid-template-areas:"name name remove" "time countdown remove";
+  padding:4px 8px;gap:0 6px;min-height:40px;
+}
+.match-col.compact .timer-drag-handle{ display:none; }
+.match-col.compact .timer-name{ grid-area:name;font-size:11px;letter-spacing:.06em; }
+.match-col.compact .timer-time-set{ grid-area:time;font-size:12px;border-bottom-style:none; }
+.match-col.compact .timer-countdown{ grid-area:countdown;font-size:14px;text-align:right; }
+.match-col.compact .timer-remove{ grid-area:remove;align-self:center;display:none; }
+.match-col.compact .timer-row.optional:hover .timer-remove{ display:flex; }
+.match-col.compact .timer-section-spacer{ height:14px; }
 
 /* ─── IMPORT FROM HUB ──────────────────────────────────── */
 .import-hub-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:2px dashed var(--purple);border-radius:6px;color:var(--purple);cursor:pointer;transition:all .2s;padding:8px 6px;font-family:var(--display);font-size:8px;letter-spacing:1.5px;text-transform:uppercase;width:48px;flex-shrink:0; }
@@ -886,7 +918,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <div class="opts-panel-title">OPTIONS</div>
           <div class="opts-row">
             <span class="opts-label">COLOUR</span>
-            <input class="colour-inp" id="global-color" type="color" value="#00d4ff" oninput="setBrandColor(this.value)" title="Default colour for dividers, labels and card accents" />
+            <input class="colour-inp" id="global-color" type="color" value="#ff6b35" oninput="setBrandColor(this.value)" title="Default colour for dividers, labels and card accents" />
           </div>
           <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">HUB TZ</span>
@@ -1059,114 +1091,130 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
 <!-- MODAL: Edit Match -->
 <div class="modal-overlay hidden" id="modal-edit-match">
-  <div class="modal" style="width:460px;max-width:96vw;">
+  <div class="modal em-wide-modal">
     <div class="modal-title">EDIT MATCH</div>
-    <div class="modal-field">
-      <label>Match Label</label>
-      <input class="modal-input" id="em-label" type="text" style="font-family:var(--ui);font-size:14px;letter-spacing:2px;" />
-    </div>
-    <div class="modal-field">
-      <label>Time Zone</label>
-      <select class="modal-input" id="em-tz" style="font-family:var(--ui);font-size:13px;"></select>
-    </div>
-    <div class="modal-divider">TEAMS</div>
-    <div class="modal-field">
-      <label>Sport</label>
-      <select class="sport-select" id="em-sport" onchange="onSportChange()">
-        <option value="">— CUSTOM (free text) —</option>
-        <option value="AFL">AFL</option>
-        <option value="Netball">SUPER NETBALL</option>
-        <option value="Golf (WPGA)">GOLF — WPGA TOUR</option>
-        <option value="Golf (PGA)">GOLF — PGA TOUR</option>
-      </select>
-    </div>
-    <!-- HOME -->
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Home</label>
-      <div class="team-picker hidden" id="em-home-picker"></div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <input class="modal-input" id="em-home" type="text" placeholder="TEAM A" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
-        <div class="colour-wrap">
-          <span class="colour-lbl">Colour</span>
-          <input class="colour-inp" id="em-home-c" type="color" value="#00d4ff" />
+    <div class="em-3col">
+
+      <!-- ── LEFT: Match Info + Hub Display ─────────────────── -->
+      <div class="em-col">
+        <div class="em-col-title">MATCH INFO</div>
+        <div class="modal-field">
+          <label>Match Label</label>
+          <input class="modal-input" id="em-label" type="text" style="font-family:var(--ui);font-size:14px;letter-spacing:2px;" />
+        </div>
+        <div class="modal-field">
+          <label>Time Zone</label>
+          <select class="modal-input" id="em-tz" style="font-family:var(--ui);font-size:13px;"></select>
+        </div>
+        <div class="em-col-title" style="margin-top:14px">HUB DISPLAY</div>
+        <div class="opts-row" style="padding:4px 0">
+          <span class="opts-label">CARD COLOUR</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="em-card-custom" onchange="document.getElementById('em-card-c').disabled=!this.checked" style="cursor:pointer;accent-color:var(--accent)" />
+            <label for="em-card-custom" style="font-size:10px;color:var(--text-dim);letter-spacing:1px;cursor:pointer">CUSTOM</label>
+            <input class="colour-inp" id="em-card-c" type="color" value="#ff6b35" disabled />
+          </div>
+        </div>
+        <div class="opts-row" style="padding:4px 0">
+          <span class="opts-label">TIMER NAME ALIGN</span>
+          <div class="name-mode-btns">
+            <button class="nmb" id="em-align-left"   onclick="setEmAlign('left')">LEFT</button>
+            <button class="nmb" id="em-align-center" onclick="setEmAlign('center')">CENTER</button>
+            <button class="nmb" id="em-align-right"  onclick="setEmAlign('right')">RIGHT</button>
+          </div>
         </div>
       </div>
-    </div>
-    <!-- AWAY -->
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Away</label>
-      <div class="team-picker hidden" id="em-away-picker"></div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <input class="modal-input" id="em-away" type="text" placeholder="TEAM B" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
-        <div class="colour-wrap">
-          <span class="colour-lbl">Colour</span>
-          <input class="colour-inp" id="em-away-c" type="color" value="#ff6b35" />
+
+      <!-- ── CENTER: Team Selector ───────────────────────────── -->
+      <div class="em-col em-col-center">
+        <div class="em-col-title">TEAMS</div>
+        <div class="modal-field">
+          <label>Sport</label>
+          <select class="sport-select" id="em-sport" onchange="onSportChange()">
+            <option value="">— CUSTOM (free text) —</option>
+            <option value="AFL">AFL</option>
+            <option value="Netball">SUPER NETBALL</option>
+            <option value="Golf (WPGA)">GOLF — WPGA TOUR</option>
+            <option value="Golf (PGA)">GOLF — PGA TOUR</option>
+          </select>
+        </div>
+        <!-- HOME -->
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+          <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Home</label>
+          <div class="team-picker hidden" id="em-home-picker"></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input class="modal-input" id="em-home" type="text" placeholder="TEAM A" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
+            <div class="colour-wrap">
+              <span class="colour-lbl">Colour</span>
+              <input class="colour-inp" id="em-home-c" type="color" value="#00d4ff" />
+            </div>
+          </div>
+        </div>
+        <!-- AWAY -->
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+          <label style="font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase">Away</label>
+          <div class="team-picker hidden" id="em-away-picker"></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input class="modal-input" id="em-away" type="text" placeholder="TEAM B" style="font-family:var(--mono);font-size:14px;letter-spacing:2px;flex:1" />
+            <div class="colour-wrap">
+              <span class="colour-lbl">Colour</span>
+              <input class="colour-inp" id="em-away-c" type="color" value="#ff6b35" />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-divider">HUB DISPLAY</div>
-    <div class="opts-row" style="padding:4px 0">
-      <span class="opts-label">CARD COLOUR</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="em-card-custom" onchange="document.getElementById('em-card-c').disabled=!this.checked" style="cursor:pointer;accent-color:var(--accent)" />
-        <label for="em-card-custom" style="font-size:10px;color:var(--text-dim);letter-spacing:1px;cursor:pointer">CUSTOM</label>
-        <input class="colour-inp" id="em-card-c" type="color" value="#00d4ff" disabled />
+
+      <!-- ── RIGHT: Schedule Data ────────────────────────────── -->
+      <div class="em-col">
+        <div class="em-col-title">SCHEDULE DATA</div>
+        <div class="modal-field">
+          <label>Game Schedule</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="modal-input" id="em-schedule" type="text" placeholder="e.g. GIA v VIX" style="flex:1;font-family:var(--mono);font-size:13px;letter-spacing:1px;" />
+            <button class="btn btn-sm" onclick="applySchedule()" style="white-space:nowrap;padding:5px 12px;font-size:11px;letter-spacing:1.5px;">PARSE</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <div class="modal-field">
+            <label>Location</label>
+            <input class="modal-input" id="em-location" type="text" placeholder="e.g. Marvel Stadium" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Host</label>
+            <input class="modal-input" id="em-host" type="text" placeholder="e.g. FOX AFL" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Hub</label>
+            <input class="modal-input" id="em-hub-field" type="text" placeholder="e.g. AHS CR 05" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Truck</label>
+            <input class="modal-input" id="em-truck" type="text" placeholder="e.g. HG31" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>VIZ Main</label>
+            <input class="modal-input" id="em-main" type="text" placeholder="e.g. AHS 01" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>VIZ Backup</label>
+            <input class="modal-input" id="em-backup" type="text" placeholder="e.g. AHS 03" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>AR Ctrl</label>
+            <input class="modal-input" id="em-ar-ctrl" type="text" placeholder="e.g. CTL02" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>AR Rend</label>
+            <input class="modal-input" id="em-ar-rend" type="text" placeholder="e.g. REN02" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Tracker</label>
+            <input class="modal-input" id="em-tracker" type="text" placeholder="e.g. Tracker" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="opts-row" style="padding:4px 0">
-      <span class="opts-label">TIMER NAME ALIGN</span>
-      <div class="name-mode-btns">
-        <button class="nmb" id="em-align-left"   onclick="setEmAlign('left')">LEFT</button>
-        <button class="nmb" id="em-align-center" onclick="setEmAlign('center')">CENTER</button>
-        <button class="nmb" id="em-align-right"  onclick="setEmAlign('right')">RIGHT</button>
-      </div>
-    </div>
-    <div class="modal-divider">SCHEDULE DATA</div>
-    <div class="modal-field">
-      <label>Game Schedule</label>
-      <div style="display:flex;gap:6px;align-items:center">
-        <input class="modal-input" id="em-schedule" type="text" placeholder="e.g. GIA v VIX" style="flex:1;font-family:var(--mono);font-size:13px;letter-spacing:1px;" />
-        <button class="btn btn-sm" onclick="applySchedule()" style="white-space:nowrap;padding:5px 12px;font-size:11px;letter-spacing:1.5px;">PARSE</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="modal-field">
-        <label>Location</label>
-        <input class="modal-input" id="em-location" type="text" placeholder="e.g. Marvel Stadium" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>Host</label>
-        <input class="modal-input" id="em-host" type="text" placeholder="e.g. FOX AFL" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>Hub</label>
-        <input class="modal-input" id="em-hub-field" type="text" placeholder="e.g. AHS CR 05" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>Truck</label>
-        <input class="modal-input" id="em-truck" type="text" placeholder="e.g. HG31" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>VIZ Main</label>
-        <input class="modal-input" id="em-main" type="text" placeholder="e.g. AHS 01" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>VIZ Backup</label>
-        <input class="modal-input" id="em-backup" type="text" placeholder="e.g. AHS 03" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>AR Ctrl</label>
-        <input class="modal-input" id="em-ar-ctrl" type="text" placeholder="e.g. CTL02" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>AR Rend</label>
-        <input class="modal-input" id="em-ar-rend" type="text" placeholder="e.g. REN02" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-      <div class="modal-field">
-        <label>Tracker</label>
-        <input class="modal-input" id="em-tracker" type="text" placeholder="e.g. Tracker" style="font-family:var(--mono);font-size:12px;" />
-      </div>
-    </div>
+
+    </div><!-- /em-3col -->
     <div class="modal-buttons">
       <button class="btn btn-cancel"  onclick="closeModal('modal-edit-match')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmEditMatch()">SAVE</button>
@@ -1314,7 +1362,7 @@ let hubTeamDisplayMode = 'long'; // 'long' | 'short' | 'tri'  — hub view
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let hubLogoSize     = 'off';  // 'off' | 'small' | 'medium' | 'large'
 let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no bg
-let brandColor      = '#00d4ff'; // global default colour for borders, labels, dividers
+let brandColor      = '#ff6b35'; // global default colour for borders, labels, dividers
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 let calendarDate  = _todayISO(); // currently selected date YYYY-MM-DD (local time)
@@ -2719,19 +2767,30 @@ function renderOpColumns(){
         <div class="match-title-row">
           <div class="match-label" id="match-label-${col}">MATCH ${col+1}</div>
           <button class="edit-match-btn" onclick="opEditMatch(${col})" title="Edit match">✎</button>
-          <button class="details-toggle-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡</button>
         </div>
         <div class="match-teams" id="match-teams-${col}"></div>
         <div class="match-local-time" id="match-clock-${col}">--:--:--</div>
         <div class="match-date-line" id="match-date-${col}">${_isoDisplay(calendarDate)}</div>
       </div>
-      <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
       <div class="timers-list" id="timers-${col}"></div>
+      <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
       <div class="timer-footer">
         <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
         <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
+        <button class="details-footer-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
       </div>`;
     grid.insertBefore(div, addCol);
+  });
+  // Attach ResizeObserver to each column to toggle compact mode when narrow
+  const RO = window._colResizeObserver;
+  if(RO) RO.disconnect();
+  window._colResizeObserver = new ResizeObserver(entries=>{
+    entries.forEach(e=>{
+      e.target.classList.toggle('compact', e.contentRect.width < 220);
+    });
+  });
+  grid.querySelectorAll('.match-col').forEach(col=>{
+    window._colResizeObserver.observe(col);
   });
 }
 
@@ -2969,6 +3028,13 @@ function renderHubGrid(){
   btn.innerHTML='<span style="font-size:16px;font-family:var(--mono)">+</span>&nbsp;ADD MATCH';
   btn.onclick=addHubMatch;
   grid.appendChild(btn);
+
+  // Dynamic row heights: card rows = 1fr (stretch to fill), add-button row = auto
+  const cardRows=Math.max(1,Math.ceil(active/hubCols));
+  const addInNewRow=(active%hubCols)===0;
+  grid.style.gridTemplateRows=addInNewRow
+    ?`repeat(${cardRows},1fr) auto`
+    :`repeat(${cardRows},1fr)`;
 }
 
 // Returns the display label for a hub card.
