@@ -1244,7 +1244,7 @@ const SPORTS_DATA = {
     {name:'West Coast Fever',         short:'Fever',        abbr:'WCF', primary:'#1a5f3f', secondary:'#0b3124', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/2/28/West_Coast_Fever_Logo.svg/400px-West_Coast_Fever_Logo.svg.png'},
   ],
   'Golf (WPGA)':[
-    {name:'Australian WPGA Championship',              short:'AUS WPGA Champ',         abbr:'AWPG', primary:'#7d3c98', secondary:'#4a235a', logo:'https://ocs-aus.sgp1.cdn.digitaloceanspaces.com/pgaaus/logos/2025/3336/3336.png'},
+    {name:'Australian WPGA Championship',              short:'AUS WPGA Champ',         abbr:'AWPG', primary:'#7d3c98', secondary:'#4a235a', logo:'https://ocs-aus.sgp1.cdn.digitaloceanspaces.com/pgaaus/logos/2025/009W/009W.jpg'},
     {name:"Women's Australian Open",                   short:"Women's AO",             abbr:'WAO',  primary:'#7d3c98', secondary:'#4a235a', logo:'https://ocs-aus.sgp1.cdn.digitaloceanspaces.com/pgaaus/logos/2025/3333/3333.webp'},
     {name:"FORD Women's NSW Open",                     short:"Women's NSW Open",       abbr:'WNSW', primary:'#7d3c98', secondary:'#4a235a', logo:'https://ocs-aus.sgp1.cdn.digitaloceanspaces.com/pgaaus/logos/2025/020W/020W.jpg'},
     {name:'Vic Open - Women',                          short:'Vic Open Women',         abbr:'VICW', primary:'#7d3c98', secondary:'#4a235a', logo:'https://ocs-aus.sgp1.cdn.digitaloceanspaces.com/pgaaus/logos/2024/105W/105W.jpg'},
@@ -2055,6 +2055,17 @@ function openEditMatch(i){
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
+function _resolveTeamRef(sport, rawName){
+  // 1. Exact full-name match in SPORTS_DATA
+  const direct=findTeamRef(sport, rawName);
+  if(direct) return direct;
+  // 2. Fuzzy match via SCHED_TEAMS (handles abbrs like "AUS WPGA CHAMP")
+  if(sport){
+    const fuzzy=fuzzyMatchTeam(rawName, sport);
+    if(fuzzy) return findTeamRef(sport, fuzzy.name.toUpperCase());
+  }
+  return null;
+}
 function confirmEditMatch(){
   const home=document.getElementById('em-home').value.trim().toUpperCase();
   const away=document.getElementById('em-away').value.trim().toUpperCase();
@@ -2075,8 +2086,8 @@ function confirmEditMatch(){
     awayColour:document.getElementById('em-away-c').value,
     cardColor:document.getElementById('em-card-custom').checked ? document.getElementById('em-card-c').value : null,
     sport,
-    homeTeamRef:findTeamRef(sport,home),
-    awayTeamRef:findTeamRef(sport,away),
+    homeTeamRef:_resolveTeamRef(sport,home),
+    awayTeamRef:_resolveTeamRef(sport,away),
     timerNameAlign: ctx.timerNameAlign||'left',
     location: document.getElementById('em-location').value.trim(),
     host:     document.getElementById('em-host').value.trim().toUpperCase(),
