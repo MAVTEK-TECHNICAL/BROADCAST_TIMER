@@ -716,7 +716,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-card-date{
   font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1) * var(--hub-date-scale,1));font-weight:600;
   color:var(--text-dim);letter-spacing:.06em;text-align:center;width:100%;margin-top:1px;
-  text-transform:uppercase;white-space:nowrap;overflow:hidden;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:clip;
 }
 .hub-t-cd{
   font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;
@@ -2757,17 +2757,23 @@ function _fitHubDateLines(){
   if(!grid) return;
   const els=grid.querySelectorAll('.hub-card-date');
   if(!els.length) return;
-  // Reset to 1 first so we measure at full size
+  // Reset scale to 1 so we measure at full size
   grid.style.setProperty('--hub-date-scale','1');
   let minScale=1;
   els.forEach(el=>{
-    if(el.clientWidth>0 && el.scrollWidth>el.clientWidth){
-      minScale=Math.min(minScale, el.clientWidth/el.scrollWidth);
+    const avail=el.clientWidth;
+    if(avail<=0) return;
+    // Temporarily allow overflow so scrollWidth reflects true content width
+    el.style.overflow='visible';
+    const full=el.scrollWidth;
+    el.style.overflow='';
+    if(full>avail){
+      minScale=Math.min(minScale, avail/full);
     }
   });
   // Clamp: don't shrink below 60% of base size
   minScale=Math.max(0.6, Math.min(1, minScale));
-  if(minScale<1) grid.style.setProperty('--hub-date-scale', minScale);
+  grid.style.setProperty('--hub-date-scale', minScale);
 }
 
 // ── OPERATOR TEAMS SHRINK-FIT ────────────────────────────
