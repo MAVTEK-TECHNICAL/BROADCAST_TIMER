@@ -714,9 +714,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   color:#fff;letter-spacing:.08em;line-height:1;margin-top:4px;text-align:center;width:100%;
 }
 .hub-card-date{
-  font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1));font-weight:600;
+  font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1) * var(--hub-date-scale,1));font-weight:600;
   color:var(--text-dim);letter-spacing:.06em;text-align:center;width:100%;margin-top:1px;
-  text-transform:uppercase;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;
 }
 .hub-t-cd{
   font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;
@@ -2749,6 +2749,27 @@ function _fitHubTeamsRows(){
   });
 }
 
+// ── HUB DATE SHRINK-FIT ──────────────────────────────────
+// After render, find the minimum scale factor so no date line overflows its card.
+// Applies the same scale to ALL hub cards so they look uniform.
+function _fitHubDateLines(){
+  const grid=document.getElementById('hub-grid');
+  if(!grid) return;
+  const els=grid.querySelectorAll('.hub-card-date');
+  if(!els.length) return;
+  // Reset to 1 first so we measure at full size
+  grid.style.setProperty('--hub-date-scale','1');
+  let minScale=1;
+  els.forEach(el=>{
+    if(el.clientWidth>0 && el.scrollWidth>el.clientWidth){
+      minScale=Math.min(minScale, el.clientWidth/el.scrollWidth);
+    }
+  });
+  // Clamp: don't shrink below 60% of base size
+  minScale=Math.max(0.6, Math.min(1, minScale));
+  if(minScale<1) grid.style.setProperty('--hub-date-scale', minScale);
+}
+
 // ── OPERATOR TEAMS SHRINK-FIT ────────────────────────────
 // Same logic as hub shrink-fit but for the .match-teams rows in operator view.
 // .match-teams already has overflow:hidden so scrollWidth works without the toggle.
@@ -3145,6 +3166,9 @@ function renderHubGrid(){
 
   // Shrink-fit teams rows after paint
   _fitHubTeamsRows();
+
+  // Shrink-fit date lines after paint (uniform scale across all cards)
+  requestAnimationFrame(_fitHubDateLines);
 
   // "Add match" card — always available
   const btn=document.createElement('button');
