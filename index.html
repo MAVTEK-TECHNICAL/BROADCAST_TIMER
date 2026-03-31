@@ -589,10 +589,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-card-btn.op:hover{ border-color:var(--accent2);color:var(--accent2); }
 .hub-card-btn.rem:hover{ border-color:var(--red);color:var(--red); }
 .hub-teams{
-  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;
+  display:flex;align-items:center;justify-content:center;flex-wrap:nowrap;gap:3px;
   font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;letter-spacing:.04em;
   text-transform:uppercase;color:var(--text-mid);margin-top:3px;line-height:1.2;
-  overflow:hidden;
+  overflow:hidden;white-space:nowrap;
 }
 .hub-teams span[style*="color"],
 .match-teams span[style*="color"]{
@@ -2324,6 +2324,37 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
   return `<span class="team-badge-mini${szCls}" style="background:${t.primary};color:${tc};border:1.5px solid ${t.secondary}">${t.abbr}</span>`;
 }
 
+// ── HUB TEAMS SHRINK-FIT ─────────────────────────────────
+// After hub cards are painted, measure each .hub-teams row. If content overflows
+// its container, progressively tighten: letter-spacing → gap → scaleX (min 0.75).
+function _fitHubTeamsRows(){
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('#hub-grid .hub-teams').forEach(el=>{
+      // 1. Reset any previous overrides
+      el.style.letterSpacing='';
+      el.style.gap='';
+      el.style.transform='';
+      el.style.transformOrigin='';
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 2. Remove letter-spacing (won't let characters overlap)
+      el.style.letterSpacing='0';
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 3. Remove gap between flex items
+      el.style.gap='1px';
+      if(el.scrollWidth<=el.offsetWidth) return;
+      el.style.gap='0';
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 4. Last resort: scaleX to just fit, capped at 0.75 so letters stay readable
+      const ratio=Math.max(0.75, el.offsetWidth/el.scrollWidth);
+      el.style.transform=`scaleX(${ratio.toFixed(3)})`;
+      el.style.transformOrigin='left center';
+    });
+  });
+}
+
 // ── VIEW SWITCHING ────────────────────────────────────────
 function switchView(mode){
   viewMode=mode;
@@ -2372,6 +2403,9 @@ function renderHubGrid(){
   for(let i=0;i<MAX_MATCHES;i++){
     if(matchVisible[i]) grid.appendChild(buildHubCard(i,now));
   }
+
+  // Shrink-fit teams rows after paint
+  _fitHubTeamsRows();
 
   // "Add match" card (if room remains)
   if(active<MAX_MATCHES){
