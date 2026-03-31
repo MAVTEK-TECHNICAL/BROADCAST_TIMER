@@ -461,6 +461,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* ─── MODALS ─────────────────────────────────────────── */
 .modal-overlay{ position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:160;backdrop-filter:blur(4px);padding:16px;overflow-y:auto; }
 .modal-overlay.hidden{ display:none; }
+.modal-overlay.modal-ontop{ z-index:220; }
 .modal{ background:var(--surface);border:1px solid var(--border-bright);border-top:3px solid var(--accent);border-radius:8px;padding:24px;width:320px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 32px);overflow-y:auto;flex-shrink:0; }
 .modal-title{ font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:3px;color:var(--accent);text-transform:uppercase; }
 .modal-field{ display:flex;flex-direction:column;gap:6px; }
@@ -2355,7 +2356,7 @@ function importMatchToOp(slotIdx){
 }
 
 // ── MODALS ───────────────────────────────────────────────
-function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+function closeModal(id){ const el=document.getElementById(id); el.classList.add('hidden'); el.classList.remove('modal-ontop'); }
 
 function openSetTime(mi, tid){
   ctx={mi,tid};
@@ -2618,13 +2619,17 @@ function emRenderTimers(mi){
 }
 
 function emAddTimer(){
-  // openAddTimer sets ctx={mi} — save _emMatchIdx first so it survives
+  // openAddTimer sets ctx={mi} — _emMatchIdx stays intact
   openAddTimer(_emMatchIdx);
+  // Raise Add Timer modal above the Edit Match modal
+  document.getElementById('modal-add-timer').classList.add('modal-ontop');
 }
 
 function emEditTimer(tid){
   // openEditTimer sets ctx={mi,tid} — _emMatchIdx stays intact
   openEditTimer(_emMatchIdx, tid);
+  // Raise Edit Timer modal above the Edit Match modal
+  document.getElementById('modal-edit-timer').classList.add('modal-ontop');
 }
 
 function emDeleteTimer(tid){
