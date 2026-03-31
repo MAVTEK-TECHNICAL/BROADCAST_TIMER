@@ -1536,6 +1536,11 @@ function applyState(s){
   }
   if(s.matchMeta){
     matchMeta = Array.from({length:MAX_MATCHES}, (_,i)=>s.matchMeta[i] ? {...s.matchMeta[i]} : _defMeta(i));
+    // Re-resolve any null teamRefs — handles matches saved before a sport's logos were added
+    matchMeta.forEach(m=>{
+      if(m.sport && m.home && !m.homeTeamRef) m.homeTeamRef=_resolveTeamRef(m.sport, m.home);
+      if(m.sport && m.away && !m.awayTeamRef) m.awayTeamRef=_resolveTeamRef(m.sport, m.away);
+    });
   }
   // Load timers — support new per-key format, old flat format, and legacy nested array
   if(s.timers0 !== undefined){
