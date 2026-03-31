@@ -1488,6 +1488,10 @@ function isMatchVisible(i){
 }
 const MAX_MATCHES = 500; // supports a full calendar year of matches
 function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',day:'',isoDate:'',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
+// A slot is "empty" when it holds no meaningful data
+function _isSlotEmpty(i){ return !matchVisible[i] && !matchEnabled[i] && !matchMeta[i].home && !matchMeta[i].away && !matchMeta[i].isoDate && !matchMeta[i].location; }
+// Returns the first N free slot indices, filling from index 0 upward
+function _findFreeSlots(n){ const slots=[]; for(let i=0;i<MAX_MATCHES&&slots.length<n;i++) if(_isSlotEmpty(i)) slots.push(i); return slots; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1979,16 +1983,51 @@ async function importJSON(e){
   try {
     const data=JSON.parse(await file.text());
     const state=data.state||data;
+    // Extract only the match slots that carry real data from the imported file
+    const srcMeta    = state.matchMeta    || [];
+    const srcTimers  = state.matchTimers  || [];
+    const srcVisible = state.matchVisible || [];
+    const srcEnabled = state.matchEnabled || [];
+    const srcTzs     = state.matchTzs     || [];
+    // Collect populated source slots
+    const srcSlots=[];
+    for(let i=0;i<srcMeta.length;i++){
+      const m=srcMeta[i];
+      if(srcVisible[i]||m.home||m.away||m.isoDate||m.location) srcSlots.push(i);
+    }
+    if(!srcSlots.length){ toast('No match data found in file'); e.target.value=''; return; }
+    // Find free destination slots
+    const freeSlots=_findFreeSlots(srcSlots.length);
+    const toWrite=Math.min(srcSlots.length,freeSlots.length);
+    if(freeSlots.length<srcSlots.length){
+      toast(`${freeSlots.length} of ${srcSlots.length} matches imported — not enough free slots`);
+    }
+    let firstNewDate=null;
+    for(let ii=0;ii<toWrite;ii++){
+      const src=srcSlots[ii];
+      const dst=freeSlots[ii];
+      matchMeta[dst]   = srcMeta[src]    ? {..._defMeta(dst), ...srcMeta[src], label:srcMeta[src].label||`MATCH ${dst+1}`} : _defMeta(dst);
+      matchTimers[dst] = (srcTimers[src] && srcTimers[src].length) ? srcTimers[src].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,srcTzs[src]||'Australia/Sydney'):null})) : _defTimers();
+      matchTzs[dst]    = srcTzs[src]    || 'Australia/Sydney';
+      matchVisible[dst]= srcVisible[src] || false;
+      matchEnabled[dst]= srcEnabled[src] || false;
+      if(!firstNewDate && matchMeta[dst].isoDate) firstNewDate=matchMeta[dst].isoDate;
+    }
+    if(firstNewDate) calendarDate=firstNewDate;
+    // Save as a new showfile entry so it appears in the list
     const name=(data.name||file.name.replace('.json','')).toUpperCase();
     const {addDoc}=window._fb;
-    const ref=await addDoc(sfColRef(),{name, updatedAt:window._fb.serverTimestamp(), state});
+    const ref=await addDoc(sfColRef(),{name, updatedAt:window._fb.serverTimestamp(), state:buildPayload().state});
     sfId=ref.id; sfName=name;
-    applyState(state);
     updateSfUI();
     await refreshSfList();
-    toast(`IMPORTED: ${name}`);
+    updateAddMatchBtn();
+    switchView('hub'); renderAll();
+    _applyCalendarDate(true);
+    scheduleSave();
+    toast(`IMPORTED: ${toWrite} MATCH${toWrite!==1?'ES':''} FROM ${name}`);
     closeSidebar();
-  } catch(err){ toast('Import failed — invalid file'); }
+  } catch(err){ console.error(err); toast('Import failed — invalid file'); }
   e.target.value='';
 }
 
@@ -3140,9 +3179,9 @@ function _renderCalPopup(){
   }
   document.getElementById('cal-popup').innerHTML=`
     <div class="cal-popup-header">
-      <button class="cal-popup-nav" onclick="calPopupPrev()">&#8249;</button>
+      <button class="cal-popup-nav" onclick="event.stopPropagation();calPopupPrev()">&#8249;</button>
       <span class="cal-popup-month">${MNAMES[month]} ${year}</span>
-      <button class="cal-popup-nav" onclick="calPopupNext()">&#8250;</button>
+      <button class="cal-popup-nav" onclick="event.stopPropagation();calPopupNext()">&#8250;</button>
     </div>
     <div class="cal-grid-header">${['M','T','W','T','F','S','S'].map(h=>`<div class="cal-dh">${h}</div>`).join('')}</div>
     <div class="cal-grid">${cells}</div>`;
@@ -3865,18 +3904,18 @@ function confirmScheduleImport(){
     .filter(Boolean);
 
   if(!selected.length) return;
-  const count=Math.min(selected.length,MAX_MATCHES);
-  const matches=selected.slice(0,count);
+  const matches=selected.slice(0,MAX_MATCHES);
 
-  // Reset all match state
-  matchMeta    = Array.from({length:MAX_MATCHES},(_,i)=>_defMeta(i));
-  matchTimers  = Array.from({length:MAX_MATCHES},()=>_defTimers());
-  matchTzs     = Array(MAX_MATCHES).fill('Australia/Sydney');
-  matchVisible = Array(MAX_MATCHES).fill(false);
-  matchEnabled = Array(MAX_MATCHES).fill(false);
+  // Find free slots — append to existing data rather than overwriting
+  const freeSlots=_findFreeSlots(matches.length);
+  if(freeSlots.length<matches.length){
+    toast(`Only ${freeSlots.length} free slot${freeSlots.length!==1?'s':''} available — ${matches.length-freeSlots.length} match${matches.length-freeSlots.length!==1?'es':''} skipped`);
+  }
 
-  for(let i=0;i<matches.length;i++){
-    const m=matches[i];
+  let firstNewDate=null;
+  for(let ii=0;ii<freeSlots.length;ii++){
+    const i=freeSlots[ii];
+    const m=matches[ii];
     const sport=detectSportFromHost(m.host,m.game);
     const parts=m.game.split(/\s+(?:vs?|[-–])\s+/i).map(s=>s.trim()).filter(Boolean);
     const homeRaw=parts[0]||m.game;
@@ -3888,6 +3927,7 @@ function confirmScheduleImport(){
     const homeRef=findTeamRef(sport,homeName);
     const awayRef=findTeamRef(sport,awayName);
     const teamPrimary=(ref)=>ref&&SPORTS_DATA[sport]?.[ref.idx]?.primary;
+    const isoDate=parseDayToISO(m.day, schedRefISO);
     matchMeta[i]={
       ..._defMeta(i), label:`MATCH ${i+1}`,
       home:homeName, away:awayName, sport,
@@ -3899,15 +3939,15 @@ function confirmScheduleImport(){
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
       backup:(m.backup||'').toUpperCase(),
       arCtrl:m.arCtrl||'', arRend:m.arRend||'', tracker:m.tracker||'',
-      day:m.day||'',
-      isoDate:parseDayToISO(m.day, schedRefISO),
+      day:m.day||'', isoDate,
     };
+    matchTimers[i]=_defTimers();
     matchVisible[i]=true; matchEnabled[i]=true;
+    if(!firstNewDate && isoDate) firstNewDate=isoDate;
   }
 
-  // Set calendarDate to the first match's date (if parsed), else keep current
-  const firstDate=matchMeta.find(m=>m.isoDate)?.isoDate;
-  if(firstDate) calendarDate=firstDate;
+  // Move calendar to the first newly-imported date (if parsed)
+  if(firstNewDate) calendarDate=firstNewDate;
   updateAddMatchBtn();
   closeModal('modal-sched-import');
   switchView('hub'); renderAll();
