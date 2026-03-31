@@ -269,6 +269,25 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 }
 .top-bar-spacer{ flex:1; }
 .opts-divider{ height:1px;background:var(--border);margin:2px 0; }
+
+/* ── Day selector strip ───────────────────────────────── */
+.day-selector{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  padding:5px 10px;flex-shrink:0;
+}
+.day-selector.ds-hidden{ display:none; }
+.day-btn{
+  background:transparent;border:1px solid var(--border-bright);border-radius:4px;
+  color:var(--text-mid);font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:1.5px;padding:3px 10px;cursor:pointer;text-transform:uppercase;
+  transition:background .12s,border-color .12s,color .12s;white-space:nowrap;
+}
+.day-btn:hover{ color:var(--text);border-color:var(--text-mid); }
+.day-btn.active{
+  background:var(--brand-color);border-color:var(--brand-color);
+  color:#000;
+}
 .name-mode-ctrl{ display:flex;align-items:center;gap:8px;flex-shrink:0; }
 .name-mode-btns{ display:flex;border:1px solid var(--border-bright);border-radius:4px;overflow:hidden; }
 .nmb{
@@ -833,6 +852,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       </div>
     </div>
 
+    <!-- Day selector — shared by both views, auto-hides when ≤1 day -->
+    <div id="day-selector" class="day-selector ds-hidden"></div>
+
     <div id="matches-grid">
       <!-- Match 1 -->
       <div class="match-col" id="match-col-0">
@@ -1212,8 +1234,12 @@ let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no
 let brandColor      = '#00d4ff'; // global default colour for borders, labels, dividers
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
+let selectedDay = null; // null = show all days; string = filter to that day
+
+// Returns true when match i should be visible given the current day filter
+function isMatchVisible(i){ return !!matchVisible[i] && (!selectedDay || matchMeta[i].day===selectedDay); }
 const MAX_MATCHES = 16;
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',day:'',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1511,6 +1537,7 @@ function buildPayload(name){
       hubLogoSize,
       logoBgMode,
       hubCols,
+      selectedDay,
       matchTzs:[...matchTzs],
       matchVisible:[...matchVisible],
       matchEnabled:[...matchEnabled],
@@ -1529,6 +1556,7 @@ function applyState(s){
   if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
   if(s.logoBgMode!==undefined){ setLogoBg(s.logoBgMode, true); }
   if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
+  selectedDay = s.selectedDay||null;
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
@@ -1594,9 +1622,10 @@ function applyState(s){
   }
   [0,1,2].forEach(i=>{
     const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
-    document.getElementById(`match-col-${i}`).classList.toggle('hidden-match',!matchVisible[i]);
+    document.getElementById(`match-col-${i}`).classList.toggle('hidden-match',!isMatchVisible(i));
   });
   updateAddMatchBtn();
+  renderDaySelector();
   renderAll();
 }
 
@@ -2415,6 +2444,43 @@ function _fitOpTeamsRows(){
   });
 }
 
+// ── DAY SELECTOR ─────────────────────────────────────────
+function renderDaySelector(){
+  const el=document.getElementById('day-selector');
+  if(!el) return;
+
+  // Collect distinct days in schedule order (preserves PDF row order)
+  const seen=new Set(), days=[];
+  for(let i=0;i<MAX_MATCHES;i++){
+    const d=matchMeta[i].day;
+    if(d && matchVisible[i] && !seen.has(d)){ seen.add(d); days.push(d); }
+  }
+
+  if(days.length<2){
+    // Only one (or zero) days — hide the strip and clear filter
+    el.classList.add('ds-hidden');
+    selectedDay=null;
+    return;
+  }
+
+  el.classList.remove('ds-hidden');
+  el.innerHTML=
+    `<button class="day-btn${!selectedDay?' active':''}" onclick="setScheduleDay(null)">ALL</button>`+
+    days.map(d=>`<button class="day-btn${selectedDay===d?' active':''}" onclick="setScheduleDay(${JSON.stringify(d)})">${esc(d)}</button>`).join('');
+}
+
+function setScheduleDay(day){
+  selectedDay=day;
+  renderDaySelector();
+  // Update operator match-column visibility
+  [0,1,2].forEach(i=>{
+    document.getElementById(`match-col-${i}`)?.classList.toggle('hidden-match',!isMatchVisible(i));
+  });
+  // Rebuild hub grid if active
+  if(viewMode==='hub') renderHubGrid();
+  scheduleSave();
+}
+
 // ── VIEW SWITCHING ────────────────────────────────────────
 function switchView(mode){
   viewMode=mode;
@@ -2453,7 +2519,8 @@ function renderHubGrid(){
   grid.style.gridTemplateColumns=`repeat(${hubCols},1fr)`;
   grid.innerHTML='';
   const now=Date.now();
-  const active=matchVisible.filter(Boolean).length;
+  // Use isMatchVisible so day-filter is respected
+  const active=matchVisible.reduce((n,_,i)=>n+(isMatchVisible(i)?1:0),0);
   document.getElementById('hub-active-count').textContent=`${active} ACTIVE`;
   // Font scale: fewer rows = bigger text
   const rows=Math.max(1,Math.ceil(active/hubCols));
@@ -2461,7 +2528,7 @@ function renderHubGrid(){
   grid.style.setProperty('--hub-fs',fs);
 
   for(let i=0;i<MAX_MATCHES;i++){
-    if(matchVisible[i]) grid.appendChild(buildHubCard(i,now));
+    if(isMatchVisible(i)) grid.appendChild(buildHubCard(i,now));
   }
 
   // Shrink-fit teams rows after paint
@@ -2991,13 +3058,16 @@ function confirmScheduleImport(){
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
       backup:(m.backup||'').toUpperCase(),
       arCtrl:m.arCtrl||'', arRend:m.arRend||'', tracker:m.tracker||'',
+      day:m.day||'',
     };
     matchVisible[i]=true; matchEnabled[i]=true;
   }
 
+  selectedDay=null; // reset day filter on each new import
+  renderDaySelector();
   [0,1,2].forEach(i=>{
     const col=document.getElementById(`match-col-${i}`);
-    if(col) col.classList.toggle('hidden-match',!matchVisible[i]);
+    if(col) col.classList.toggle('hidden-match',!isMatchVisible(i));
   });
   updateAddMatchBtn();
   closeModal('modal-sched-import');
