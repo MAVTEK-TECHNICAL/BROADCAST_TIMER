@@ -1536,10 +1536,34 @@ function applyState(s){
   }
   if(s.matchMeta){
     matchMeta = Array.from({length:MAX_MATCHES}, (_,i)=>s.matchMeta[i] ? {...s.matchMeta[i]} : _defMeta(i));
-    // Re-resolve any null teamRefs — handles matches saved before a sport's logos were added
+    // Re-resolve teamRefs — handles matches saved before a sport was added, or saved without a sport set
+    const _validRef=ref=>ref&&SPORTS_DATA[ref.sport]?.[ref.idx];
+    const _findAcrossAllSports=name=>{
+      // 1. Exact full-name match
+      for(const sp of Object.keys(SPORTS_DATA)){
+        const ref=findTeamRef(sp,name);
+        if(ref) return ref;
+      }
+      // 2. Fuzzy match across all sports (handles abbrs/short names like "AUS WPGA CHAMP")
+      const fuzzy=fuzzyMatchTeam(name,'');
+      if(fuzzy){
+        for(const sp of Object.keys(SPORTS_DATA)){
+          const ref=findTeamRef(sp,fuzzy.name.toUpperCase());
+          if(ref) return ref;
+        }
+      }
+      return null;
+    };
     matchMeta.forEach(m=>{
-      if(m.sport && m.home && !m.homeTeamRef) m.homeTeamRef=_resolveTeamRef(m.sport, m.home);
-      if(m.sport && m.away && !m.awayTeamRef) m.awayTeamRef=_resolveTeamRef(m.sport, m.away);
+      if(m.home && !_validRef(m.homeTeamRef)){
+        m.homeTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.home) : null)
+                     || _findAcrossAllSports(m.home);
+        if(m.homeTeamRef && !m.sport) m.sport=m.homeTeamRef.sport;
+      }
+      if(m.away && !_validRef(m.awayTeamRef)){
+        m.awayTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.away) : null)
+                     || _findAcrossAllSports(m.away);
+      }
     });
   }
   // Load timers — support new per-key format, old flat format, and legacy nested array
