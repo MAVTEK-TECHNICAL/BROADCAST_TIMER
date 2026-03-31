@@ -2521,19 +2521,22 @@ function _resolveTeamRef(sport, rawName){
   return null;
 }
 function confirmEditMatch(){
+  // Use _emMatchIdx — stable reference that survives child modal ctx overwrites
+  const mi = _emMatchIdx;
+  if(mi==null) return;
   const home=document.getElementById('em-home').value.trim().toUpperCase();
   const away=document.getElementById('em-away').value.trim().toUpperCase();
   const sport=document.getElementById('em-sport').value||'';
   // Update match TZ and recalculate timer targets if it changed
   const newTz=document.getElementById('em-tz').value;
-  if(newTz && newTz!==matchTzs[ctx.i]){
-    matchTzs[ctx.i]=newTz;
-    const hiddenSel=document.getElementById(`match-tz-${ctx.i}`);
+  if(newTz && newTz!==matchTzs[mi]){
+    matchTzs[mi]=newTz;
+    const hiddenSel=document.getElementById(`match-tz-${mi}`);
     if(hiddenSel) hiddenSel.value=newTz;
-    matchTimers[ctx.i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,newTz); });
+    matchTimers[mi].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,newTz); });
   }
-  const _prevMeta = matchMeta[ctx.i]; // preserve fields not in the edit form
-  matchMeta[ctx.i]={
+  const _prevMeta = matchMeta[mi]; // preserve fields not in the edit form
+  matchMeta[mi]={
     label:(document.getElementById('em-label').value.trim().toUpperCase())||_prevMeta.label,
     home,
     away,
@@ -2543,7 +2546,7 @@ function confirmEditMatch(){
     sport,
     homeTeamRef:_resolveTeamRef(sport,home),
     awayTeamRef:_resolveTeamRef(sport,away),
-    timerNameAlign: ctx.timerNameAlign||'left',
+    timerNameAlign: ctx.timerNameAlign || matchMeta[mi].timerNameAlign || 'left',
     location: document.getElementById('em-location').value.trim(),
     host:     document.getElementById('em-host').value.trim().toUpperCase(),
     hub:      document.getElementById('em-hub-field').value.trim().toUpperCase(),
