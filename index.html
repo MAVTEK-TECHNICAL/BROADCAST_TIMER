@@ -489,6 +489,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .em-col-title{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px; }
 /* ── Edit Match — Timers column ─────────────────────────── */
 .em-timer-list{ display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:340px;overflow-y:auto; }
+.em-custom-row{ display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center; }
+.em-custom-row input{ font-family:var(--mono);font-size:11px; }
+.em-custom-del{ background:none;border:none;color:var(--border-bright);font-size:13px;cursor:pointer;padding:2px 4px;line-height:1;transition:color .15s; }
+.em-custom-del:hover{ color:var(--red); }
 .em-timer-list::-webkit-scrollbar{ width:3px; }
 .em-timer-list::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
 .em-timer-row{ display:grid;grid-template-columns:14px 1fr auto auto;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:5px 8px;cursor:grab;user-select:none;transition:border-color .15s,opacity .15s; }
@@ -1292,10 +1296,26 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <input class="modal-input" id="em-ar-rend" type="text" placeholder="e.g. REN02" style="font-family:var(--mono);font-size:12px;" />
           </div>
           <div class="modal-field">
+            <label>Drone Ctrl</label>
+            <input class="modal-input" id="em-drone-ctrl" type="text" placeholder="e.g. CTL03" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Drone Rend</label>
+            <input class="modal-input" id="em-drone-rend" type="text" placeholder="e.g. REN03" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
+            <label>Tactic</label>
+            <input class="modal-input" id="em-tactic" type="text" placeholder="e.g. AHM 05" style="font-family:var(--mono);font-size:12px;" />
+          </div>
+          <div class="modal-field">
             <label>Tracker</label>
             <input class="modal-input" id="em-tracker" type="text" placeholder="e.g. Tracker" style="font-family:var(--mono);font-size:12px;" />
           </div>
         </div>
+        <!-- Custom fields -->
+        <div class="em-col-title" style="margin-top:14px">CUSTOM FIELDS</div>
+        <div id="em-custom-fields" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+        <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:5px 0" onclick="emAddCustomField()">+ ADD FIELD</button>
       </div>
 
       <!-- ── TIMERS: Full list + add + reorder ────────────── -->
@@ -1487,7 +1507,7 @@ function isMatchVisible(i){
   return d===calendarDate;
 }
 const MAX_MATCHES = 500; // supports a full calendar year of matches
-function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',day:'',isoDate:'',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
+function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',day:'',isoDate:'',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',droneCtrl:'',droneRend:'',tactic:'',tracker:'',customFields:[]}; }
 // A slot is "empty" when it holds no meaningful data
 function _isSlotEmpty(i){ return !matchVisible[i] && !matchEnabled[i] && !matchMeta[i].home && !matchMeta[i].away && !matchMeta[i].isoDate && !matchMeta[i].location; }
 // Returns the first N free slot indices, filling from index 0 upward
@@ -2344,15 +2364,19 @@ function _renderOpDetails(col){
   if(!panel || !opDetailsExpanded[si]) return;
   const m = matchMeta[si];
   const rows = [
-    ['LOC',      m.location],
-    ['HUB',      resolveHubCode(m.hub)],
-    ['TRUCK',    m.truck],
-    ['HOST',     m.host],
-    ['VIZ MAIN', resolveVizEngine(m.main)],
-    ['VIZ BACK', resolveVizEngine(m.backup)],
-    ['AR CTRL',  m.arCtrl],
-    ['AR REND',  m.arRend],
-    ['TRACKER',  m.tracker],
+    ['LOC',        m.location],
+    ['HUB',        resolveHubCode(m.hub)],
+    ['TRUCK',      m.truck],
+    ['HOST',       m.host],
+    ['VIZ MAIN',   resolveVizEngine(m.main)],
+    ['VIZ BACK',   resolveVizEngine(m.backup)],
+    ['AR CTRL',    m.arCtrl],
+    ['AR REND',    m.arRend],
+    ['DRONE CTRL', m.droneCtrl],
+    ['DRONE REND', m.droneRend],
+    ['TACTIC',     resolveVizEngine(m.tactic)],
+    ['TRACKER',    m.tracker],
+    ...(m.customFields||[]).filter(cf=>cf.key).map(cf=>[cf.key.toUpperCase(), cf.val]),
   ].filter(r => r[1]);
   if(rows.length===0){
     panel.innerHTML='<div class="op-details-empty">NO SCHEDULE DATA</div>';
@@ -2542,8 +2566,12 @@ function openEditMatch(i){
   document.getElementById('em-backup').value=m.backup||'';
   document.getElementById('em-ar-ctrl').value=m.arCtrl||'';
   document.getElementById('em-ar-rend').value=m.arRend||'';
+  document.getElementById('em-drone-ctrl').value=m.droneCtrl||'';
+  document.getElementById('em-drone-rend').value=m.droneRend||'';
+  document.getElementById('em-tactic').value=m.tactic||'';
   document.getElementById('em-tracker').value=m.tracker||'';
   _emMatchIdx=i;
+  emRenderCustomFields(m.customFields||[]);
   emRenderTimers(i);
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
@@ -2594,7 +2622,11 @@ function confirmEditMatch(){
     backup:   document.getElementById('em-backup').value.trim().toUpperCase(),
     arCtrl:   document.getElementById('em-ar-ctrl').value.trim(),
     arRend:   document.getElementById('em-ar-rend').value.trim(),
+    droneCtrl:document.getElementById('em-drone-ctrl').value.trim(),
+    droneRend:document.getElementById('em-drone-rend').value.trim(),
+    tactic:   document.getElementById('em-tactic').value.trim(),
     tracker:  document.getElementById('em-tracker').value.trim(),
+    customFields: emReadCustomFields(),
     isoDate:  _prevMeta.isoDate || '', // PRESERVE — not in edit form, must not be lost
     day:      _prevMeta.day     || '', // PRESERVE — original raw day string from PDF import
   };
@@ -2658,6 +2690,41 @@ function emRenderTimers(mi){
     });
     list.appendChild(row);
   });
+}
+
+function emRenderCustomFields(fields){
+  const wrap=document.getElementById('em-custom-fields');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  (fields||[]).forEach((cf,idx)=>{
+    const row=document.createElement('div');
+    row.className='em-custom-row';
+    row.innerHTML=`
+      <input class="modal-input em-cf-key" type="text" placeholder="LABEL" value="${esc(cf.key||'')}" style="text-transform:uppercase;letter-spacing:1px;" />
+      <input class="modal-input em-cf-val" type="text" placeholder="VALUE" value="${esc(cf.val||'')}" />
+      <button class="em-custom-del" onclick="this.closest('.em-custom-row').remove()" title="Remove">✕</button>`;
+    wrap.appendChild(row);
+  });
+}
+
+function emAddCustomField(){
+  const wrap=document.getElementById('em-custom-fields');
+  if(!wrap) return;
+  const row=document.createElement('div');
+  row.className='em-custom-row';
+  row.innerHTML=`
+    <input class="modal-input em-cf-key" type="text" placeholder="LABEL" style="text-transform:uppercase;letter-spacing:1px;" />
+    <input class="modal-input em-cf-val" type="text" placeholder="VALUE" />
+    <button class="em-custom-del" onclick="this.closest('.em-custom-row').remove()" title="Remove">✕</button>`;
+  wrap.appendChild(row);
+  row.querySelector('.em-cf-key').focus();
+}
+
+function emReadCustomFields(){
+  return [...document.querySelectorAll('#em-custom-fields .em-custom-row')].map(row=>({
+    key: (row.querySelector('.em-cf-key').value.trim().toUpperCase()),
+    val: (row.querySelector('.em-cf-val').value.trim()),
+  })).filter(cf=>cf.key);
 }
 
 function emAddTimer(){
@@ -3419,24 +3486,29 @@ function buildHubCard(i,now,displayNum){
     </div>`;
   }).join('');
 
-  // Info grid (schedule data) — order: HUB, TRUCK, HOST, LOC, [spacer], VIZ MAIN, VIZ BACK, AR CTRL, AR REND, TRACKER
+  // Info grid (schedule data)
   const hubResolved=resolveHubCode(m.hub);
   const infoRows=[
-    ['HUB',      hubResolved],
-    ['TRUCK',    m.truck],
-    ['HOST',     m.host],
-    ['LOC',      m.location],
+    ['HUB',        hubResolved],
+    ['TRUCK',      m.truck],
+    ['HOST',       m.host],
+    ['LOC',        m.location],
     null,
-    ['VIZ MAIN', resolveVizEngine(m.main)],
-    ['VIZ BACK', resolveVizEngine(m.backup)],
-    ['AR CTRL',  m.arCtrl],
-    ['AR REND',  m.arRend],
-    ['TRACKER',  m.tracker],
+    ['VIZ MAIN',   resolveVizEngine(m.main)],
+    ['VIZ BACK',   resolveVizEngine(m.backup)],
+    ['AR CTRL',    m.arCtrl],
+    ['AR REND',    m.arRend],
+    ['DRONE CTRL', m.droneCtrl],
+    ['DRONE REND', m.droneRend],
+    ['TACTIC',     resolveVizEngine(m.tactic)],
+    ['TRACKER',    m.tracker],
+    ...(m.customFields||[]).map(cf=>cf.key?[cf.key.toUpperCase(), cf.val]:[]),
   ];
   const hasAny=infoRows.some(r=>r&&r[1]);
   const infoHtml=hasAny
     ? `<div class="hub-info-grid">${infoRows.map(r=>{
-        if(!r) return `<div class="hub-info-spacer"></div>`;
+        if(!r||!r.length) return '';
+        if(r===null) return `<div class="hub-info-spacer"></div>`;
         return `<span class="hub-info-key">${r[0]}</span><span class="hub-info-val">${esc(r[1])||'-'}</span>`;
       }).join('')}</div>`
     : '';
@@ -3599,6 +3671,8 @@ async function handleScheduleFile(file){
     const mainColI   =colIdx('MAIN');
     const backupColI =colIdx('BACKUP');
     const arColI     =colIdx('CAM 2 AR')<0?colIdx('AR'):colIdx('CAM 2 AR');
+    const droneColI  =colIdx('DRONE');
+    const tacticColI =colIdx('TACTIC');
     const trackerColI=colIdx('TRACKER');
 
     // Two-pass extraction:
@@ -3651,6 +3725,8 @@ async function handleScheduleFile(file){
         main:    mainColI   >=0?cells[mainColI].trim()   :'',
         backup:  backupColI >=0?cells[backupColI].trim() :'',
         ...parseArField(arColI>=0?cells[arColI].trim():''),
+        ...parseDroneField(droneColI>=0?cells[droneColI].trim():''),
+        tactic:  tacticColI>=0?cells[tacticColI].trim():'',
         tracker: trackerColI>=0?cells[trackerColI].trim():'',
       });
     }
@@ -3691,7 +3767,7 @@ function renderScheduleTable(matches){
   thead.innerHTML=`<tr>
     <th style="width:28px"><input type="checkbox" id="sched-check-all" onchange="schedCheckAll(this.checked)" /></th>
     <th>#</th><th>Day</th><th>Game Schedule</th><th>Location</th>
-    <th>Host</th><th>Hub</th><th>Truck</th><th>VIZ Main</th><th>VIZ Backup</th><th>AR Ctrl</th><th>AR Rend</th><th>Tracker</th>
+    <th>Host</th><th>Hub</th><th>Truck</th><th>VIZ Main</th><th>VIZ Backup</th><th>AR Ctrl</th><th>AR Rend</th><th>Drone Ctrl</th><th>Drone Rend</th><th>Tactic</th><th>Tracker</th>
   </tr>`;
 
   // Rows — all checked by default
@@ -3709,6 +3785,9 @@ function renderScheduleTable(matches){
       <td>${esc(m.backup)}</td>
       <td>${esc(m.arCtrl)}</td>
       <td>${esc(m.arRend)}</td>
+      <td>${esc(m.droneCtrl)}</td>
+      <td>${esc(m.droneRend)}</td>
+      <td>${esc(m.tactic)}</td>
       <td>${esc(m.tracker)}</td>
     </tr>`).join('');
 
@@ -3852,7 +3931,7 @@ function parseScheduleImport(){
 
   const sep=lines[0].includes('\t')?'\t':',';
   const firstCols=lines[0].split(sep).map(c=>c.trim().replace(/"/g,'').toUpperCase());
-  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,arCol=-1,trackerCol=-1,dataStart=0;
+  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,arCol=-1,trackerCol=-1,droneCol=-1,tacticCol=-1,dataStart=0;
 
   if(firstCols.some(c=>c==='DAY'||c.includes('GAME'))){
     dataStart=1;
@@ -3861,6 +3940,7 @@ function parseScheduleImport(){
     hubCol=fi('HUB'); hostCol=fi('HOST'); truckCol=fi('TRUCK');
     mainCol=fi('MAIN'); backupCol=fi('BACKUP');
     arCol=fi('AR')<0?fi('CAM 2 AR'):fi('AR'); trackerCol=fi('TRACKER');
+    droneCol=fi('DRONE'); tacticCol=fi('TACTIC');
   }
 
   const col=(cols,i)=>i>=0&&i<cols.length?cols[i].replace(/"/g,'').trim():'';
@@ -3875,6 +3955,8 @@ function parseScheduleImport(){
       host:col(cols,hostCol),   truck:col(cols,truckCol),
       main:col(cols,mainCol),   backup:col(cols,backupCol),
       ...parseArField(col(cols,arCol)),
+      ...parseDroneField(col(cols,droneCol)),
+      tactic:col(cols,tacticCol),
       tracker:col(cols,trackerCol),
     });
   }
@@ -3938,7 +4020,10 @@ function confirmScheduleImport(){
       host:(m.host||'').toUpperCase(), hub:(m.hub||'').toUpperCase(),
       truck:(m.truck||'').toUpperCase(), main:(m.main||'').toUpperCase(),
       backup:(m.backup||'').toUpperCase(),
-      arCtrl:m.arCtrl||'', arRend:m.arRend||'', tracker:m.tracker||'',
+      arCtrl:m.arCtrl||'', arRend:m.arRend||'',
+      droneCtrl:m.droneCtrl||'', droneRend:m.droneRend||'',
+      tactic:m.tactic||'', tracker:m.tracker||'',
+      customFields:[],
       day:m.day||'', isoDate,
     };
     matchTimers[i]=_defTimers();
@@ -4091,15 +4176,27 @@ function resolveVizEngine(raw){
 function parseArField(raw){
   if(!raw) return {arCtrl:'',arRend:''};
   const s=raw.trim();
-  // "CTL02 & REN02" or "CTL02 & REN02" or "CTL 02 & REN 02"
+  // "CTL02 & REN02" or "CTL 02 & REN 02"
   const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REN\s*(\w+)/i);
   if(both) return {arCtrl:`CTL${both[1].toUpperCase()}`,arRend:`REN${both[2].toUpperCase()}`};
   const ctlOnly=s.match(/CTL\s*(\w+)/i);
   if(ctlOnly) return {arCtrl:`CTL${ctlOnly[1].toUpperCase()}`,arRend:''};
   const renOnly=s.match(/REN\s*(\w+)/i);
   if(renOnly) return {arCtrl:'',arRend:`REN${renOnly[1].toUpperCase()}`};
-  // Unknown — put in arCtrl
   return {arCtrl:s,arRend:''};
+}
+
+function parseDroneField(raw){
+  if(!raw || raw==='-') return {droneCtrl:'',droneRend:''};
+  const s=raw.trim();
+  // Same CTL/REN split pattern as AR
+  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REN\s*(\w+)/i);
+  if(both) return {droneCtrl:`CTL${both[1].toUpperCase()}`,droneRend:`REN${both[2].toUpperCase()}`};
+  const ctlOnly=s.match(/CTL\s*(\w+)/i);
+  if(ctlOnly) return {droneCtrl:`CTL${ctlOnly[1].toUpperCase()}`,droneRend:''};
+  const renOnly=s.match(/REN\s*(\w+)/i);
+  if(renOnly) return {droneCtrl:'',droneRend:`REN${renOnly[1].toUpperCase()}`};
+  return {droneCtrl:s,droneRend:''};
 }
 
 function fuzzyMatchTeam(token, sport){
