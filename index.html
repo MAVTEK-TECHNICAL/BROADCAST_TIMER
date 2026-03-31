@@ -384,7 +384,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .match-label{ font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:3px;color:var(--accent);text-transform:uppercase; }
 .edit-match-btn{ background:none;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;flex-shrink:0; }
 .edit-match-btn:hover{ color:var(--accent); }
-.match-teams{ display:flex;align-items:center;justify-content:center;gap:.5em;min-height:16px;font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.08em;text-transform:uppercase;line-height:1;width:100%;white-space:nowrap;overflow:hidden; }
+.match-teams{ display:flex;align-items:center;justify-content:center;gap:.5em;min-height:var(--op-teams-minh,16px);font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.08em;text-transform:uppercase;line-height:1;width:100%;white-space:nowrap;overflow:hidden; }
 .team-vs{ font-size:11px;color:var(--text-dim);letter-spacing:2px;font-family:var(--ui);font-weight:600; }
 
 /* Status bar */
@@ -500,7 +500,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* Logo banner version of mini badge */
 .team-badge-mini.has-logo{
   width:44px;height:26px;
-  background-size:cover;background-position:center;
+  background-size:contain;background-position:center;background-repeat:no-repeat;
   border-radius:3px;
 }
 
@@ -594,7 +594,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   text-transform:uppercase;color:var(--text-mid);margin-top:3px;line-height:1.2;
   overflow:hidden;
 }
-.hub-teams span[style*="color"]{
+.hub-teams span[style*="color"],
+.match-teams span[style*="color"]{
   text-shadow:1px 2px 4px rgba(0,0,0,.95),0 1px 3px rgba(0,0,0,.85),-1px 1px 3px rgba(0,0,0,.7);
 }
 .hub-timers{
@@ -2126,6 +2127,9 @@ function setLogoSize(mode, silent){
   ['small','medium','large','xl'].forEach(m=>{
     document.getElementById('nlb-'+m)?.classList.toggle('active', m===mode);
   });
+  // Keep match-teams min-height in sync so all three columns share the same separator height
+  const minH={small:'26px',medium:'36px',large:'50px',xl:'100px'}[mode]||'26px';
+  document.documentElement.style.setProperty('--op-teams-minh', minH);
   renderHeaders();
   if(!silent) scheduleSave();
 }
@@ -2250,8 +2254,9 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
       }
     }
     // Netball: full-bleed banner — just strip the border when bg is off
-    const border=logoBgMode?`border:1.5px solid ${t.primary};`:'';
-    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');${border}"></span>`;
+    // Full-bleed banner (Netball, Golf, etc.) — use contain so rectangular logos show fully
+    const bg=logoBgMode?`background-color:#0d0f15;border:1.5px solid ${t.primary};`:'';
+    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');${bg}"></span>`;
   }
   // Abbr tile: always needs the bg to stay readable
   const tc=_badgeTextColor(t);
