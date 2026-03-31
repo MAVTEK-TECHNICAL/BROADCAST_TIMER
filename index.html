@@ -316,6 +316,7 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 }
 .cal-day.selected{ background:var(--brand-color);color:#000;font-weight:700; }
 .cal-day.selected:hover{ opacity:.9; }
+.cal-day.in-range{ background:color-mix(in srgb, var(--brand-color) 20%, transparent);border-radius:2px; }
 /* ── Date line under clocks ──────────────────────────── */
 .match-date-line{
   font-family:var(--mono);font-size:12px;font-weight:600;
@@ -615,6 +616,18 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hcb:hover{ color:var(--text);background:var(--surface2); }
 .hcb.active{ background:var(--purple);color:#fff; }
 .hub-active-badge{ font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-left:auto;letter-spacing:1px; }
+.hub-range-btn{
+  background:transparent;border:1px solid var(--border-bright);border-radius:4px;
+  color:var(--text-mid);font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  padding:3px 7px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.hub-range-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.hub-range-btn.active{ border-color:var(--purple);color:var(--purple); }
+.hub-range-clear{
+  background:transparent;border:none;color:var(--text-dim);font-size:13px;cursor:pointer;
+  padding:0 2px;line-height:1;transition:color .15s;margin-left:-4px;
+}
+.hub-range-clear:hover{ color:var(--red); }
 
 #hub-grid{
   display:grid;gap:6px;flex:1;min-height:0;overflow-y:auto;align-content:stretch;
@@ -989,8 +1002,16 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <button class="hcb" id="hcb-8" onclick="setHubCols(8)">8</button>
         </div>
         <div class="hub-layout-sep"></div>
-        <span class="hub-layout-label">DAYS</span>
-        <button class="hcb" id="hub-all-days-btn" onclick="setHubShowAllDays(!hubShowAllDays)" title="Show matches from all schedule days">ALL</button>
+        <span class="hub-layout-label">FROM</span>
+        <button class="hub-range-btn" id="hub-range-start-btn" onclick="openHubRangePicker('start',event)" title="Set start date">
+          <span id="hub-range-start-lbl">ALL</span>
+        </button>
+        <button class="hub-range-clear" id="hub-range-start-clr" onclick="clearHubRange('start')" title="Clear start date" style="display:none">×</button>
+        <span class="hub-layout-label">TO</span>
+        <button class="hub-range-btn" id="hub-range-end-btn" onclick="openHubRangePicker('end',event)" title="Set end date">
+          <span id="hub-range-end-lbl">ALL</span>
+        </button>
+        <button class="hub-range-clear" id="hub-range-end-clr" onclick="clearHubRange('end')" title="Clear end date" style="display:none">×</button>
         <span class="hub-active-badge" id="hub-active-count">0 ACTIVE</span>
       </div>
       <div id="hub-grid"></div>
@@ -1302,7 +1323,8 @@ let brandColor      = '#00d4ff'; // global default colour for borders, labels, d
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 let calendarDate  = _todayISO(); // currently selected date YYYY-MM-DD (local time)
-let hubShowAllDays= false; // hub only: show all schedule days instead of just calendarDate
+let hubRangeStart = null; // hub view date range start (ISO string or null = no lower bound)
+let hubRangeEnd   = null; // hub view date range end   (ISO string or null = no upper bound)
 let _calPopupYM   = null;  // {year,month} currently displayed in popup
 // Operator view: maps display column (0/1/2) → actual match slot index (0-15)
 let opSlotMap    = [0, 1, 2];
@@ -1313,10 +1335,15 @@ function isMatchVisible(i){
   if(!matchVisible[i]) return false;
   const d=matchMeta[i].isoDate;
   if(!d) return true; // no date set = always show (backward compat)
-  if(viewMode==='hub' && hubShowAllDays) return true;
+  if(viewMode==='hub'){
+    // Hub uses a date range — null bounds mean no restriction on that end
+    if(hubRangeStart && d < hubRangeStart) return false;
+    if(hubRangeEnd   && d > hubRangeEnd)   return false;
+    return true;
+  }
   return d===calendarDate;
 }
-const MAX_MATCHES = 16;
+const MAX_MATCHES = 500; // supports a full calendar year of matches
 function _defMeta(i){ return {label:`MATCH ${i+1}`,home:'',homeColour:'#00d4ff',away:'',awayColour:'#ff6b35',sport:'',homeTeamRef:null,awayTeamRef:null,timerNameAlign:'left',day:'',isoDate:'',location:'',host:'',hub:'',truck:'',main:'',backup:'',arCtrl:'',arRend:'',tracker:''}; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
@@ -1598,10 +1625,15 @@ async function loadSf(id){
 }
 
 function buildPayload(name){
-  // Firestore doesn't support nested arrays — flatten matchTimers into keyed objects
+  // Only serialize up to the highest active match slot (sparse — avoids huge arrays)
+  const maxActive = matchVisible.reduce((hi,v,i)=>v?i:hi, -1);
+  const serLen = Math.max(maxActive+1, 3); // at least 3 for backward compat
+  // Only include timers for active slots
   const timerKeys = {};
-  for(let i=0;i<MAX_MATCHES;i++){
-    timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+  for(let i=0;i<serLen;i++){
+    if(matchVisible[i]){
+      timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+    }
   }
   return {
     name: name||sfName||'Untitled',
@@ -1617,11 +1649,12 @@ function buildPayload(name){
       logoBgMode,
       hubCols,
       calendarDate,
-      hubShowAllDays,
-      matchTzs:[...matchTzs],
-      matchVisible:[...matchVisible],
-      matchEnabled:[...matchEnabled],
-      matchMeta: matchMeta.map(m=>({...m})),
+      hubRangeStart,
+      hubRangeEnd,
+      matchTzs:    matchTzs.slice(0,serLen),
+      matchVisible:matchVisible.slice(0,serLen),
+      matchEnabled:matchEnabled.slice(0,serLen),
+      matchMeta:   matchMeta.slice(0,serLen).map(m=>({...m})),
       ...timerKeys
     }
   };
@@ -1637,7 +1670,10 @@ function applyState(s){
   if(s.logoBgMode!==undefined){ setLogoBg(s.logoBgMode, true); }
   if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
   if(s.calendarDate)   { calendarDate=s.calendarDate; }
-  if(s.hubShowAllDays!==undefined){ setHubShowAllDays(s.hubShowAllDays, true); }
+  hubRangeStart = s.hubRangeStart||null;
+  hubRangeEnd   = s.hubRangeEnd  ||null;
+  // Legacy: if old save had hubShowAllDays=false treat as no range
+  _updateHubRangeUI();
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
@@ -1931,7 +1967,9 @@ function timerDragEnd(e){
 function renderHeaders(){
   [0,1,2].forEach(i=>{
     const m=matchMeta[opSlotMap[i]]; // translate column → real match slot
-    document.getElementById(`match-label-${i}`).textContent=m.label;
+    // Operator column label: day-relative position (MATCH 1/2/3) unless user set a custom name
+    const isAuto=/^MATCH\s+\d+$/i.test((m.label||'').trim());
+    document.getElementById(`match-label-${i}`).textContent = (isAuto||!m.label) ? `MATCH ${i+1}` : m.label;
     const el=document.getElementById(`match-teams-${i}`);
     if(m.home||m.away){
       const soloMode = m.home && !m.away; // single-team event (e.g. golf tournament)
@@ -2050,27 +2088,28 @@ function startClock(){
 
 // ── MATCH MGMT ───────────────────────────────────────────
 function addMatch(){
-  // Find first unused slot and assign it to the current calendar day
+  // Find first unused slot, reset to blank, assign to current calendar day
   for(let i=0;i<MAX_MATCHES;i++){
     if(!matchVisible[i]){
       matchVisible[i]=matchEnabled[i]=true;
-      matchMeta[i].isoDate=calendarDate;
+      matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
+      matchTimers[i] = _defTimers();
       _rebuildOpSlotMap(); renderAll(); scheduleSave(); return;
     }
   }
-  toast('MAX 16 MATCHES REACHED');
+  toast('SCHEDULE FULL');
 }
 function addHubMatch(){
-  // HUB can add any slot 0-15
+  // Find first unused slot, reset to blank, assign to current calendar day
   for(let i=0;i<MAX_MATCHES;i++){
     if(!matchVisible[i]){
       matchVisible[i]=matchEnabled[i]=true;
-      matchMeta[i].isoDate = calendarDate;
-      if(i<3){ document.getElementById(`match-col-${i}`).classList.remove('hidden-match'); updateAddMatchBtn(); }
+      matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
+      matchTimers[i] = _defTimers();
       scheduleSave(); renderHubGrid(); return;
     }
   }
-  toast('MAX 16 MATCHES REACHED');
+  toast('SCHEDULE FULL');
 }
 function removeMatch(col){
   // Operator view only: hides this column without deleting match data.
@@ -2642,7 +2681,16 @@ function _renderCalPopup(){
   for(let i=0;i<firstDow;i++) cells+=`<div class="cal-day cal-day-empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const iso=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const cls=['cal-day', iso===calendarDate?'selected':'', iso===today?'today':'', matchDates.has(iso)?'has-matches':''].filter(Boolean).join(' ');
+    const isSelectedOp  = _calPickerMode==='cal' && iso===calendarDate;
+    const isRangeStart  = _calPickerMode==='hub-start' && iso===hubRangeStart;
+    const isRangeEnd    = _calPickerMode==='hub-end'   && iso===hubRangeEnd;
+    const inRange = hubRangeStart&&hubRangeEnd && iso>=hubRangeStart && iso<=hubRangeEnd;
+    const cls=['cal-day',
+      (isSelectedOp||isRangeStart||isRangeEnd)?'selected':'',
+      inRange&&!(isRangeStart||isRangeEnd)?'in-range':'',
+      iso===today?'today':'',
+      matchDates.has(iso)?'has-matches':''
+    ].filter(Boolean).join(' ');
     cells+=`<div class="${cls}" onclick="selectCalendarDate('${iso}')">${d}</div>`;
   }
   document.getElementById('cal-popup').innerHTML=`
@@ -2656,23 +2704,88 @@ function _renderCalPopup(){
 }
 
 function selectCalendarDate(iso){
-  calendarDate=iso;
-  closeCalendar();
-  _applyCalendarDate();
+  if(_calPickerMode==='hub-start'){
+    hubRangeStart=iso;
+    // If end is before start, clear it
+    if(hubRangeEnd && hubRangeEnd < hubRangeStart) hubRangeEnd=null;
+    closeCalendar();
+    _calPickerMode='cal';
+    _updateHubRangeUI();
+    renderHubGrid();
+    scheduleSave();
+  } else if(_calPickerMode==='hub-end'){
+    hubRangeEnd=iso;
+    // If start is after end, clear it
+    if(hubRangeStart && hubRangeStart > hubRangeEnd) hubRangeStart=null;
+    closeCalendar();
+    _calPickerMode='cal';
+    _updateHubRangeUI();
+    renderHubGrid();
+    scheduleSave();
+  } else {
+    calendarDate=iso;
+    closeCalendar();
+    _applyCalendarDate();
+  }
 }
 
-function setHubShowAllDays(val, silent){
-  hubShowAllDays=val;
-  document.getElementById('hub-all-days-btn')?.classList.toggle('active', val);
+// Hub date range — UI helpers
+let _calPickerMode='cal'; // 'cal' | 'hub-start' | 'hub-end'
+
+function _updateHubRangeUI(){
+  const sl=document.getElementById('hub-range-start-lbl');
+  const el=document.getElementById('hub-range-end-lbl');
+  const sc=document.getElementById('hub-range-start-clr');
+  const ec=document.getElementById('hub-range-end-clr');
+  const sb=document.getElementById('hub-range-start-btn');
+  const eb=document.getElementById('hub-range-end-btn');
+  if(sl) sl.textContent = hubRangeStart ? _isoDisplay(hubRangeStart) : 'ALL';
+  if(el) el.textContent = hubRangeEnd   ? _isoDisplay(hubRangeEnd)   : 'ALL';
+  if(sc) sc.style.display = hubRangeStart ? '' : 'none';
+  if(ec) ec.style.display = hubRangeEnd   ? '' : 'none';
+  if(sb) sb.classList.toggle('active', !!hubRangeStart);
+  if(eb) eb.classList.toggle('active', !!hubRangeEnd);
+}
+
+function openHubRangePicker(which, event){
+  event.stopPropagation();
+  _calPickerMode = which==='start' ? 'hub-start' : 'hub-end';
+  const popup=document.getElementById('cal-popup');
+  // If already open in same mode, close it
+  if(!popup.classList.contains('cal-hidden') && popup.dataset.mode===_calPickerMode){
+    closeCalendar(); return;
+  }
+  const anchor = which==='start'
+    ? document.getElementById('hub-range-start-btn')
+    : document.getElementById('hub-range-end-btn');
+  const ref = which==='start'
+    ? (hubRangeStart || hubRangeEnd || calendarDate)
+    : (hubRangeEnd   || hubRangeStart || calendarDate);
+  const d=new Date(ref+'T00:00:00');
+  _calPopupYM={year:d.getFullYear(), month:d.getMonth()};
+  _renderCalPopup();
+  const r=anchor.getBoundingClientRect();
+  popup.style.top=(r.bottom+6)+'px';
+  popup.style.left=Math.min(r.left, window.innerWidth-230)+'px';
+  popup.dataset.mode=_calPickerMode;
+  popup.classList.remove('cal-hidden');
+}
+
+function clearHubRange(which){
+  if(which==='start') hubRangeStart=null;
+  else                hubRangeEnd=null;
+  _updateHubRangeUI();
   renderHubGrid();
-  if(!silent) scheduleSave();
+  scheduleSave();
 }
 
 // Dismiss calendar popup when clicking outside
 document.addEventListener('click', e=>{
   const popup=document.getElementById('cal-popup');
-  if(popup && !popup.classList.contains('cal-hidden') && !popup.contains(e.target) && e.target.id!=='cal-date-btn'){
+  const anchors=['cal-date-btn','hub-range-start-btn','hub-range-end-btn'];
+  if(popup && !popup.classList.contains('cal-hidden') && !popup.contains(e.target) && !anchors.includes(e.target.id) && !anchors.find(id=>document.getElementById(id)?.contains(e.target))){
     closeCalendar();
+    _calPickerMode='cal';
   }
 });
 
@@ -2712,6 +2825,7 @@ const HUB_COLORS=[
 function renderHubGrid(){
   const grid=document.getElementById('hub-grid');
   if(!grid) return;
+  _updateHubRangeUI(); // keep range button labels in sync
   grid.style.gridTemplateColumns=`repeat(${hubCols},1fr)`;
   grid.innerHTML='';
   const now=Date.now();
@@ -2723,24 +2837,32 @@ function renderHubGrid(){
   const fs=rows<=1?1.75:rows<=2?1.35:rows<=3?1.1:rows<=4?1.0:0.88;
   grid.style.setProperty('--hub-fs',fs);
 
+  let dayPos=0;
   for(let i=0;i<MAX_MATCHES;i++){
-    if(isMatchVisible(i)) grid.appendChild(buildHubCard(i,now));
+    if(isMatchVisible(i)){ dayPos++; grid.appendChild(buildHubCard(i,now,dayPos)); }
   }
 
   // Shrink-fit teams rows after paint
   _fitHubTeamsRows();
 
-  // "Add match" card (if room remains)
-  if(active<MAX_MATCHES){
-    const btn=document.createElement('button');
-    btn.className='hub-add-card';
-    btn.innerHTML='<span style="font-size:16px;font-family:var(--mono)">+</span>&nbsp;ADD MATCH';
-    btn.onclick=addHubMatch;
-    grid.appendChild(btn);
-  }
+  // "Add match" card — always available
+  const btn=document.createElement('button');
+  btn.className='hub-add-card';
+  btn.innerHTML='<span style="font-size:16px;font-family:var(--mono)">+</span>&nbsp;ADD MATCH';
+  btn.onclick=addHubMatch;
+  grid.appendChild(btn);
 }
 
-function buildHubCard(i,now){
+// Returns the display label for a hub card.
+// If the stored label is the auto-generated "MATCH N" pattern, use the day-relative position instead.
+// Custom labels (e.g. "NRL GRAND FINAL") are shown as-is.
+function _hubCardLabel(m, displayNum){
+  const isAuto = /^MATCH\s+\d+$/i.test((m.label||'').trim());
+  if(isAuto || !m.label) return displayNum ? `MATCH ${displayNum}` : (m.label||'MATCH');
+  return m.label;
+}
+
+function buildHubCard(i,now,displayNum){
   const m=matchMeta[i];
   const timers=matchTimers[i];
   const color=m.cardColor||'var(--brand-color)';
@@ -2816,7 +2938,7 @@ function buildHubCard(i,now){
   card.innerHTML=`
     <div class="hub-card-head" style="border-bottom-color:${color}">
       <div class="hub-card-head-row">
-        <div class="hub-card-label" style="color:${color}">${esc(m.label)}</div>
+        <div class="hub-card-label" style="color:${color}">${esc(_hubCardLabel(m,displayNum))}</div>
         <div class="hub-card-acts">
           <button class="hub-card-btn" onclick="openEditMatch(${i})" title="Edit">✎</button>
           ${opBtn}${remBtn}
