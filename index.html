@@ -319,8 +319,9 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 .cal-day.in-range{ background:color-mix(in srgb, var(--brand-color) 20%, transparent);border-radius:2px; }
 /* ── Date line under clocks ──────────────────────────── */
 .match-date-line{
-  font-family:var(--mono);font-size:12px;font-weight:600;
-  letter-spacing:2px;color:var(--text-mid);text-align:center;text-transform:uppercase;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:1.5px;color:var(--text-mid);text-align:center;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .hub-card-date{
   font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1));font-weight:600;
@@ -2794,6 +2795,18 @@ function _isoDisplay(iso){
   const ms=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   return `${ds[d.getDay()]} ${d.getDate()} ${ms[d.getMonth()]}`;
 }
+// "Australia/Sydney" → "SYDNEY" | "America/New_York" → "NEW YORK"
+function _tzLabel(tz){
+  if(!tz) return '';
+  const city = tz.split('/').pop().replace(/_/g,' ');
+  return city.toUpperCase();
+}
+// Full date+tz string for operator view date line, e.g. "SAT 21 MAR - SYDNEY"
+function _opDateText(si){
+  const dateStr = _isoDisplay(calendarDate);
+  const tzLbl   = _tzLabel(matchTzs[si]);
+  return tzLbl ? `${dateStr} - ${tzLbl}` : dateStr;
+}
 function _isoFull(iso){
   if(!iso) return '';
   const d=new Date(iso+'T00:00:00');
@@ -2869,7 +2882,7 @@ function renderOpColumns(){
         </div>
         <div class="match-teams" id="match-teams-${col}"></div>
         <div class="match-local-time" id="match-clock-${col}">--:--:--</div>
-        <div class="match-date-line" id="match-date-${col}">${_isoDisplay(calendarDate)}</div>
+        <div class="match-date-line" id="match-date-${col}">${_opDateText(si)}</div>
       </div>
       <div class="timers-list" id="timers-${col}"></div>
       <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
@@ -2907,9 +2920,9 @@ function _applyCalendarDate(silent){
   document.getElementById('cal-date-label').textContent=_isoDisplay(calendarDate);
   _rebuildOpSlotMap(); // recalculates opSlotMap + calls renderOpColumns (rebuilds DOM)
   // Update date lines for all active columns (after renderOpColumns creates them)
-  opSlotMap.forEach((_,i)=>{
+  opSlotMap.forEach((si,i)=>{
     const el=document.getElementById(`match-date-${i}`);
-    if(el) el.textContent=_isoDisplay(calendarDate);
+    if(el) el.textContent=_opDateText(si);
   });
   // If hubTodayMode is active, track the new day in the hub range
   if(hubTodayMode){ hubRangeStart=hubRangeEnd=calendarDate; _updateHubRangeUI(); }
