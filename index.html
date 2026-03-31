@@ -479,13 +479,30 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .btn-sm:hover{ border-color:var(--accent);color:var(--accent); }
 .modal-divider{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:-4px; }
 /* ─── EDIT MATCH — WIDE 3-COLUMN MODAL ─────────────────────── */
-.em-wide-modal{ width:min(92vw,960px)!important;max-width:none!important; }
-.em-3col{ display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;align-items:start; }
+.em-wide-modal{ width:min(96vw,1200px)!important;max-width:none!important; }
+.em-3col{ display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;align-items:start; }
 .em-col{ padding:0 18px;border-right:1px solid var(--border); }
 .em-col:first-child{ padding-left:0; }
 .em-col:last-child{ padding-right:0;border-right:none; }
 .em-col-center{ }
 .em-col-title{ font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px; }
+/* ── Edit Match — Timers column ─────────────────────────── */
+.em-timer-list{ display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:340px;overflow-y:auto; }
+.em-timer-list::-webkit-scrollbar{ width:3px; }
+.em-timer-list::-webkit-scrollbar-thumb{ background:var(--border-bright);border-radius:2px; }
+.em-timer-row{ display:grid;grid-template-columns:14px 1fr auto auto;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:5px 8px;cursor:grab;user-select:none;transition:border-color .15s,opacity .15s; }
+.em-timer-row:active{ cursor:grabbing; }
+.em-timer-row.em-dragging{ opacity:.4; }
+.em-timer-row.em-drag-over{ border-color:var(--accent); }
+.em-timer-drag-handle{ color:var(--border-bright);font-size:11px;line-height:1;text-align:center; }
+.em-timer-info{ display:flex;flex-direction:column;gap:1px;min-width:0; }
+.em-timer-name{ font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.em-timer-time{ font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.04em; }
+.em-timer-edit-btn{ background:none;border:none;color:var(--text-dim);font-size:13px;cursor:pointer;padding:2px 4px;line-height:1;transition:color .15s;flex-shrink:0; }
+.em-timer-edit-btn:hover{ color:var(--accent); }
+.em-timer-del-btn{ background:none;border:none;color:var(--border-bright);font-size:12px;cursor:pointer;padding:2px 4px;line-height:1;transition:color .15s;flex-shrink:0; }
+.em-timer-del-btn:hover{ color:var(--red); }
+.em-timer-core-badge{ font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--border-bright);padding:1px 5px;border:1px solid var(--border);border-radius:2px;text-transform:uppercase;flex-shrink:0; }
 .time-picker-row{ display:flex;flex-direction:row;align-items:center;gap:10px; }
 .time-text{ flex:1;font-family:var(--mono)!important;font-size:28px!important;padding:10px 14px!important;letter-spacing:4px;text-align:center;min-width:0; }
 .time-text::placeholder{ color:var(--border-bright);letter-spacing:3px; }
@@ -1278,6 +1295,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <input class="modal-input" id="em-tracker" type="text" placeholder="e.g. Tracker" style="font-family:var(--mono);font-size:12px;" />
           </div>
         </div>
+      </div>
+
+      <!-- ── TIMERS: Full list + add + reorder ────────────── -->
+      <div class="em-col">
+        <div class="em-col-title">TIMERS</div>
+        <div class="em-timer-list" id="em-timer-list"></div>
+        <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:6px 0" onclick="emAddTimer()">+ ADD TIMER</button>
       </div>
 
     </div><!-- /em-3col -->
@@ -2398,6 +2422,8 @@ function confirmEditTimer(){
   t.timeStr=ts||null;
   t.targetUTC=ts?localToUTC(ts,matchTzs[ctx.mi]):null;
   closeModal('modal-edit-timer'); renderAll(); scheduleSave();
+  // Refresh em panel if Edit Match modal is open
+  if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
 function clearEditTimerTime(){
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
@@ -2419,6 +2445,8 @@ function confirmAddTimer(){
   const ts = v ? parseTimeInput(v) : null;
   matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,matchTzs[ctx.mi]):null});
   closeModal('modal-add-timer'); scheduleSave();
+  // Refresh em panel if Edit Match modal is open
+  if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
 function removeTimer(mi,tid){ matchTimers[mi]=matchTimers[mi].filter(t=>t.id!==tid); scheduleSave(); }
 
@@ -2473,6 +2501,7 @@ function openEditMatch(i){
   document.getElementById('em-ar-ctrl').value=m.arCtrl||'';
   document.getElementById('em-ar-rend').value=m.arRend||'';
   document.getElementById('em-tracker').value=m.tracker||'';
+  emRenderTimers(i);
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
 }
@@ -2524,6 +2553,76 @@ function confirmEditMatch(){
     day:      _prevMeta.day     || '', // PRESERVE — original raw day string from PDF import
   };
   closeModal('modal-edit-match'); renderAll(); scheduleSave();
+}
+
+// ── EDIT MATCH — inline timers panel ─────────────────────
+let _emDragIdx=null;
+
+function emRenderTimers(mi){
+  const list=document.getElementById('em-timer-list');
+  if(!list) return;
+  const timers=matchTimers[mi!=null?mi:ctx.i];
+  list.innerHTML='';
+  timers.forEach((t,idx)=>{
+    const row=document.createElement('div');
+    row.className='em-timer-row';
+    row.draggable=true;
+    row.dataset.idx=idx;
+    row.innerHTML=`
+      <div class="em-timer-drag-handle">⠿</div>
+      <div class="em-timer-info">
+        <div class="em-timer-name">${esc(t.name)}${t.core?'&nbsp;<span class="em-timer-core-badge">CORE</span>':''}</div>
+        <div class="em-timer-time">${t.timeStr||'--:--'}</div>
+      </div>
+      <button class="em-timer-edit-btn" title="Edit name &amp; time" onclick="emEditTimer('${t.id}')">✎</button>
+      ${!t.core?`<button class="em-timer-del-btn" title="Remove" onclick="emDeleteTimer('${t.id}')">✕</button>`:'<span style="width:20px"></span>'}`;
+    // Drag-to-reorder
+    row.addEventListener('dragstart', e=>{
+      _emDragIdx=idx;
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain','');
+      setTimeout(()=>row.classList.add('em-dragging'),0);
+    });
+    row.addEventListener('dragover', e=>{
+      e.preventDefault();
+      list.querySelectorAll('.em-drag-over').forEach(el=>el.classList.remove('em-drag-over'));
+      row.classList.add('em-drag-over');
+    });
+    row.addEventListener('dragleave', ()=>row.classList.remove('em-drag-over'));
+    row.addEventListener('drop', e=>{
+      e.preventDefault();
+      row.classList.remove('em-drag-over');
+      const toIdx=parseInt(row.dataset.idx);
+      if(_emDragIdx===null||_emDragIdx===toIdx) return;
+      const arr=matchTimers[ctx.i];
+      const [moved]=arr.splice(_emDragIdx,1);
+      arr.splice(toIdx,0,moved);
+      scheduleSave();
+      emRenderTimers();
+    });
+    row.addEventListener('dragend', ()=>{
+      list.querySelectorAll('.em-dragging,.em-drag-over').forEach(el=>{el.classList.remove('em-dragging');el.classList.remove('em-drag-over');});
+      _emDragIdx=null;
+    });
+    list.appendChild(row);
+  });
+}
+
+function emAddTimer(){
+  // Re-use the existing Add Timer modal but refresh the em panel on confirm
+  openAddTimer(ctx.i);
+  // Patch confirmAddTimer to also refresh em panel
+  window._emAddTimerPending=true;
+}
+
+function emEditTimer(tid){
+  openEditTimer(ctx.i, tid);
+}
+
+function emDeleteTimer(tid){
+  matchTimers[ctx.i]=matchTimers[ctx.i].filter(t=>t.id!==tid);
+  scheduleSave();
+  emRenderTimers();
 }
 
 function syncTyped(p){
