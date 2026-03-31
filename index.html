@@ -772,6 +772,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <select id="hub-tz" onchange="onHubTzChange()"></select>
           </div>
           <div class="opts-row opts-view-hub hidden-view">
+            <span class="opts-label">TEAMS</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="hnmb-long"  onclick="setHubNameMode('long')">LONG</button>
+              <button class="nmb"        id="hnmb-short" onclick="setHubNameMode('short')">SHORT</button>
+              <button class="nmb"        id="hnmb-tri"   onclick="setHubNameMode('tri')">TRI</button>
+            </div>
+          </div>
+          <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">LOGOS</span>
             <div class="name-mode-btns">
               <button class="nmb active" id="hlb-off"    onclick="setHubLogoSize('off')">OFF</button>
@@ -1196,7 +1204,8 @@ const TZ_GROUPS = [
 
 // ── App state ─────────────────────────────────────────────
 let hubTz       = 'Australia/Sydney';
-let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
+let opTeamDisplayMode  = 'long'; // 'long' | 'short' | 'tri'  — operator view
+let hubTeamDisplayMode = 'long'; // 'long' | 'short' | 'tri'  — hub view
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let hubLogoSize     = 'off';  // 'off' | 'small' | 'medium' | 'large'
 let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no bg
@@ -1496,7 +1505,8 @@ function buildPayload(name){
     state:{
       brandColor,
       hubTz,
-      teamDisplayMode,
+      teamDisplayMode:opTeamDisplayMode,
+      hubTeamDisplayMode,
       logoSizeMode,
       hubLogoSize,
       logoBgMode,
@@ -1513,7 +1523,8 @@ function buildPayload(name){
 function applyState(s){
   if(s.brandColor)     { setBrandColor(s.brandColor, true); }
   if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
-  if(s.teamDisplayMode){ teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
+  if(s.teamDisplayMode)    { setNameMode(s.teamDisplayMode, true); }
+  if(s.hubTeamDisplayMode) { setHubNameMode(s.hubTeamDisplayMode, true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
   if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
   if(s.logoBgMode!==undefined){ setLogoBg(s.logoBgMode, true); }
@@ -2208,7 +2219,7 @@ function setBrandColor(hex, silent){
 
 // ── NAME DISPLAY MODE ────────────────────────────────────
 function setNameMode(mode, silent){
-  teamDisplayMode=mode;
+  opTeamDisplayMode=mode;
   ['long','short','tri'].forEach(m=>{
     document.getElementById('nmb-'+m)?.classList.toggle('active', m===mode);
   });
@@ -2216,12 +2227,22 @@ function setNameMode(mode, silent){
   if(!silent) scheduleSave();
 }
 
-function getTeamDisplayName(ref, fallback){
+function setHubNameMode(mode, silent){
+  hubTeamDisplayMode=mode;
+  ['long','short','tri'].forEach(m=>{
+    document.getElementById('hnmb-'+m)?.classList.toggle('active', m===mode);
+  });
+  if(viewMode==='hub') renderHubGrid();
+  if(!silent) scheduleSave();
+}
+
+function getTeamDisplayName(ref, fallback, mode){
   if(!ref||!SPORTS_DATA[ref.sport]) return fallback||'—';
   const t=SPORTS_DATA[ref.sport][ref.idx];
   if(!t) return fallback||'—';
-  if(teamDisplayMode==='short') return t.short||t.name;
-  if(teamDisplayMode==='tri')   return t.abbr;
+  const m=mode||opTeamDisplayMode;
+  if(m==='short') return t.short||t.name;
+  if(m==='tri')   return t.abbr;
   return t.name;
 }
 
@@ -2370,8 +2391,8 @@ function buildHubCard(i,now){
   // Teams line
   let teamsHtml='';
   if(m.home||m.away){
-    const hName=getTeamDisplayName(m.homeTeamRef, m.home||'—');
-    const aName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
+    const hName=getTeamDisplayName(m.homeTeamRef, m.home||'—', hubTeamDisplayMode);
+    const aName=getTeamDisplayName(m.awayTeamRef, m.away||'—', hubTeamDisplayMode);
     const showLogos=hubLogoSize!=='off';
     const hBadge=showLogos?getTeamBadgeMiniHTML(m.homeTeamRef||null, hubLogoSize):'';
     const aBadge=showLogos?getTeamBadgeMiniHTML(m.awayTeamRef||null, hubLogoSize):'';
