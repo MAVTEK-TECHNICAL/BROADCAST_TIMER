@@ -319,9 +319,9 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 .cal-day.in-range{ background:color-mix(in srgb, var(--brand-color) 20%, transparent);border-radius:2px; }
 /* ── Date line under clocks ──────────────────────────── */
 .match-date-line{
-  font-family:var(--mono);font-size:11px;font-weight:600;
+  font-family:var(--mono);font-size:var(--date-fs,11px);font-weight:600;
   letter-spacing:1.5px;color:var(--text-mid);text-align:center;text-transform:uppercase;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;overflow:hidden;
 }
 .hub-card-date{
   font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1));font-weight:600;
@@ -2931,6 +2931,16 @@ function renderOpColumns(){
         const fs = Math.round(Math.max(18, Math.min(48, 0.118*(w-150)+20)));
         clock.style.fontSize = fs+'px';
         clock.style.letterSpacing = fs < 30 ? '0.02em' : fs < 38 ? '0.04em' : '0.06em';
+      }
+      // Scale date line so full text always fits — measure at base size first
+      const dateLine = e.target.querySelector('.match-date-line');
+      if(dateLine){
+        dateLine.style.setProperty('--date-fs','11px');
+        if(dateLine.scrollWidth > dateLine.clientWidth && dateLine.clientWidth > 0){
+          const scale = dateLine.clientWidth / dateLine.scrollWidth;
+          const scaledFs = Math.max(7, Math.round(11 * scale * 10) / 10);
+          dateLine.style.setProperty('--date-fs', scaledFs+'px');
+        }
       }
     });
   });
