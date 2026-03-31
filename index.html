@@ -1087,7 +1087,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </button>
         <button class="hub-range-clear" id="hub-range-end-clr" onclick="clearHubRange('end')" title="Clear end date" style="display:none">×</button>
         <div class="hub-layout-sep"></div>
-        <button class="hub-today-btn" id="hub-today-btn" onclick="setHubToday()" title="Show only today's matches">TODAY</button>
+        <button class="hub-today-btn" id="hub-today-btn" onclick="setHubToday()" title="Show today's matches">TODAY</button>
+        <button class="hub-today-btn" id="hub-week-btn" onclick="setHubThisWeek()" title="Show this week's matches (Mon–Sun)">THIS WEEK</button>
         <span class="hub-active-badge" id="hub-active-count">0 ACTIVE</span>
       </div>
       <div id="hub-grid"></div>
@@ -1491,7 +1492,8 @@ let _calPopupYM   = null;  // {year,month} currently displayed in popup
 // Operator view: maps display column (0/1/2) → actual match slot index (0-15)
 let opSlotMap    = []; // dynamically sized: real slot indices currently shown in operator view
 let opDetailsExpanded = {}; // keyed by real slot index — true if details panel is open
-let hubTodayMode = false;   // true = hub range tracks calendarDate (shows only today)
+let hubTodayMode = false;   // true = hub range locked to today
+let hubWeekMode  = false;   // true = hub range locked to current Mon–Sun week
 
 // Returns true when match i should be visible given current date filter
 function isMatchVisible(i){
@@ -1844,7 +1846,7 @@ function applyState(s){
   hubTodayMode  = !!s.hubTodayMode;
   // Legacy: if old save had hubShowAllDays=false treat as no range
   _updateHubRangeUI();
-  _updateHubTodayBtn();
+  _updateHubQuickBtns();
   // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
@@ -3256,7 +3258,7 @@ function _renderCalPopup(){
 
 function selectCalendarDate(iso){
   if(_calPickerMode==='hub-start'){
-    hubTodayMode=false; _updateHubTodayBtn(); // manual range change disengages TODAY mode
+    hubTodayMode=false; hubWeekMode=false; _updateHubQuickBtns(); // manual range disengages quick buttons
     hubRangeStart=iso;
     if(hubRangeEnd && hubRangeEnd < hubRangeStart) hubRangeEnd=null;
     closeCalendar();
@@ -3265,7 +3267,7 @@ function selectCalendarDate(iso){
     renderHubGrid();
     scheduleSave();
   } else if(_calPickerMode==='hub-end'){
-    hubTodayMode=false; _updateHubTodayBtn();
+    hubTodayMode=false; hubWeekMode=false; _updateHubQuickBtns();
     hubRangeEnd=iso;
     if(hubRangeStart && hubRangeStart > hubRangeEnd) hubRangeStart=null;
     closeCalendar();
@@ -3323,24 +3325,54 @@ function openHubRangePicker(which, event){
 }
 
 function setHubToday(){
-  hubTodayMode = !hubTodayMode;
+  const wasActive = hubTodayMode;
+  hubTodayMode = !wasActive;
+  hubWeekMode  = false;
   if(hubTodayMode){
-    hubRangeStart = hubRangeEnd = calendarDate;
+    const today = _todayISO();
+    calendarDate = today;                   // sync operator calendar to real today
+    hubRangeStart = hubRangeEnd = today;
+    _applyCalendarDate(true);
   } else {
     hubRangeStart = hubRangeEnd = null;
   }
   _updateHubRangeUI();
-  _updateHubTodayBtn();
+  _updateHubQuickBtns();
   renderHubGrid();
   scheduleSave();
 }
-function _updateHubTodayBtn(){
+
+function setHubThisWeek(){
+  const wasActive = hubWeekMode;
+  hubWeekMode  = !wasActive;
+  hubTodayMode = false;
+  if(hubWeekMode){
+    // Compute Monday and Sunday of the current local week
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun … 6=Sat
+    const diffToMon = (dow + 6) % 7;  // days back to Monday
+    const mon = new Date(now); mon.setDate(now.getDate() - diffToMon);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    hubRangeStart = fmt(mon);
+    hubRangeEnd   = fmt(sun);
+  } else {
+    hubRangeStart = hubRangeEnd = null;
+  }
+  _updateHubRangeUI();
+  _updateHubQuickBtns();
+  renderHubGrid();
+  scheduleSave();
+}
+
+function _updateHubQuickBtns(){
   document.getElementById('hub-today-btn')?.classList.toggle('active', hubTodayMode);
+  document.getElementById('hub-week-btn')?.classList.toggle('active', hubWeekMode);
 }
 
 function clearHubRange(which){
-  hubTodayMode = false; // manual clear disengages TODAY mode
-  _updateHubTodayBtn();
+  hubTodayMode = false; hubWeekMode = false; // manual clear disengages quick buttons
+  _updateHubQuickBtns();
   if(which==='start') hubRangeStart=null;
   else                hubRangeEnd=null;
   _updateHubRangeUI();
