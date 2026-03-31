@@ -1854,6 +1854,7 @@ function renderHeaders(){
       el.innerHTML='';
     }
   });
+  _fitOpTeamsRows();
 }
 
 function renderTimers(){
@@ -2370,6 +2371,45 @@ function _fitHubTeamsRows(){
         fs=Math.max(7, fs-0.5);
         textSpans.forEach(s=>s.style.fontSize=`${fs}px`);
         if(measure()<=avail) break;
+      }
+    });
+  });
+}
+
+// ── OPERATOR TEAMS SHRINK-FIT ────────────────────────────
+// Same logic as hub shrink-fit but for the .match-teams rows in operator view.
+// .match-teams already has overflow:hidden so scrollWidth works without the toggle.
+// Font starts at 24px; minimum floor is 10px to stay legible on monitor.
+function _fitOpTeamsRows(){
+  requestAnimationFrame(()=>{
+    [0,1,2].forEach(i=>{
+      const el=document.getElementById(`match-teams-${i}`);
+      if(!el) return;
+
+      // Reset overrides
+      el.style.letterSpacing='';
+      el.style.gap='';
+      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>s.style.fontSize='');
+
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 1. Remove letter-spacing (.08em default)
+      el.style.letterSpacing='0';
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 2. Tighten gap (.5em default)
+      el.style.gap='4px';
+      if(el.scrollWidth<=el.offsetWidth) return;
+      el.style.gap='0';
+      if(el.scrollWidth<=el.offsetWidth) return;
+
+      // 3. Shrink text spans only (not badges), minimum 10px
+      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini)')];
+      let fs=parseFloat(getComputedStyle(el).fontSize);
+      while(fs>10){
+        fs=Math.max(10, fs-0.5);
+        textSpans.forEach(s=>s.style.fontSize=`${fs}px`);
+        if(el.scrollWidth<=el.offsetWidth) break;
       }
     });
   });
