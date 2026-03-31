@@ -76,6 +76,7 @@ function boot() {
   --accent:#00d4ff; --accent2:#ff6b35;
   --green:#00ff88; --red:#ff3355; --yellow:#ffd600; --purple:#9b59b6;
   --text:#e8ecf4; --text-dim:#6b7390; --text-mid:#9ba3bf;
+  --brand-color:#00d4ff;
   --mono:'Share Tech Mono',monospace;
   --display:'Oswald',sans-serif;
   --ui:'Rajdhani',sans-serif;
@@ -330,7 +331,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 #matches-grid{ display:flex;gap:8px;flex:1;min-height:0; }
 .match-col{ flex:1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:0;transition:opacity .3s,filter .3s; }
 .match-col.disabled{ opacity:.35;filter:grayscale(.6);pointer-events:none; }
-.match-header{ display:flex;flex-direction:column;align-items:center;padding:10px 12px 8px;background:var(--surface2);border-bottom:2px solid var(--accent);gap:4px;flex-shrink:0;position:relative; }
+.match-header{ display:flex;flex-direction:column;align-items:center;padding:10px 12px 8px;background:var(--surface2);border-bottom:2px solid var(--brand-color);gap:4px;flex-shrink:0;position:relative; }
 .match-local-time{ font-family:var(--mono);font-size:48px;font-weight:700;color:#fff;letter-spacing:.06em;line-height:1;width:100%;text-align:center;white-space:nowrap;overflow:hidden; }
 .timers-list{ display:flex;flex-direction:column;flex:1;overflow-y:auto;padding:6px;gap:4px; }
 .timer-row{ display:grid;grid-template-columns:auto 1fr 62px 140px 20px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px;gap:8px;min-height:48px;transition:border-color .2s,opacity .15s; }
@@ -569,13 +570,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 }
 .hub-card:hover{ border-color:var(--border-bright); }
 .hub-card-head{
-  background:var(--surface2);border-bottom:2px solid var(--accent);
+  background:var(--surface2);border-bottom:2px solid var(--brand-color);
   padding:5px 7px 4px;flex-shrink:0;
 }
 .hub-card-head-row{ display:flex;align-items:center;gap:4px; }
 .hub-card-label{
   font-family:var(--display);font-size:calc(10px * var(--hub-fs,1));font-weight:600;letter-spacing:2px;
-  color:var(--accent);text-transform:uppercase;flex:1;overflow:hidden;
+  color:var(--brand-color);text-transform:uppercase;flex:1;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;
 }
 .hub-card-acts{ display:flex;gap:3px;flex-shrink:0; }
@@ -761,6 +762,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </button>
         <div class="opts-panel hidden" id="opts-panel">
           <div class="opts-panel-title">OPTIONS</div>
+          <div class="opts-row">
+            <span class="opts-label">COLOUR</span>
+            <input class="colour-inp" id="global-color" type="color" value="#00d4ff" oninput="setBrandColor(this.value)" title="Default colour for dividers, labels and card accents" />
+          </div>
           <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">HUB TZ</span>
             <select id="hub-tz" onchange="onHubTzChange()"></select>
@@ -822,7 +827,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <div id="matches-grid">
       <!-- Match 1 -->
       <div class="match-col" id="match-col-0">
-        <div class="match-header" style="border-bottom-color:var(--accent)">
+        <div class="match-header">
           <div class="match-title-row">
             <div class="match-label" id="match-label-0">MATCH 1</div>
             <button class="edit-match-btn" onclick="openEditMatch(0)">✎</button>
@@ -839,7 +844,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
       <!-- Match 2 -->
       <div class="match-col hidden-match" id="match-col-1">
-        <div class="match-header" style="border-bottom-color:var(--accent2)">
+        <div class="match-header">
           <button class="remove-match-btn" onclick="removeMatch(1)">✕</button>
           <div class="match-title-row">
             <div class="match-label" id="match-label-1">MATCH 2</div>
@@ -857,7 +862,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
       <!-- Match 3 -->
       <div class="match-col hidden-match" id="match-col-2">
-        <div class="match-header" style="border-bottom-color:var(--purple)">
+        <div class="match-header">
           <button class="remove-match-btn" onclick="removeMatch(2)">✕</button>
           <div class="match-title-row">
             <div class="match-label" id="match-label-2">MATCH 3</div>
@@ -1002,6 +1007,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       </div>
     </div>
     <div class="modal-divider">HUB DISPLAY</div>
+    <div class="opts-row" style="padding:4px 0">
+      <span class="opts-label">CARD COLOUR</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="em-card-custom" onchange="document.getElementById('em-card-c').disabled=!this.checked" style="cursor:pointer;accent-color:var(--accent)" />
+        <label for="em-card-custom" style="font-size:10px;color:var(--text-dim);letter-spacing:1px;cursor:pointer">CUSTOM</label>
+        <input class="colour-inp" id="em-card-c" type="color" value="#00d4ff" disabled />
+      </div>
+    </div>
     <div class="opts-row" style="padding:4px 0">
       <span class="opts-label">TIMER NAME ALIGN</span>
       <div class="name-mode-btns">
@@ -1186,6 +1199,7 @@ let teamDisplayMode = 'long'; // 'long' | 'short' | 'tri'
 let logoSizeMode    = 'small'; // 'small' | 'medium' | 'large'
 let hubLogoSize     = 'off';  // 'off' | 'small' | 'medium' | 'large'
 let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no bg
+let brandColor      = '#00d4ff'; // global default colour for borders, labels, dividers
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
 const MAX_MATCHES = 16;
@@ -1479,6 +1493,7 @@ function buildPayload(name){
     updatedAt: window._fb.serverTimestamp(),
     updatedAtMs: Date.now(),
     state:{
+      brandColor,
       hubTz,
       teamDisplayMode,
       logoSizeMode,
@@ -1495,7 +1510,8 @@ function buildPayload(name){
 }
 
 function applyState(s){
-  if(s.hubTz)        { hubTz=s.hubTz; const el=document.getElementById('hub-tz'); if(el) el.value=hubTz; }
+  if(s.brandColor)     { setBrandColor(s.brandColor, true); }
+  if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
   if(s.teamDisplayMode){ teamDisplayMode=s.teamDisplayMode; setNameMode(teamDisplayMode,true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
   if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
@@ -1505,8 +1521,9 @@ function applyState(s){
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
     s.matchTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES) matchTzs[i]=tz; });
-    // Sync op-tz selector to matchTzs[0] as the representative value
-    const opTzEl=document.getElementById('op-tz'); if(opTzEl) opTzEl.value=matchTzs[0];
+    // Sync both TZ selectors to matchTzs[0] as the representative value
+    ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=matchTzs[0]; });
+    hubTz=matchTzs[0];
   }
   if(s.matchVisible){
     matchVisible = Array(MAX_MATCHES).fill(false);
@@ -1667,17 +1684,24 @@ function populateSelects(){
   });
 }
 
-function onHubTzChange(){ hubTz=document.getElementById('hub-tz').value; scheduleSave(); }
-function onOpTzChange(){
-  const tz=document.getElementById('op-tz').value;
+function _applyBroadcastTz(tz){
+  hubTz=tz;
   for(let i=0;i<MAX_MATCHES;i++){
     matchTzs[i]=tz;
     const hidden=document.getElementById(`match-tz-${i}`);
     if(hidden) hidden.value=tz;
     matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,tz); });
   }
+  // Update clocks immediately without waiting for next tick
+  document.getElementById('hub-clock').textContent=getTimeInTz(tz);
+  [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(tz); });
+  // Sync both selectors
+  const hubEl=document.getElementById('hub-tz'); if(hubEl) hubEl.value=tz;
+  const opEl=document.getElementById('op-tz');   if(opEl)  opEl.value=tz;
   scheduleSave();
 }
+function onHubTzChange(){ _applyBroadcastTz(document.getElementById('hub-tz').value); }
+function onOpTzChange(){  _applyBroadcastTz(document.getElementById('op-tz').value);  }
 function onMatchTzChange(i){
   matchTzs[i]=document.getElementById(`match-tz-${i}`).value;
   matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
@@ -2006,6 +2030,10 @@ function openEditMatch(i){
   document.getElementById('em-away').value=m.away;
   document.getElementById('em-home-c').value=m.homeColour;
   document.getElementById('em-away-c').value=m.awayColour;
+  const hasCardColor=!!m.cardColor;
+  document.getElementById('em-card-custom').checked=hasCardColor;
+  document.getElementById('em-card-c').value=m.cardColor||brandColor;
+  document.getElementById('em-card-c').disabled=!hasCardColor;
   const sport=m.sport||'';
   document.getElementById('em-sport').value=sport;
   renderTeamPicker('home',sport);
@@ -2044,6 +2072,7 @@ function confirmEditMatch(){
     away,
     homeColour:document.getElementById('em-home-c').value,
     awayColour:document.getElementById('em-away-c').value,
+    cardColor:document.getElementById('em-card-custom').checked ? document.getElementById('em-card-c').value : null,
     sport,
     homeTeamRef:findTeamRef(sport,home),
     awayTeamRef:findTeamRef(sport,away),
@@ -2120,6 +2149,15 @@ function setLogoBg(val, silent){
     document.getElementById(`lbg-${v}-off`)?.classList.toggle('active', val===false);
   });
   renderHeaders();
+  if(viewMode==='hub') renderHubGrid();
+  if(!silent) scheduleSave();
+}
+
+function setBrandColor(hex, silent){
+  brandColor=hex;
+  document.documentElement.style.setProperty('--brand-color', hex);
+  const el=document.getElementById('global-color');
+  if(el) el.value=hex;
   if(viewMode==='hub') renderHubGrid();
   if(!silent) scheduleSave();
 }
@@ -2282,7 +2320,7 @@ function renderHubGrid(){
 function buildHubCard(i,now){
   const m=matchMeta[i];
   const timers=matchTimers[i];
-  const color=HUB_COLORS[i]||'var(--accent)';
+  const color=m.cardColor||'var(--brand-color)';
 
   // Teams line
   let teamsHtml='';
@@ -2361,7 +2399,11 @@ function buildHubCard(i,now){
           ${opBtn}${remBtn}
         </div>
       </div>
-      ${teamsHtml?`<div class="hub-teams">${teamsHtml}</div>`:''}
+      ${(()=>{
+        const logoMinH={small:'26px',medium:'36px',large:'50px'};
+        const minH=hubLogoSize!=='off'?`min-height:${logoMinH[hubLogoSize]||'26px'};`:'';
+        return (teamsHtml||hubLogoSize!=='off')?`<div class="hub-teams" style="${minH}">${teamsHtml}</div>`:'';
+      })()}
       <div class="hub-local-time" data-hub-clock-mi="${i}">${getTimeInTz(matchTzs[i])}</div>
     </div>
     <div class="hub-timers">${timersHtml}</div>
