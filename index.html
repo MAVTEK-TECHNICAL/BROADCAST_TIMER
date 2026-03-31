@@ -803,25 +803,34 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .match-col.compact .timer-row{
   display:grid;
   grid-template-columns:1fr auto;
-  grid-template-rows:auto auto;
-  padding:4px 8px;gap:1px 6px;min-height:38px;position:relative;
+  /* fixed rows: 26px for name (fits 2 wrapped lines), 18px for time */
+  grid-template-rows:26px 18px;
+  padding:4px 8px 3px;gap:2px 6px;
+  min-height:0;position:relative;
 }
 .match-col.compact .timer-drag-handle{ display:none; }
-/* name spans full width on row 1 */
+/* name: full-width top row, wraps up to 2 lines, font shrinks to fit */
 .match-col.compact .timer-name{
   grid-column:1 / -1;grid-row:1;
-  font-size:11px;letter-spacing:.04em;line-height:1.3;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:10px;letter-spacing:.04em;line-height:1.25;
+  white-space:normal;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
   padding-right:18px;
+  align-self:center;
 }
-/* time-set left, countdown right on row 2 */
+/* time-set: left-aligned on bottom row */
 .match-col.compact .timer-time-set{
   grid-column:1;grid-row:2;
   font-size:11px;border-bottom-style:none;
+  text-align:left;
+  align-self:center;
 }
+/* countdown: right-aligned on bottom row */
 .match-col.compact .timer-countdown{
   grid-column:2;grid-row:2;
   font-size:13px;font-weight:700;text-align:right;
+  align-self:center;
 }
 /* remove btn: absolutely positioned top-right, hidden until hover */
 .match-col.compact .timer-remove{
@@ -829,7 +838,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   display:none;
 }
 .match-col.compact .timer-row.optional:hover .timer-remove{ display:block; }
-/* hide the empty placeholder <span> used for core timers */
+/* hide empty placeholder <span> used for core timers */
 .match-col.compact .timer-row > span:not([class]){ display:none; }
 .match-col.compact .timer-section-spacer{ height:10px; }
 
@@ -2868,7 +2877,16 @@ function renderOpColumns(){
   if(RO) RO.disconnect();
   window._colResizeObserver = new ResizeObserver(entries=>{
     entries.forEach(e=>{
-      e.target.classList.toggle('compact', e.contentRect.width < 300);
+      const w = e.contentRect.width;
+      e.target.classList.toggle('compact', w < 350);
+      // Scale match clock font proportionally to column width
+      const clock = e.target.querySelector('.match-local-time');
+      if(clock){
+        // 48px at ≥400px → 20px at ≤150px, clamped
+        const fs = Math.round(Math.max(18, Math.min(48, 0.118*(w-150)+20)));
+        clock.style.fontSize = fs+'px';
+        clock.style.letterSpacing = fs < 30 ? '0.02em' : fs < 38 ? '0.04em' : '0.06em';
+      }
     });
   });
   grid.querySelectorAll('.match-col').forEach(col=>{
