@@ -2430,6 +2430,8 @@ function clearEditTimerTime(){
   if(!t) return;
   t.timeStr=null; t.targetUTC=null;
   closeModal('modal-edit-timer'); renderAll(); scheduleSave();
+  // Refresh em panel if Edit Match modal is open
+  if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
 
 function openAddTimer(mi){
@@ -2501,6 +2503,7 @@ function openEditMatch(i){
   document.getElementById('em-ar-ctrl').value=m.arCtrl||'';
   document.getElementById('em-ar-rend').value=m.arRend||'';
   document.getElementById('em-tracker').value=m.tracker||'';
+  _emMatchIdx=i;
   emRenderTimers(i);
   document.getElementById('modal-edit-match').classList.remove('hidden');
   setTimeout(()=>document.getElementById('em-label').focus(),50);
@@ -2556,18 +2559,24 @@ function confirmEditMatch(){
 }
 
 // ── EDIT MATCH — inline timers panel ─────────────────────
+// _emMatchIdx is set once when Edit Match opens and is NOT touched by
+// openAddTimer / openEditTimer (which overwrite ctx). This keeps the
+// em panel's match reference stable while child modals are open.
 let _emDragIdx=null;
+let _emMatchIdx=null;
 
 function emRenderTimers(mi){
+  // Accept explicit mi, or fall back to the stable _emMatchIdx
+  const idx = (mi!=null) ? mi : _emMatchIdx;
   const list=document.getElementById('em-timer-list');
-  if(!list) return;
-  const timers=matchTimers[mi!=null?mi:ctx.i];
+  if(!list || idx==null) return;
+  const timers=matchTimers[idx];
   list.innerHTML='';
-  timers.forEach((t,idx)=>{
+  timers.forEach((t,rowIdx)=>{
     const row=document.createElement('div');
     row.className='em-timer-row';
     row.draggable=true;
-    row.dataset.idx=idx;
+    row.dataset.idx=rowIdx;
     row.innerHTML=`
       <div class="em-timer-drag-handle">⠿</div>
       <div class="em-timer-info">
@@ -2578,7 +2587,7 @@ function emRenderTimers(mi){
       ${!t.core?`<button class="em-timer-del-btn" title="Remove" onclick="emDeleteTimer('${t.id}')">✕</button>`:'<span style="width:20px"></span>'}`;
     // Drag-to-reorder
     row.addEventListener('dragstart', e=>{
-      _emDragIdx=idx;
+      _emDragIdx=rowIdx;
       e.dataTransfer.effectAllowed='move';
       e.dataTransfer.setData('text/plain','');
       setTimeout(()=>row.classList.add('em-dragging'),0);
@@ -2594,7 +2603,7 @@ function emRenderTimers(mi){
       row.classList.remove('em-drag-over');
       const toIdx=parseInt(row.dataset.idx);
       if(_emDragIdx===null||_emDragIdx===toIdx) return;
-      const arr=matchTimers[ctx.i];
+      const arr=matchTimers[_emMatchIdx];
       const [moved]=arr.splice(_emDragIdx,1);
       arr.splice(toIdx,0,moved);
       scheduleSave();
@@ -2609,18 +2618,17 @@ function emRenderTimers(mi){
 }
 
 function emAddTimer(){
-  // Re-use the existing Add Timer modal but refresh the em panel on confirm
-  openAddTimer(ctx.i);
-  // Patch confirmAddTimer to also refresh em panel
-  window._emAddTimerPending=true;
+  // openAddTimer sets ctx={mi} — save _emMatchIdx first so it survives
+  openAddTimer(_emMatchIdx);
 }
 
 function emEditTimer(tid){
-  openEditTimer(ctx.i, tid);
+  // openEditTimer sets ctx={mi,tid} — _emMatchIdx stays intact
+  openEditTimer(_emMatchIdx, tid);
 }
 
 function emDeleteTimer(tid){
-  matchTimers[ctx.i]=matchTimers[ctx.i].filter(t=>t.id!==tid);
+  matchTimers[_emMatchIdx]=matchTimers[_emMatchIdx].filter(t=>t.id!==tid);
   scheduleSave();
   emRenderTimers();
 }
