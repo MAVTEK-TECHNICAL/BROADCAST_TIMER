@@ -782,6 +782,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             </div>
           </div>
           <div class="opts-row opts-view-op">
+            <span class="opts-label">OP TZ</span>
+            <select id="op-tz" onchange="onOpTzChange()"></select>
+          </div>
+          <div class="opts-row opts-view-op">
             <span class="opts-label">TEAMS</span>
             <div class="name-mode-btns">
               <button class="nmb active" id="nmb-long"  onclick="setNameMode('long')">LONG</button>
@@ -1501,6 +1505,8 @@ function applyState(s){
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
     s.matchTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES) matchTzs[i]=tz; });
+    // Sync op-tz selector to matchTzs[0] as the representative value
+    const opTzEl=document.getElementById('op-tz'); if(opTzEl) opTzEl.value=matchTzs[0];
   }
   if(s.matchVisible){
     matchVisible = Array(MAX_MATCHES).fill(false);
@@ -1638,7 +1644,7 @@ async function importJSON(e){
 
 // ── SELECTS ──────────────────────────────────────────────
 function populateSelects(){
-  const tzSelIds = ['hub-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz'];
+  const tzSelIds = ['hub-tz', 'op-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz'];
   tzSelIds.forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel||sel.options.length) return;
@@ -1662,6 +1668,16 @@ function populateSelects(){
 }
 
 function onHubTzChange(){ hubTz=document.getElementById('hub-tz').value; scheduleSave(); }
+function onOpTzChange(){
+  const tz=document.getElementById('op-tz').value;
+  for(let i=0;i<MAX_MATCHES;i++){
+    matchTzs[i]=tz;
+    const hidden=document.getElementById(`match-tz-${i}`);
+    if(hidden) hidden.value=tz;
+    matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,tz); });
+  }
+  scheduleSave();
+}
 function onMatchTzChange(i){
   matchTzs[i]=document.getElementById(`match-tz-${i}`).value;
   matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
