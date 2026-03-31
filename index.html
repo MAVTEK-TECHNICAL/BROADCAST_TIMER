@@ -915,9 +915,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       <!-- Match 1 -->
       <div class="match-col" id="match-col-0">
         <div class="match-header">
+          <button class="remove-match-btn" onclick="removeMatch(0)">✕</button>
           <div class="match-title-row">
             <div class="match-label" id="match-label-0">MATCH 1</div>
-            <button class="edit-match-btn" onclick="openEditMatch(0)">✎</button>
+            <button class="edit-match-btn" onclick="opEditMatch(0)">✎</button>
           </div>
           <div class="match-teams" id="match-teams-0"></div>
           <div class="match-local-time" id="match-clock-0">--:--:--</div>
@@ -925,8 +926,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
         <div class="timers-list" id="timers-0"></div>
         <div class="timer-footer">
-          <button class="add-timer-btn" onclick="openAddTimer(0)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-0" onclick="sortTimers(0)" title="Sort by time remaining">⇅ SORT</button>
+          <button class="add-timer-btn" onclick="opAddTimer(0)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-0" onclick="opSortTimers(0)" title="Sort by time remaining">⇅ SORT</button>
         </div>
       </div>
 
@@ -936,7 +937,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <button class="remove-match-btn" onclick="removeMatch(1)">✕</button>
           <div class="match-title-row">
             <div class="match-label" id="match-label-1">MATCH 2</div>
-            <button class="edit-match-btn" onclick="openEditMatch(1)">✎</button>
+            <button class="edit-match-btn" onclick="opEditMatch(1)">✎</button>
           </div>
           <div class="match-teams" id="match-teams-1"></div>
           <div class="match-local-time" id="match-clock-1">--:--:--</div>
@@ -944,8 +945,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
         <div class="timers-list" id="timers-1"></div>
         <div class="timer-footer">
-          <button class="add-timer-btn" onclick="openAddTimer(1)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-1" onclick="sortTimers(1)" title="Sort by time remaining">⇅ SORT</button>
+          <button class="add-timer-btn" onclick="opAddTimer(1)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-1" onclick="opSortTimers(1)" title="Sort by time remaining">⇅ SORT</button>
         </div>
       </div>
 
@@ -955,7 +956,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <button class="remove-match-btn" onclick="removeMatch(2)">✕</button>
           <div class="match-title-row">
             <div class="match-label" id="match-label-2">MATCH 3</div>
-            <button class="edit-match-btn" onclick="openEditMatch(2)">✎</button>
+            <button class="edit-match-btn" onclick="opEditMatch(2)">✎</button>
           </div>
           <div class="match-teams" id="match-teams-2"></div>
           <div class="match-local-time" id="match-clock-2">--:--:--</div>
@@ -963,8 +964,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
         <div class="timers-list" id="timers-2"></div>
         <div class="timer-footer">
-          <button class="add-timer-btn" onclick="openAddTimer(2)">+ ADD TIMER</button>
-          <button class="sort-timer-btn" id="sort-btn-2" onclick="sortTimers(2)" title="Sort by time remaining">⇅ SORT</button>
+          <button class="add-timer-btn" onclick="opAddTimer(2)">+ ADD TIMER</button>
+          <button class="sort-timer-btn" id="sort-btn-2" onclick="opSortTimers(2)" title="Sort by time remaining">⇅ SORT</button>
         </div>
       </div>
 
@@ -1300,9 +1301,12 @@ let logoBgMode      = true;   // true = coloured tile bg | false = logo only, no
 let brandColor      = '#00d4ff'; // global default colour for borders, labels, dividers
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
-let calendarDate  = new Date().toISOString().split('T')[0]; // currently selected date YYYY-MM-DD
+let calendarDate  = _todayISO(); // currently selected date YYYY-MM-DD (local time)
 let hubShowAllDays= false; // hub only: show all schedule days instead of just calendarDate
 let _calPopupYM   = null;  // {year,month} currently displayed in popup
+// Operator view: maps display column (0/1/2) → actual match slot index (0-15)
+let opSlotMap    = [0, 1, 2];
+let opSlotActive = [true, false, false]; // which op columns currently have a match
 
 // Returns true when match i should be visible given current date filter
 function isMatchVisible(i){
@@ -1697,13 +1701,12 @@ function applyState(s){
       if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,matchTzs[i]):null}));
     });
   }
-  [0,1,2].forEach(i=>{
+  // Sync hidden TZ selects for all 16 slots
+  for(let i=0;i<MAX_MATCHES;i++){
     const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
-    document.getElementById(`match-col-${i}`).classList.toggle('hidden-match',!isMatchVisible(i));
-  });
-  updateAddMatchBtn();
+  }
+  // _applyCalendarDate rebuilds opSlotMap, show/hides op columns, and calls renderAll()
   _applyCalendarDate(true);
-  renderAll();
 }
 
 // Auto-save
@@ -1927,7 +1930,7 @@ function timerDragEnd(e){
 
 function renderHeaders(){
   [0,1,2].forEach(i=>{
-    const m=matchMeta[i];
+    const m=matchMeta[opSlotMap[i]]; // translate column → real match slot
     document.getElementById(`match-label-${i}`).textContent=m.label;
     const el=document.getElementById(`match-teams-${i}`);
     if(m.home||m.away){
@@ -1965,12 +1968,13 @@ function renderHeaders(){
 
 function renderTimers(){
   for(let mi=0;mi<3;mi++){
+    const si=opSlotMap[mi]; // real match slot index for this display column
     const list=document.getElementById(`timers-${mi}`);
     const now=Date.now();
 
     // During a drag, only update countdown text in-place to avoid breaking the drag
     if(_timerDragging){
-      matchTimers[mi].forEach(t=>{
+      matchTimers[si].forEach(t=>{
         const cdEl=list.querySelector(`.timer-countdown[data-tid="${t.id}"]`);
         if(!cdEl) return;
         const diff=t.targetUTC ? t.targetUTC-now : null;
@@ -1989,11 +1993,11 @@ function renderTimers(){
 
     list.innerHTML='';
     let _spacerInserted=false;
-    matchTimers[mi].forEach((t,idx)=>{
+    matchTimers[si].forEach((t,idx)=>{
       const diff=t.targetUTC ? t.targetUTC-now : null;
       // Insert spacer between future and past groups when in sort mode
-      if(timerSortMode[mi] && !_spacerInserted && idx>0 && diff!==null && diff<0){
-        const prevT=matchTimers[mi][idx-1];
+      if(timerSortMode[si] && !_spacerInserted && idx>0 && diff!==null && diff<0){
+        const prevT=matchTimers[si][idx-1];
         const prevDiff=prevT.targetUTC ? prevT.targetUTC-now : null;
         if(prevDiff!==null && prevDiff>=0){
           const spacer=document.createElement('div');
@@ -2015,18 +2019,18 @@ function renderTimers(){
       const div=document.createElement('div');
       div.className=`timer-row ${row}`;
       div.draggable=true;
-      div.dataset.mi=mi; div.dataset.idx=idx;
-      div.addEventListener('dragstart', e=>timerDragStart(mi,idx,e));
-      div.addEventListener('dragover',  e=>timerDragOver(mi,idx,e));
+      div.dataset.mi=si; div.dataset.idx=idx; // use real slot index for drag callbacks
+      div.addEventListener('dragstart', e=>timerDragStart(si,idx,e));
+      div.addEventListener('dragover',  e=>timerDragOver(si,idx,e));
       div.addEventListener('dragleave', e=>timerDragLeave(e));
-      div.addEventListener('drop',      e=>timerDrop(mi,idx,e));
+      div.addEventListener('drop',      e=>timerDrop(si,idx,e));
       div.addEventListener('dragend',   e=>timerDragEnd(e));
       div.innerHTML=`
         <div class="timer-drag-handle"><span></span><span></span><span></span></div>
         <div class="timer-name">${esc(t.name)}</div>
-        <div class="timer-time-set" onclick="openSetTime(${mi},'${t.id}')">${t.timeStr||'--:--'}</div>
+        <div class="timer-time-set" onclick="openSetTime(${si},'${t.id}')">${t.timeStr||'--:--'}</div>
         <div class="timer-countdown ${cls}" data-tid="${t.id}">${txt}</div>
-        ${!t.core?`<button class="timer-remove" onclick="removeTimer(${mi},'${t.id}')">✕</button>`:'<span></span>'}`;
+        ${!t.core?`<button class="timer-remove" onclick="removeTimer(${si},'${t.id}')">✕</button>`:'<span></span>'}`;
       list.appendChild(div);
     });
   }
@@ -2037,7 +2041,7 @@ function startClock(){
   function tick(){
     document.getElementById('hub-clock').textContent  = getTimeInTz(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
-    [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[i]); });
+    [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[opSlotMap[i]]); });
     if(viewMode==='operator') renderTimers();
     else updateHubCountdowns();
   }
@@ -2046,14 +2050,15 @@ function startClock(){
 
 // ── MATCH MGMT ───────────────────────────────────────────
 function addMatch(){
-  // OPERATOR only uses slots 0-2
-  for(let i=1;i<3;i++){
+  // Find first unused slot and assign it to the current calendar day
+  for(let i=0;i<MAX_MATCHES;i++){
     if(!matchVisible[i]){
       matchVisible[i]=matchEnabled[i]=true;
-      document.getElementById(`match-col-${i}`).classList.remove('hidden-match');
-      updateAddMatchBtn(); scheduleSave(); return;
+      matchMeta[i].isoDate=calendarDate;
+      _rebuildOpSlotMap(); renderAll(); scheduleSave(); return;
     }
   }
+  toast('MAX 16 MATCHES REACHED');
 }
 function addHubMatch(){
   // HUB can add any slot 0-15
@@ -2067,24 +2072,34 @@ function addHubMatch(){
   }
   toast('MAX 16 MATCHES REACHED');
 }
-function removeMatch(i){
-  // Called from OPERATOR ✕ buttons (slots 1 and 2)
-  matchVisible[i]=matchEnabled[i]=false;
-  document.getElementById(`match-col-${i}`).classList.add('hidden-match');
-  if(i===1&&matchVisible[2]){ matchVisible[2]=matchEnabled[2]=false; document.getElementById('match-col-2').classList.add('hidden-match'); }
-  updateAddMatchBtn(); scheduleSave();
+function removeMatch(col){
+  // Operator view only: hides this column without deleting match data.
+  // Match remains in the schedule and will re-appear when navigating back to its day.
+  const keep=[...opSlotActive.map((a,c)=>a&&c!==col?opSlotMap[c]:-1).filter(s=>s>=0)];
+  opSlotMap   =[keep[0]??0, keep[1]??0, keep[2]??0];
+  opSlotActive=[keep.length>=1, keep.length>=2, keep.length>=3];
+  [0,1,2].forEach(c=>document.getElementById(`match-col-${c}`)?.classList.toggle('hidden-match',!opSlotActive[c]));
+  updateAddMatchBtn(); renderAll();
+  // No scheduleSave() — this is a transient view change, not a data change
 }
+// Operator column wrappers — translate display column (0/1/2) → real match slot via opSlotMap
+function opEditMatch(col)  { openEditMatch(opSlotMap[col]); }
+function opAddTimer(col)   { openAddTimer(opSlotMap[col]);  }
+function opSortTimers(col) {
+  sortTimers(opSlotMap[col]);
+  // Flash the visible sort button using the display column index, not the real slot
+  const btn=document.getElementById(`sort-btn-${col}`);
+  btn?.classList.add('sort-active');
+  setTimeout(()=>btn?.classList.remove('sort-active'),800);
+}
+
 function removeHubMatch(i){
-  // Called from HUB card × buttons
+  // Called from HUB card × buttons — permanently removes the match
   matchVisible[i]=matchEnabled[i]=false;
-  if(i<3){
-    document.getElementById(`match-col-${i}`).classList.add('hidden-match');
-    if(i===1&&matchVisible[2]){ matchVisible[2]=matchEnabled[2]=false; document.getElementById('match-col-2').classList.add('hidden-match'); }
-    updateAddMatchBtn();
-  }
+  _rebuildOpSlotMap(); // in case this slot was in the op view
   scheduleSave(); renderHubGrid();
 }
-function updateAddMatchBtn(){ document.getElementById('add-match-col').classList.toggle('hidden',matchVisible[1]&&matchVisible[2]); }
+function updateAddMatchBtn(){ document.getElementById('add-match-col').classList.toggle('hidden', opSlotActive[1]&&opSlotActive[2]); }
 
 // ── MODALS ───────────────────────────────────────────────
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
@@ -2164,10 +2179,6 @@ function sortTimers(mi){
     return db-da;                       // both past: most recently finished first (least negative da)
   });
   timerSortMode[mi]=true; // enable spacer between future/past groups
-  // Flash the button to confirm
-  const btn=document.getElementById(`sort-btn-${mi}`);
-  btn?.classList.add('sort-active');
-  setTimeout(()=>btn?.classList.remove('sort-active'),800);
   renderTimers(); scheduleSave();
 }
 
@@ -2524,7 +2535,7 @@ function _fitOpTeamsRows(){
 
 // ── CALENDAR SYSTEM ───────────────────────────────────────
 // Date helpers
-function _todayISO(){ return new Date().toISOString().split('T')[0]; }
+function _todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function _isoDisplay(iso){
   if(!iso) return '';
   const d=new Date(iso+'T00:00:00');
@@ -2540,9 +2551,9 @@ function _isoFull(iso){
   return `${ds[d.getDay()]} ${d.getDate()} ${ms[d.getMonth()]} ${d.getFullYear()}`;
 }
 function _offsetISO(iso, delta){
-  const d=new Date(iso+'T00:00:00');
-  d.setDate(d.getDate()+delta);
-  return d.toISOString().split('T')[0];
+  const [y,mo,d]=iso.split('-').map(Number);
+  const dt=new Date(y,mo-1,d+delta); // local-time constructor avoids UTC drift
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 // Try to parse a PDF day string ("Sat 28 Mar", "SAT", "28 MAR 2026") → YYYY-MM-DD
 // refISO = round start date for resolving bare day names like "Sat"
@@ -2565,10 +2576,27 @@ function parseDayToISO(dayStr, refISO){
       const ref=new Date(refISO+'T00:00:00'), target=DAYS[dm[1]];
       let delta=target-ref.getDay(); if(delta<0) delta+=7;
       const d2=new Date(ref); d2.setDate(d2.getDate()+delta);
-      return d2.toISOString().split('T')[0];
+      return `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}-${String(d2.getDate()).padStart(2,'0')}`;
     }
   }
   return '';
+}
+
+// Rebuild which match slots are shown in the 3 operator columns for the current day
+function _rebuildOpSlotMap(){
+  const slots=[];
+  for(let i=0;i<MAX_MATCHES;i++){
+    if(matchVisible[i]){
+      const d=matchMeta[i].isoDate;
+      if(!d||d===calendarDate) slots.push(i); // no date = always visible (backward compat)
+    }
+  }
+  opSlotMap   =[slots[0]??0, slots[1]??0, slots[2]??0];
+  opSlotActive=[slots.length>=1, slots.length>=2, slots.length>=3];
+  [0,1,2].forEach(col=>{
+    document.getElementById(`match-col-${col}`)?.classList.toggle('hidden-match',!opSlotActive[col]);
+  });
+  updateAddMatchBtn();
 }
 
 // Apply calendarDate: refresh label, date lines, visibility, hub grid
@@ -2577,9 +2605,9 @@ function _applyCalendarDate(silent){
   [0,1,2].forEach(i=>{
     const el=document.getElementById(`match-date-${i}`);
     if(el) el.textContent=_isoDisplay(calendarDate);
-    document.getElementById(`match-col-${i}`)?.classList.toggle('hidden-match',!isMatchVisible(i));
   });
-  if(viewMode==='hub') renderHubGrid();
+  _rebuildOpSlotMap(); // recalculates opSlotMap + shows/hides op columns
+  renderAll();         // refresh headers+timers (op) or hub grid
   if(!silent) scheduleSave();
 }
 
@@ -2661,6 +2689,7 @@ function switchView(mode){
   document.querySelectorAll('.opts-view-hub').forEach(el=>el.classList.toggle('hidden-view', mode!=='hub'));
   document.querySelectorAll('.opts-view-op').forEach(el=>el.classList.toggle('hidden-view', mode!=='operator'));
   if(mode==='hub') renderHubGrid();
+  else renderAll(); // refresh op headers+timers with current opSlotMap
 }
 
 // ── HUB LAYOUT ────────────────────────────────────────────
@@ -3436,11 +3465,9 @@ function applySchedule(){
 }
 
 function operateMatch(i){
-  if(i<3){
-    matchVisible[i]=matchEnabled[i]=true;
-    document.getElementById(`match-col-${i}`).classList.remove('hidden-match');
-    updateAddMatchBtn();
-  }
+  // Navigate calendar to the match's day so it appears in operator view
+  if(matchMeta[i].isoDate) calendarDate=matchMeta[i].isoDate;
+  _applyCalendarDate(true); // rebuild opSlotMap + refresh display
   switchView('operator');
 }
 
