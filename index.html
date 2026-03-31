@@ -2110,6 +2110,9 @@ function renderHeaders(){
       el.innerHTML='';
     }
     _renderOpDetails(i); // refresh details panel
+    // Keep date-tz line in sync whenever headers are re-rendered
+    const dateEl=document.getElementById(`match-date-${i}`);
+    if(dateEl) dateEl.textContent=_opDateText(opSlotMap[i]);
   }
   _fitOpTeamsRows();
 }
