@@ -571,7 +571,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-card:hover{ border-color:var(--border-bright); }
 .hub-card-head{
   background:var(--surface2);border-bottom:2px solid var(--brand-color);
-  padding:5px 7px 4px;flex-shrink:0;
+  padding:5px 7px 4px;flex-shrink:0;overflow:hidden;
 }
 .hub-card-head-row{ display:flex;align-items:center;gap:4px; }
 .hub-card-label{
@@ -592,7 +592,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   display:flex;align-items:center;justify-content:center;flex-wrap:nowrap;gap:3px;
   font-family:var(--mono);font-size:calc(10px * var(--hub-fs,1));font-weight:700;letter-spacing:.04em;
   text-transform:uppercase;color:var(--text-mid);margin-top:3px;line-height:1.2;
-  overflow:hidden;white-space:nowrap;
+  overflow:visible;white-space:nowrap;
 }
 .hub-teams span[style*="color"],
 .match-teams span[style*="color"]{
@@ -2325,32 +2325,42 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
 }
 
 // ── HUB TEAMS SHRINK-FIT ─────────────────────────────────
-// After hub cards are painted, measure each .hub-teams row. If content overflows
-// its container, progressively tighten: letter-spacing → gap → scaleX (min 0.75).
+// After hub cards are painted, measure each .hub-teams row against the full
+// hub-card-head width (the true clip boundary). If content overflows, progressively
+// tighten: letter-spacing → gap → font-size on TEXT spans only.
+// Badges (.team-badge-mini) are never resized — logos always stay intact.
 function _fitHubTeamsRows(){
   requestAnimationFrame(()=>{
     document.querySelectorAll('#hub-grid .hub-teams').forEach(el=>{
-      // 1. Reset any previous overrides
+      // Reset any previous overrides
       el.style.letterSpacing='';
       el.style.gap='';
-      el.style.transform='';
-      el.style.transformOrigin='';
-      if(el.scrollWidth<=el.offsetWidth) return;
+      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>{
+        s.style.fontSize='';
+      });
 
-      // 2. Remove letter-spacing (won't let characters overlap)
+      // Available width = hub-card-head clientWidth (overflow:hidden clips here).
+      // hub-teams is overflow:visible so its content can use the 7px padding zone.
+      const avail=el.parentElement.clientWidth;
+      if(el.scrollWidth<=avail) return;
+
+      // 1. Remove letter-spacing
       el.style.letterSpacing='0';
-      if(el.scrollWidth<=el.offsetWidth) return;
+      if(el.scrollWidth<=avail) return;
 
-      // 3. Remove gap between flex items
+      // 2. Tighten gap
       el.style.gap='1px';
-      if(el.scrollWidth<=el.offsetWidth) return;
+      if(el.scrollWidth<=avail) return;
       el.style.gap='0';
-      if(el.scrollWidth<=el.offsetWidth) return;
+      if(el.scrollWidth<=avail) return;
 
-      // 4. Last resort: scaleX to just fit, capped at 0.75 so letters stay readable
-      const ratio=Math.max(0.75, el.offsetWidth/el.scrollWidth);
-      el.style.transform=`scaleX(${ratio.toFixed(3)})`;
-      el.style.transformOrigin='left center';
+      // 3. Shrink text spans only (not badges) down to 7px minimum
+      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini)')];
+      let fs=parseFloat(getComputedStyle(el).fontSize);
+      while(el.scrollWidth>avail && fs>7){
+        fs=Math.max(7, fs-0.5);
+        textSpans.forEach(s=>s.style.fontSize=`${fs}px`);
+      }
     });
   });
 }
