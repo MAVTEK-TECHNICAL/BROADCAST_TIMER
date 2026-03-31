@@ -394,18 +394,17 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .match-header{ display:flex;flex-direction:column;align-items:center;padding:10px 12px 8px;background:var(--surface2);border-bottom:2px solid var(--brand-color);gap:4px;flex-shrink:0;position:relative; }
 .match-local-time{ font-family:var(--mono);font-size:48px;font-weight:700;color:#fff;letter-spacing:.06em;line-height:1;width:100%;text-align:center;white-space:nowrap;overflow:hidden; }
 .timers-list{ display:flex;flex-direction:column;flex:1;overflow-y:auto;padding:6px;gap:4px; }
-.timer-row{ display:grid;grid-template-columns:auto 1fr 62px 140px 20px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px;gap:8px;min-height:48px;transition:border-color .2s,opacity .15s; }
-.timer-drag-handle{ display:flex;flex-direction:column;gap:2px;padding:2px 3px;cursor:grab;opacity:0;transition:opacity .15s;align-self:center; }
-.timer-drag-handle span{ display:block;width:14px;height:2px;border-radius:1px;background:var(--text-dim); }
-.timer-row:hover .timer-drag-handle{ opacity:1; }
+.timer-row{ display:grid;grid-template-columns:8px 1fr 62px 140px 20px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px 6px 0;gap:8px;height:52px;overflow:hidden;transition:border-color .2s,opacity .15s; }
+/* colour chip — flush left, full height, replaces the old 3-line drag handle */
+.timer-color-chip{ align-self:stretch;cursor:grab;border-radius:3px 0 0 3px;transition:filter .15s; }
+.timer-color-chip:active{ cursor:grabbing; }
+.timer-row:hover .timer-color-chip{ filter:brightness(1.4); }
 .timer-row.dragging{ opacity:.35;cursor:grabbing; }
 .timer-row.drag-over{ border-top:2px solid var(--accent);margin-top:-1px; }
-.timer-row.core{ border-left:3px solid var(--accent2); }
-.timer-row.optional{ border-left:3px solid var(--border-bright); }
 .timer-row.countdown-warning{ border-color:var(--yellow); }
 .timer-row.countdown-live{ border-color:var(--red);animation:pulse-border 1s infinite; }
 @keyframes pulse-border{ 0%,100%{border-color:var(--red);box-shadow:0 0 0 0 rgba(255,51,85,0);}50%{border-color:#ff6680;box-shadow:0 0 0 3px rgba(255,51,85,.15);} }
-.timer-name{ font-family:var(--ui);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.timer-name{ font-family:var(--ui);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mid);line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal; }
 .timer-name-edit{ cursor:pointer; }
 .timer-name-edit:hover{ color:var(--accent); }
 .timer-row.optional .timer-name{ font-weight:400;font-style:italic; }
@@ -802,20 +801,20 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* ─── COMPACT TIMER ROWS (narrow columns) ─────────────── */
 .match-col.compact .timer-row{
   display:grid;
+  /* chip hidden in compact — 2-col layout: name/time | countdown */
   grid-template-columns:1fr auto;
   /* fixed rows: 26px for name (fits 2 wrapped lines), 18px for time */
   grid-template-rows:26px 18px;
   padding:4px 8px 3px;gap:2px 6px;
-  min-height:0;position:relative;
+  height:auto;min-height:0;position:relative;
+  overflow:visible;
 }
-.match-col.compact .timer-drag-handle{ display:none; }
+.match-col.compact .timer-color-chip{ display:none; }
 /* name: full-width top row, wraps up to 2 lines, font shrinks to fit */
 .match-col.compact .timer-name{
   grid-column:1 / -1;grid-row:1;
   font-size:10px;letter-spacing:.04em;line-height:1.25;
-  white-space:normal;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-  overflow:hidden;
+  -webkit-line-clamp:2;
   padding-right:18px;
   align-self:center;
 }
@@ -2157,6 +2156,8 @@ function renderTimers(){
       let row=t.core?'core':'optional';
       if(diff!==null&&diff>=0&&diff<6e4)  row+=' countdown-live';
       else if(diff!==null&&diff>=0&&diff<6e5) row+=' countdown-warning';
+      const chipColor = (matchMeta[si]&&matchMeta[si].cardColor) ? matchMeta[si].cardColor : 'var(--brand-color)';
+      const chipOpacity = t.core ? '1' : '0.45';
       const div=document.createElement('div');
       div.className=`timer-row ${row}`;
       div.draggable=true;
@@ -2167,7 +2168,7 @@ function renderTimers(){
       div.addEventListener('drop',      e=>timerDrop(si,idx,e));
       div.addEventListener('dragend',   e=>timerDragEnd(e));
       div.innerHTML=`
-        <div class="timer-drag-handle"><span></span><span></span><span></span></div>
+        <div class="timer-color-chip" style="background:${chipColor};opacity:${chipOpacity}"></div>
         <div class="timer-name timer-name-edit" onclick="openEditTimer(${si},'${t.id}')" title="Edit name &amp; time">${esc(t.name)}</div>
         <div class="timer-time-set" onclick="openEditTimer(${si},'${t.id}')">${t.timeStr||'--:--'}</div>
         <div class="timer-countdown ${cls}" data-tid="${t.id}">${txt}</div>
