@@ -769,6 +769,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .sched-day-chip{ background:transparent;border:1px solid var(--border-bright);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:10px;color:var(--text-dim);cursor:pointer;transition:all .15s;white-space:nowrap; }
 .sched-day-chip:hover{ border-color:var(--purple);color:var(--purple); }
 .sched-day-chip.active{ background:var(--purple);border-color:var(--purple);color:#fff; }
+.sched-preset-btn{ background:transparent;border:1px solid var(--border-bright);border-radius:3px;padding:3px 10px;font-family:var(--display);font-size:10px;letter-spacing:1.5px;color:var(--text-dim);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:uppercase; }
+.sched-preset-btn:hover{ border-color:var(--purple);color:var(--purple); }
+.sched-preset-btn.active{ background:var(--purple);border-color:var(--purple);color:#fff; }
 
 /* ─── HUB TODAY BUTTON ─────────────────────────────────── */
 .hub-today-btn{
@@ -1316,6 +1319,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 <div class="modal-overlay hidden" id="modal-sched-import">
   <div class="modal" style="width:min(820px,96vw);">
     <div class="modal-title" style="color:var(--purple)">IMPORT SCHEDULE</div>
+
+    <!-- Parser preset selector -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-family:var(--display);font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;flex-shrink:0">PARSER PRESET</span>
+      <div id="sched-preset-btns" style="display:flex;gap:5px;flex-wrap:wrap;">
+        <button class="sched-preset-btn active" data-preset="champion-data" onclick="schedSelectPreset(this)">CHAMPION DATA</button>
+      </div>
+    </div>
 
     <!-- Drop zone -->
     <div class="sched-drop-zone" id="sched-drop-zone">
@@ -3332,7 +3343,7 @@ async function loadPDFJS(){
 
 function handleScheduleFileInput(e){
   const f=e.target.files[0];
-  if(f) handleScheduleFile(f);
+  if(f)(SCHED_PARSERS[_activePreset]?.handleFile||handleScheduleFile)(f);
   e.target.value=''; // reset so same file can be re-dropped
 }
 
@@ -3614,6 +3625,42 @@ function schedUpdateBtn(){
   document.getElementById('sched-count-label').textContent=selected?`${selected} selected`:'';
 }
 
+// ── PARSER PRESET REGISTRY ────────────────────────────────
+// Each preset can override: fileTypes (accept attr), dropLabel, and parse logic.
+// Add new presets here as objects in SCHED_PARSERS.
+const SCHED_PARSERS = {
+  'champion-data': {
+    label: 'CHAMPION DATA',
+    fileAccept: '.pdf',
+    dropLabel: (name) => name
+      ? `✓ ${name}`
+      : `Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span>`,
+    handleFile: handleScheduleFile,   // existing PDF handler
+    parseTSV:   parseScheduleImport,  // existing TSV handler
+  },
+  // Future parsers go here, e.g.:
+  // 'my-other-format': { label: 'MY FORMAT', fileAccept: '.csv', ... }
+};
+
+let _activePreset = 'champion-data';
+
+function schedSelectPreset(btn){
+  const preset = btn.dataset.preset;
+  if(!SCHED_PARSERS[preset]) return;
+  _activePreset = preset;
+  document.querySelectorAll('.sched-preset-btn').forEach(b => b.classList.toggle('active', b===btn));
+  // Update file input accept type and reset drop zone
+  const parser = SCHED_PARSERS[preset];
+  document.getElementById('sched-pdf-input').accept = parser.fileAccept || '.pdf';
+  const zone = document.getElementById('sched-drop-zone');
+  zone.className = 'sched-drop-zone';
+  document.getElementById('sched-drop-label').innerHTML = parser.dropLabel('');
+  window._schedAllMatches = [];
+  document.getElementById('sched-table-wrap').classList.add('hidden');
+  document.getElementById('sched-import-btn').disabled = true;
+  document.getElementById('sched-import-btn').textContent = 'IMPORT';
+}
+
 function openImportSchedule(){
   document.getElementById('sched-import-text').value='';
   document.getElementById('sched-import-day').value='';
@@ -3623,17 +3670,21 @@ function openImportSchedule(){
   document.getElementById('sched-table-wrap').classList.add('hidden');
   document.getElementById('sched-import-btn').textContent='IMPORT';
   document.getElementById('sched-import-btn').disabled=true;
+  // Reset to default preset (champion-data)
+  _activePreset='champion-data';
+  document.querySelectorAll('.sched-preset-btn').forEach(b=>b.classList.toggle('active',b.dataset.preset==='champion-data'));
+  const parser=SCHED_PARSERS[_activePreset];
+  document.getElementById('sched-pdf-input').accept=parser.fileAccept||'.pdf';
   const zone=document.getElementById('sched-drop-zone');
   zone.className='sched-drop-zone';
-  document.getElementById('sched-drop-label').innerHTML=
-    `Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span>`;
+  document.getElementById('sched-drop-label').innerHTML=parser.dropLabel('');
   window._schedAllMatches=[];
   document.getElementById('modal-sched-import').classList.remove('hidden');
   closeSidebar();
-  // Wire drag-and-drop on the zone
+  // Wire drag-and-drop on the zone — routes through active preset's handler
   zone.ondragover=e=>{ e.preventDefault(); zone.classList.add('drag-over'); };
   zone.ondragleave=e=>{ if(!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); };
-  zone.ondrop=e=>{ e.preventDefault(); zone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) handleScheduleFile(f); };
+  zone.ondrop=e=>{ e.preventDefault(); zone.classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f)(SCHED_PARSERS[_activePreset]?.handleFile||handleScheduleFile)(f); };
   zone.onclick=()=>document.getElementById('sched-pdf-input').click();
 }
 
