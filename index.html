@@ -3622,9 +3622,11 @@ function switchView(mode){
 function setHubCols(n, silent){
   hubCols=n;
   [2,3,4,6,8].forEach(c=>document.getElementById(`hcb-${c}`)?.classList.toggle('active',c===n));
-  const grid=document.getElementById('hub-grid');
-  if(grid) grid.style.gridTemplateColumns=`repeat(${n},1fr)`;
-  if(!silent) scheduleSave();
+  if(!silent){
+    // Full re-render so gridTemplateRows is also recalculated for the new column count
+    renderHubGrid();
+    scheduleSave();
+  }
 }
 
 // ── HUB RENDER ────────────────────────────────────────────
