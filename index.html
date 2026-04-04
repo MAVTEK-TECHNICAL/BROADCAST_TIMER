@@ -421,7 +421,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .timer-footer{ display:flex;gap:4px;margin:0 6px 6px;flex-shrink:0; }
 .add-timer-btn{ display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px;cursor:pointer;transition:all .2s;flex:1; }
 .add-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
-.sort-timer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap; }
+.sort-timer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 4px;cursor:pointer;transition:all .2s;flex:1; }
 .sort-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .sort-timer-btn.sort-active{ border-color:var(--accent);color:var(--accent);border-style:solid; }
 .timer-section-spacer{ display:block;height:2px;margin:4px 0;background:linear-gradient(90deg,transparent,var(--border-bright),transparent);flex-shrink:0; }
@@ -713,7 +713,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* ── Hub card 2-row clock ─────────────────────────────────────────── */
 .hub-clock-wrap{ width:100%;display:flex;flex-direction:column;gap:1px;margin-top:3px; }
 /* ── Callsheet import ────────────────────── */
-.callsheet-footer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap; }
+.callsheet-footer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 4px;cursor:pointer;transition:all .2s;flex:1; }
 .callsheet-footer-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .cs-drop-zone{ flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:180px;border:2px dashed var(--border-bright);border-radius:8px;margin:16px 20px;cursor:pointer;transition:border-color .2s; }
 .cs-drop-zone:hover,.cs-drop-zone.drag-over{ border-color:var(--accent); }
@@ -858,10 +858,23 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   display:flex;align-items:center;justify-content:center;gap:4px;
   background:transparent;border:1px dashed var(--border-bright);border-radius:4px;
   color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;
-  text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap;
+  text-transform:uppercase;padding:6px 4px;cursor:pointer;transition:all .2s;flex:1;
 }
 .details-footer-btn:hover{ border-color:var(--purple);color:var(--purple); }
 .details-footer-btn.active{ background:var(--purple);border-color:var(--purple);border-style:solid;color:#fff; }
+/* ── Footer button internal layout ──────────────────────── */
+.tf-icon{ font-style:normal;line-height:1;flex-shrink:0; }
+.tf-l,.tf-r{ white-space:nowrap; }
+.tf-sep{ /* space between words in normal mode */ }
+/* Compact footer: 2×2 grid, each button stacks icon/word1/word2 */
+.match-col.compact .timer-footer{ display:grid;grid-template-columns:1fr 1fr;gap:3px; }
+.match-col.compact .timer-footer button{
+  flex-direction:column;gap:1px;padding:5px 2px;min-width:0;
+}
+.match-col.compact .tf-icon{ font-size:13px; }
+.match-col.compact .tf-l,
+.match-col.compact .tf-r{ font-size:8px;letter-spacing:.6px;line-height:1.3;text-align:center;white-space:nowrap; }
+.match-col.compact .tf-sep{ display:none; }
 
 /* ─── COMPACT TIMER ROWS (narrow columns) ─────────────── */
 .match-col.compact .timer-row{
@@ -880,12 +893,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   margin:-4px 0 -3px;
   display:block;
 }
-/* name: cols 2-3 on row 1, wraps up to 2 lines */
+/* name: col 2, row 1 (badge lives in col 3, row 1 when present) */
 .match-col.compact .timer-name{
-  grid-column:2 / -1;grid-row:1;
+  grid-column:2;grid-row:1;
   font-size:10px;letter-spacing:.04em;line-height:1.25;
   -webkit-line-clamp:2;
-  padding-right:18px;
   align-self:center;
 }
 /* time-set: col 2, row 2 — left-aligned */
@@ -894,6 +906,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   font-size:11px;border-bottom-style:none;
   text-align:left;
   align-self:center;
+}
+/* badge-cell: col 3, row 1 — top-right, next to name */
+.match-col.compact .timer-badge-cell{
+  grid-column:3;grid-row:1;
+  align-self:center;justify-self:end;
 }
 /* countdown: col 3, row 2 — right-aligned */
 .match-col.compact .timer-countdown{
@@ -2583,10 +2600,10 @@ function addMatch(){
           <div class="timers-list" id="timers-${col}"></div>
           <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
           <div class="timer-footer">
-            <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
-            <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
-            <button class="details-footer-btn${opDetailsExpanded[i]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
-            <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet">⬇ CALLSHEET</button>
+            <button class="add-timer-btn" onclick="opAddTimer(${col})"><span class="tf-icon">+</span><span class="tf-l">ADD</span><span class="tf-sep"> </span><span class="tf-r">TIMER</span></button>
+            <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining"><span class="tf-icon">⇅</span><span class="tf-l">SORT</span></button>
+            <button class="details-footer-btn${opDetailsExpanded[i]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details"><span class="tf-icon">≡</span><span class="tf-l">DETAILS</span></button>
+            <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>
           </div>`;
         grid.insertBefore(div, addCol);
         window._colResizeObserver?.observe(div);
@@ -3456,10 +3473,10 @@ function renderOpColumns(){
       <div class="timers-list" id="timers-${col}"></div>
       <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
       <div class="timer-footer">
-        <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
-        <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
-        <button class="details-footer-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
-        <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet">⬇ CALLSHEET</button>
+        <button class="add-timer-btn" onclick="opAddTimer(${col})"><span class="tf-icon">+</span><span class="tf-l">ADD</span><span class="tf-sep"> </span><span class="tf-r">TIMER</span></button>
+        <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining"><span class="tf-icon">⇅</span><span class="tf-l">SORT</span></button>
+        <button class="details-footer-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details"><span class="tf-icon">≡</span><span class="tf-l">DETAILS</span></button>
+        <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>
       </div>`;
     grid.insertBefore(div, addCol);
   });
