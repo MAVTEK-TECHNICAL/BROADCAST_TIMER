@@ -4684,47 +4684,92 @@ function _parseCallsheetTime(raw){
 
 function _parseCallsheet(wb){
   const ws=wb.Sheets[wb.SheetNames[0]];
+  // Parse twice: formatted strings (raw:false) and raw values (raw:true) for time serials.
+  // SheetJS sheet_to_json starts from the sheet's used-range first column, NOT necessarily A.
+  // We therefore detect column positions dynamically rather than using hardcoded indices.
   const rowsFmt=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
   const rowsRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const result={jobName:null,jobId:null,venue:null,state:null,controlUnit:null,
                  date:null,onAir:null,matchStart:null,roles:[]};
-  let inData=false, currentRefTz='site', currentSection='SITE CREW';
+
+  // ── Step 1: locate the WORK ROLE header row to anchor all column positions ──
+  let roleCol=-1, companyCol=-1, nameCol=-1, personStateCol=-1, timeOnCol=-1;
+  let headerRowIdx=-1;
+  for(let ri=0;ri<rowsFmt.length;ri++){
+    const row=rowsFmt[ri];
+    const wi=row.findIndex(c=>c&&String(c).trim()==='WORK ROLE');
+    if(wi>=0){
+      headerRowIdx=ri; roleCol=wi;
+      // Structure: WORK ROLE | NEP/FREE | Name | Contact | State | TX On-Site | TX Off-Site
+      companyCol    =wi+1;
+      nameCol       =wi+2;
+      // contactCol =wi+3  (not needed)
+      personStateCol=wi+4;
+      timeOnCol     =wi+5;
+      break;
+    }
+  }
+
+  // ── Step 2: scan every row for match-info fields (position-independent) ──
   for(let ri=0;ri<rowsFmt.length;ri++){
     const row=rowsFmt[ri], rowR=rowsRaw[ri];
-    const c1=row[1]?String(row[1]).trim():'';
-    const c4=row[4]?String(row[4]).trim():'';
-    if(c1==='Job Name')    result.jobName    =row[2]?String(row[2]).trim():null;
-    if(c1==='Job ID')      result.jobId      =row[2]?String(row[2]).trim():null;
-    if(c1==='Venue')       result.venue      =row[2]?String(row[2]).trim():null;
-    if(c1==='State')       result.state      =row[2]?String(row[2]).trim():null;
-    if(c4==='Control Unit')result.controlUnit=row[5]?String(row[5]).trim():null;
-    if(c4==='On Air'&&row[5]){
-      result.onAir=_parseCallsheetTime(String(row[5]).trim())||_parseCallsheetTime(rowR[5]);
+    // Scan adjacent cell pairs for known labels
+    for(let ci=0;ci<row.length-1;ci++){
+      const lbl=row[ci]?String(row[ci]).trim():'';
+      if(!lbl) continue;
+      const val =row[ci+1]?String(row[ci+1]).trim():'';
+      const valR=rowR[ci+1];
+      switch(lbl){
+        case 'Job Name':     if(val&&!result.jobName)    result.jobName    =val; break;
+        case 'Job ID':       if(val&&!result.jobId)      result.jobId      =val; break;
+        case 'Venue':        if(val&&!result.venue)      result.venue      =val; break;
+        case 'State':        if(val&&!result.state&&!/^\d/.test(val)) result.state=val; break;
+        case 'Control Unit': if(val&&!result.controlUnit)result.controlUnit=val; break;
+        case 'On Air':
+          if(!result.onAir){
+            result.onAir=_parseCallsheetTime(val)||_parseCallsheetTime(valR);
+          }
+          break;
+        case 'From':
+          if(!result.date&&val){
+            const p=val.split('/');
+            if(p.length===3) result.date=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+          }
+          break;
+      }
     }
-    if(c4==='From'&&row[5]){
-      const parts=String(row[5]).split('/');
-      if(parts.length===3) result.date=`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-    }
+    // Detect CENTRE PASS in any cell (already position-independent)
     for(const cell of row){
       if(typeof cell==='string'&&/CENTRE PASS/i.test(cell)){
         const cm=cell.match(/(\d{1,2}:\d{2})/); if(cm) result.matchStart=cm[1];
       }
     }
-    if(c1&&/^(AHS|AHM)/i.test(c1)&&!row[2]&&!row[3]){
+  }
+
+  // ── Step 3: parse role rows using detected column positions ──
+  if(roleCol<0) return result; // couldn't find WORK ROLE header
+  let inData=false, currentRefTz='site', currentSection='SITE CREW';
+  for(let ri=0;ri<rowsFmt.length;ri++){
+    const row=rowsFmt[ri], rowR=rowsRaw[ri];
+    const c1=row[roleCol]?String(row[roleCol]).trim():'';
+    // AHS/AHM section header: role-col has hub prefix, adjacent cells empty
+    if(c1&&/^(AHS|AHM)/i.test(c1)&&!row[companyCol]&&!row[nameCol]){
       currentRefTz='hub'; currentSection=c1; inData=false; continue;
     }
     if(c1==='WORK ROLE'){ inData=true; continue; }
     if(!inData||!c1) continue;
-    const timeStr=_parseCallsheetTime(rowR[6])||_parseCallsheetTime(row[6]);
+    const timeStr=_parseCallsheetTime(rowR[timeOnCol])||_parseCallsheetTime(row[timeOnCol]);
     if(!timeStr) continue;
     result.roles.push({
       id:`cs_${ri}_${Math.random().toString(36).slice(2,6)}`,
-      role:c1, name:row[3]?String(row[3]).trim():'',
-      company:row[2]?String(row[2]).trim():'',
-      personState:row[5]?String(row[5]).trim():'',
+      role:c1,
+      name:      row[nameCol]       ?String(row[nameCol]).trim()       :'',
+      company:   row[companyCol]    ?String(row[companyCol]).trim()    :'',
+      personState:row[personStateCol]?String(row[personStateCol]).trim():'',
       timeStr, refTz:currentRefTz, section:currentSection
     });
   }
+  // Deduplicate
   const seen=new Set();
   result.roles=result.roles.filter(r=>{
     const k=`${r.role}|${r.name}|${r.timeStr}`;
@@ -4807,16 +4852,26 @@ function confirmCallsheetImport(){
   if(!checkedIds.size){ toast('NOTHING SELECTED'); return; }
   const d=_csData;
   const allItems=[];
-  if(d.onAir)      allItems.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site'});
-  if(d.matchStart) allItems.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site'});
+  if(d.onAir)      allItems.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site',isSpecial:true});
+  if(d.matchStart) allItems.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site',isSpecial:true});
   d.roles.forEach(r=>allItems.push(r));
   let count=0;
   allItems.filter(it=>checkedIds.has(it.id)).forEach(it=>{
     const refTzField=it.refTz==='hub'?'hub':null;
     const resolvedTz=getTimerRefTz({refTz:refTzField},_csMi);
+    const name=it.role.toUpperCase();
+    if(it.isSpecial){
+      // Update the existing core timer in-place rather than adding a duplicate
+      const existing=matchTimers[_csMi].find(t=>t.core&&t.name.toUpperCase()===name);
+      if(existing){
+        existing.timeStr=it.timeStr;
+        existing.targetUTC=localToUTC(it.timeStr,resolvedTz);
+        count++; return;
+      }
+    }
     matchTimers[_csMi].push({
       id:`t${Date.now()}${Math.random().toString(36).slice(2,6)}`,
-      name:it.role.toUpperCase(), core:false,
+      name, core:false,
       timeStr:it.timeStr,
       targetUTC:localToUTC(it.timeStr,resolvedTz),
       refTz:refTzField
