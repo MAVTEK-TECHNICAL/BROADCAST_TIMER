@@ -938,6 +938,20 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* hide empty placeholder <span> used for core timers */
 .match-col.compact .timer-row > span:not([class]){ display:none; }
 
+/* ── Untimed rows (no set time) — collapsed single-line in compact, dimmed in normal ── */
+/* Compact: collapse to name-only single row so timed items dominate */
+.match-col.compact .timer-row.no-time{
+  grid-template-rows:20px;
+  padding-top:2px;padding-bottom:2px;
+  opacity:.45;
+}
+.match-col.compact .timer-row.no-time .timer-time-badge{ display:none; }
+.match-col.compact .timer-row.no-time .timer-name{
+  align-self:center;font-size:9px;letter-spacing:.06em;color:var(--text-dim);
+}
+/* Normal mode: same width/height but more muted */
+.match-col:not(.compact) .timer-row.no-time{ opacity:.4; }
+
 
 /* ─── IMPORT FROM HUB ──────────────────────────────────── */
 .import-hub-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:2px dashed var(--purple);border-radius:6px;color:var(--purple);cursor:pointer;transition:all .2s;padding:8px 6px;font-family:var(--display);font-size:8px;letter-spacing:1.5px;text-transform:uppercase;width:48px;flex-shrink:0; }
@@ -2568,6 +2582,7 @@ function renderTimers(){
         else             { cls='positive';txt=fmtCountdown(diff); }
       }
       let row=t.core?'core':'optional';
+      if(!t.timeStr && !t.core) row+=' no-time'; // collapse non-core untimed rows for readability
       if(diff!==null&&diff>=0&&diff<6e4)  row+=' countdown-live';
       else if(diff!==null&&diff>=0&&diff<6e5) row+=' countdown-warning';
       const _matchChipColor = (matchMeta[si]&&matchMeta[si].cardColor) ? matchMeta[si].cardColor : 'var(--brand-color)';
