@@ -4662,12 +4662,17 @@ function csDrop(e){
 function csFileChosen(e){ const file=e.target.files?.[0]; if(file) _csProcessFile(file); }
 
 async function _csProcessFile(file){
-  if(!/\.xlsx?$/i.test(file.name)){ toast('XLSX FILES ONLY'); return; }
   try{
-    await _loadXLSX();
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array',cellDates:false,raw:false});
-    _csData=_parseCallsheet(wb);
+    if(/\.pdf$/i.test(file.name)){
+      _csData=await _parseCallsheetPdf(file);
+    } else if(/\.xlsx?$/i.test(file.name)){
+      await _loadXLSX();
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array',cellDates:false,raw:false});
+      _csData=_parseCallsheet(wb);
+    } else {
+      toast('XLSX OR PDF FILES ONLY'); return;
+    }
     _csRenderParsed();
     _csSaveToDb(_csData);
   } catch(err){ console.error('Callsheet parse error:',err); toast('PARSE ERROR \u2014 SEE CONSOLE'); }
@@ -4789,6 +4794,156 @@ function _parseCallsheet(wb){
       timeStr, refTz:currentRefTz, section:currentSection
     });
   }
+  // Deduplicate
+  const seen=new Set();
+  result.roles=result.roles.filter(r=>{
+    const k=`${r.role}|${r.name}|${r.timeStr}`;
+    if(seen.has(k)) return false; seen.add(k); return true;
+  });
+  return result;
+}
+
+async function _parseCallsheetPdf(file){
+  // ── Load PDF.js (shared with schedule import) ──
+  await loadPDFJS();
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+
+  // ── Extract all text items with X/Y positions ──
+  const allItems=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const vp=page.getViewport({scale:1});
+    const content=await page.getTextContent();
+    content.items.forEach(item=>{
+      const s=item.str.trim(); if(!s) return;
+      allItems.push({str:s,
+        x:Math.round(item.transform[4]),
+        y:Math.round(vp.height-item.transform[5]),
+        w:Math.round(item.width||0)});
+    });
+  }
+
+  // ── Group into rows by y-proximity ──
+  allItems.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
+  const ROW_TOL=5;
+  const rows=[];
+  for(const item of allItems){
+    const last=rows[rows.length-1];
+    if(last&&Math.abs(item.y-last.refY)<=ROW_TOL) last.items.push(item);
+    else rows.push({refY:item.y,items:[item]});
+  }
+  rows.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
+
+  const result={jobName:null,jobId:null,venue:null,state:null,
+                controlUnit:null,date:null,onAir:null,matchStart:null,roles:[]};
+
+  // ── Step 1: Scan all rows for header fields using full-row regex ──
+  // PDF.js splits multi-word labels/values into separate text items, so we
+  // join the full row text and match with regex rather than adjacent-item pairs.
+  for(const row of rows){
+    const joined=row.items.map(it=>it.str).join(' ');
+    // CENTRE PASS — appears in a coloured box, extracted as plain text
+    if(!result.matchStart){
+      const cpM=joined.match(/CENTRE\s*PASS[^0-9]*(\d{1,2}:\d{2})/i);
+      if(cpM) result.matchStart=_parseCallsheetTime(cpM[1]);
+    }
+    let m;
+    // Job Name — value runs until the next known label "From"
+    if(!result.jobName&&(m=joined.match(/Job\s+Name\s+(.+?)\s+From\b/i))) result.jobName=m[1].trim();
+    // Job ID — value is the first token after "Job ID"
+    if(!result.jobId&&(m=joined.match(/Job\s+ID\s+(\S+)/i))) result.jobId=m[1].trim();
+    // Venue — value runs until "On Air" or "Control"
+    if(!result.venue&&(m=joined.match(/Venue\s+(.+?)\s+(?:On\s+Air|Control)/i))) result.venue=m[1].trim();
+    // On Air — value is a time token (strip timezone suffix like AEST)
+    if(!result.onAir&&(m=joined.match(/On\s+Air\s+(\d{1,2}:\d{2})/i))) result.onAir=_parseCallsheetTime(m[1]);
+    // Control Unit — value is the first token after "Control Unit"
+    if(!result.controlUnit&&(m=joined.match(/Control\s+Unit\s+(\S+)/i))) result.controlUnit=m[1].trim();
+    // State — first token after "State" (skip "State" header in table)
+    if(!result.state&&(m=joined.match(/State\s+(\S+)\s+Client/i))) result.state=m[1].trim();
+    // From date
+    if(!result.date&&(m=joined.match(/From\s+(\d{1,2}\/\d{1,2}\/\d{4})/i))) result.date=m[1].trim();
+  }
+
+  // ── Step 2: Find WORK ROLE header row, anchor column X positions ──
+  let workRoleRowIdx=-1;
+  const colX={}; // role | company | name | personState | timeOn
+  for(let ri=0;ri<rows.length;ri++){
+    const items=rows[ri].items;
+    const upStrs=items.map(it=>it.str.toUpperCase());
+    // Handle both 'WORK ROLE' as one item or split 'WORK' + 'ROLE' items
+    const wrIdx=upStrs.findIndex(s=>s==='WORK ROLE'||s==='WORK');
+    if(wrIdx<0) continue;
+    // Verify it's the table header (NEP/FREE or Name must also be present)
+    if(!upStrs.some(s=>s.includes('NEP')||s.includes('FREE')||s==='NAME')) continue;
+    workRoleRowIdx=ri;
+    colX.role=items[wrIdx].x;
+    // NEP/FREE column
+    const nepIdx=upStrs.findIndex(s=>s.includes('NEP')||s==='FREE');
+    if(nepIdx>=0) colX.company=items[nepIdx].x;
+    // Name column
+    const nameIdx=upStrs.indexOf('NAME');
+    if(nameIdx>=0) colX.name=items[nameIdx].x;
+    // State column (rightmost 'STATE' in this row)
+    for(let ii=upStrs.length-1;ii>=0;ii--){
+      if(upStrs[ii]==='STATE'){ colX.personState=items[ii].x; break; }
+    }
+    break;
+  }
+  if(workRoleRowIdx<0) return result;
+
+  // Find 'On Site' sub-header — may be same row or next 1-3 rows
+  for(let ri=workRoleRowIdx;ri<=Math.min(workRoleRowIdx+3,rows.length-1);ri++){
+    const items=rows[ri].items;
+    const upStrs=items.map(it=>it.str.toUpperCase());
+    for(let ii=0;ii<upStrs.length;ii++){
+      if(upStrs[ii]==='ON SITE'){ colX.timeOn=items[ii].x; break; }
+      // Split across two items: 'ON' + 'SITE'
+      if(upStrs[ii]==='ON'&&upStrs[ii+1]==='SITE'){ colX.timeOn=items[ii].x; break; }
+    }
+    if(colX.timeOn!==undefined) break;
+  }
+
+  // Assign a cell value to its nearest column (within tolerance)
+  const COL_TOL=65;
+  function assignCol(x){
+    let best=null,bestDist=Infinity;
+    for(const [col,cx] of Object.entries(colX)){
+      const d=Math.abs(x-cx); if(d<bestDist){bestDist=d;best=col;}
+    }
+    return bestDist<=COL_TOL?best:null;
+  }
+
+  // ── Step 3: Parse data rows ──
+  let currentRefTz='site', currentSection='SITE CREW';
+  for(let ri=workRoleRowIdx+1;ri<rows.length;ri++){
+    const items=rows[ri].items;
+    if(!items.length) continue;
+    const cells={};
+    for(const item of items){
+      const col=assignCol(item.x);
+      if(col) cells[col]=cells[col]?cells[col]+' '+item.str:item.str;
+    }
+    const roleVal=(cells.role||'').trim();
+    if(!roleVal) continue;
+    // Skip sub-header rows
+    if(/^(on site|off site|tx)$/i.test(roleVal)) continue;
+    // Section header: AHS/AHM row with no company or name data
+    if(/^(AHS|AHM)/i.test(roleVal)&&!cells.company&&!cells.name){
+      currentRefTz='hub'; currentSection=roleVal; continue;
+    }
+    const timeStr=_parseCallsheetTime(cells.timeOn);
+    if(!timeStr) continue;
+    result.roles.push({
+      id:`cs_pdf_${ri}_${Math.random().toString(36).slice(2,6)}`,
+      role:roleVal,
+      name:(cells.name||'').trim(),
+      company:(cells.company||'').trim(),
+      personState:(cells.personState||'').trim(),
+      timeStr, refTz:currentRefTz, section:currentSection
+    });
+  }
+
   // Deduplicate
   const seen=new Set();
   result.roles=result.roles.filter(r=>{
@@ -5046,12 +5201,18 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
       ⬇ CALLSHEET IMPORT
       <span id="cs-match-label" style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:1px;margin-left:10px"></span>
     </div>
+    <!-- NEP PRESET label -->
+    <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 20px 6px;border-bottom:1px solid var(--border)">
+      <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase">PARSER PRESET</span>
+      <span style="font-family:var(--display);font-size:10px;letter-spacing:1.5px;padding:3px 10px;background:var(--accent);color:#000;border-radius:3px;font-weight:700">NEP PRESET</span>
+      <span style="font-size:10px;color:var(--text-dim);margin-left:4px">Accepts .xlsx and .pdf</span>
+    </div>
     <div id="cs-drop-zone" class="cs-drop-zone"
          ondrop="csDrop(event)" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
          onclick="document.getElementById('cs-file-input').click()">
-      <input type="file" id="cs-file-input" accept=".xlsx,.xls" style="display:none" onchange="csFileChosen(event)">
+      <input type="file" id="cs-file-input" accept=".xlsx,.xls,.pdf" style="display:none" onchange="csFileChosen(event)">
       <div style="font-size:28px;opacity:.4;line-height:1">&#128203;</div>
-      <div style="font-size:12px;color:var(--text-mid);letter-spacing:1.5px;text-transform:uppercase">Drop Callsheet .xlsx Here</div>
+      <div style="font-size:12px;color:var(--text-mid);letter-spacing:1.5px;text-transform:uppercase">Drop Callsheet .xlsx or .pdf</div>
       <div style="font-size:10px;color:var(--text-dim)">or click to browse</div>
     </div>
     <!-- Body: left list + right selected pane -->
