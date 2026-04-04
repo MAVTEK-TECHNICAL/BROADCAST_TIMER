@@ -1403,6 +1403,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <div class="em-col-title">TIMERS</div>
         <div class="em-timer-list" id="em-timer-list"></div>
         <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:6px 0" onclick="emAddTimer()">+ ADD TIMER</button>
+        <div style="height:1px;background:var(--border);margin:10px 0"></div>
+        <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:6px 0;border-color:var(--accent);color:var(--accent)" onclick="emImportCallsheet()">⬇ IMPORT CALLSHEET</button>
       </div>
 
     </div><!-- /em-3col -->
@@ -4636,12 +4638,9 @@ function updateHubCountdowns(){
 // \u2500\u2500 CALLSHEET IMPORT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 let _csMi=-1, _csData=null, _csFilter='all', _csSort='time', _csSearch='', _csChecked=new Set();
 
-function opImportCallsheet(col){
-  const si=opSlotMap[col];
-  if(si===undefined){ toast('NO MATCH'); return; }
+function _csOpenModal(si, displayLabel){
   _csMi=si; _csData=null; _csFilter='all'; _csSort='time'; _csChecked=new Set();
-  const m=matchMeta[si];
-  document.getElementById('cs-match-label').textContent=m.label||`MATCH ${col+1}`;
+  document.getElementById('cs-match-label').textContent=displayLabel||'';
   document.getElementById('cs-drop-zone').classList.remove('hidden');
   document.getElementById('cs-body').classList.add('hidden');
   document.getElementById('cs-file-input').value='';
@@ -4651,6 +4650,18 @@ function opImportCallsheet(col){
   ['cs-flt-site','cs-flt-hub','cs-srt-role','cs-srt-nep'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
   const _csSI=document.getElementById('cs-search-input'); if(_csSI) _csSI.value='';
   document.getElementById('modal-callsheet').classList.remove('hidden');
+}
+function opImportCallsheet(col){
+  const si=opSlotMap[col];
+  if(si===undefined){ toast('NO MATCH'); return; }
+  const m=matchMeta[si];
+  _csOpenModal(si, m.label||`MATCH ${col+1}`);
+}
+function emImportCallsheet(){
+  const si=_emMatchIdx;
+  if(si==null||si<0){ toast('NO MATCH'); return; }
+  const m=matchMeta[si];
+  _csOpenModal(si, m.label||`MATCH ${si+1}`);
 }
 
 function csDrop(e){
