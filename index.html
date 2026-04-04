@@ -399,7 +399,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 /* colour chip — flush left, full height, replaces the old 3-line drag handle.
    margin:-6px 0 escapes the row's top/bottom padding so the chip spans the
    full 52px row height; overflow:hidden on the row clips the corners. */
-.timer-time-badge{ display:flex;align-items:center;gap:4px;justify-content:flex-end; }
+.timer-time-badge{ display:flex;align-items:center;gap:4px; }
 .timer-color-chip{ align-self:stretch;margin:-6px 0;cursor:grab;border-radius:0;transition:filter .15s; }
 .timer-color-chip:active{ cursor:grabbing; }
 .timer-row:hover .timer-color-chip{ filter:brightness(1.4); }
@@ -763,8 +763,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   overflow:hidden;text-overflow:ellipsis;line-height:1.2;
 }
 .hub-t-time-row{ display:flex;align-items:center;gap:3px; }
-.hub-t-badge-cell{ flex:0 0 auto; }
-.hub-t-cd{ margin-left:auto; } /* flush right regardless of badge */
+.hub-t-badge-cell{ flex:1;display:flex;align-items:center;justify-content:center; }
+.hub-t-cd{ flex-shrink:0; } /* stays right after centred badge */
 .hub-t-time{
   font-family:var(--mono);font-size:calc(9px * var(--hub-fs,1));color:var(--text-dim);
   white-space:nowrap;cursor:pointer;border-bottom:1px dashed var(--border-bright);
