@@ -4754,7 +4754,7 @@ function _parseCallsheet(wb){
     const c1=row[roleCol]?String(row[roleCol]).trim():'';
     // AHS/AHM section header: role-col has hub prefix, adjacent cells empty
     if(c1&&/^(AHS|AHM)/i.test(c1)&&!row[companyCol]&&!row[nameCol]){
-      currentRefTz='hub'; currentSection=c1; inData=false; continue;
+      currentRefTz='hub'; currentSection=c1; continue; // keep inData — no second WORK ROLE header
     }
     if(c1==='WORK ROLE'){ inData=true; continue; }
     if(!inData||!c1) continue;
@@ -4933,7 +4933,7 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
 </div>
 <!-- MODAL: Callsheet Import -->
 <div class="modal-overlay hidden" id="modal-callsheet">
-  <div class="modal-box" style="width:700px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+  <div class="modal" style="width:700px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
     <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border)">
       ⬇ CALLSHEET IMPORT
       <span id="cs-match-label" style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:1px;margin-left:10px"></span>
