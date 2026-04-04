@@ -415,8 +415,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .timer-time-set{ font-family:var(--mono);font-size:17px;color:var(--text-mid);letter-spacing:.05em;cursor:pointer;border-bottom:1px dashed var(--border-bright);padding-bottom:1px;white-space:nowrap;text-align:right; }
 .timer-time-set:hover{ color:var(--accent);border-color:var(--accent); }
 .timer-countdown{ font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.08em;text-align:right;white-space:nowrap; }
-/* Fixed width locks the countdown column for vertical alignment (max format +HH:MM:SS ≈ 133px) */
-.match-col:not(.compact) .timer-countdown{ width:140px; }
+/* min-width locks the countdown column for vertical alignment — 120px ≈ H:MM:SS leaving ~2px spare so gap matches set-time→[HUB] */
+.match-col:not(.compact) .timer-countdown{ min-width:120px; }
 .timer-countdown.positive{ color:var(--green); }
 .timer-countdown.warning{ color:var(--yellow); }
 .timer-countdown.live{ color:var(--red); }
