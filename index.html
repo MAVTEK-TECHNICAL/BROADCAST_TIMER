@@ -720,6 +720,22 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);animation:pulse-border 1s infinite; }
 /* ── Hub card 2-row clock ─────────────────────────────────────────── */
 .hub-clock-wrap{ width:100%;display:flex;flex-direction:column;gap:1px;margin-top:3px; }
+/* ── Callsheet import ────────────────────── */
+.callsheet-footer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap; }
+.callsheet-footer-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.cs-drop-zone{ flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:180px;border:2px dashed var(--border-bright);border-radius:8px;margin:16px 20px;cursor:pointer;transition:border-color .2s; }
+.cs-drop-zone:hover,.cs-drop-zone.drag-over{ border-color:var(--accent); }
+.cs-flt{ background:transparent;border:1px solid var(--border-bright);border-radius:3px;color:var(--text-dim);font-family:var(--ui);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;cursor:pointer;transition:all .15s; }
+.cs-flt.active{ border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08); }
+.cs-flt:hover:not(.active){ color:var(--text-mid);border-color:var(--text-dim); }
+.cs-row{ display:grid;grid-template-columns:20px 52px 1fr 80px;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.04);border-radius:3px;transition:background .1s; }
+.cs-row:hover{ background:rgba(255,255,255,.04); }
+.cs-section-hdr{ font-size:9px;letter-spacing:2px;color:var(--text-dim);padding:10px 6px 4px;text-transform:uppercase;display:flex;align-items:center;gap:8px; }
+.cs-badge-site{ font-size:9px;padding:2px 5px;border-radius:3px;border:1px solid var(--text-dim);color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;white-space:nowrap; }
+.cs-badge-hub{ font-size:9px;padding:2px 5px;border-radius:3px;border:1px solid var(--red);color:var(--red);background:rgba(231,76,60,.1);letter-spacing:1px;font-weight:700;text-transform:uppercase;white-space:nowrap; }
+.cs-role{ font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cs-person{ font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cs-time{ font-family:var(--mono);font-size:13px;color:var(--accent);text-align:right;white-space:nowrap; }
 .hub-clock-row{ display:flex;align-items:baseline;justify-content:space-between;width:100%; }
 .hub-clock-label{ font-family:var(--display);font-size:calc(7px * var(--hub-fs,1));font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;padding-right:4px; }
 .hub-clock-val{ font-family:var(--mono);font-size:calc(11px * var(--hub-fs,1));font-weight:700;color:#fff;letter-spacing:.06em;line-height:1.2;text-align:right;white-space:nowrap;flex:1; }
@@ -1729,7 +1745,7 @@ document.addEventListener('keydown', e=>{
     else if (!document.getElementById('modal-sf-name').classList.contains('hidden'))   confirmNewShowfile();
   }
   if (e.key==='Escape'){
-    ['modal-edit-timer','modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name','modal-sched-import','modal-import-hub'].forEach(closeModal);
+    ['modal-edit-timer','modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name','modal-sched-import','modal-import-hub','modal-callsheet'].forEach(closeModal);
     closeSidebar();
   }
   if ((e.metaKey||e.ctrlKey) && e.key==='s'){
@@ -2526,6 +2542,7 @@ function addMatch(){
             <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
             <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
             <button class="details-footer-btn${opDetailsExpanded[i]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
+            <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet">⬇ CALLSHEET</button>
           </div>`;
         grid.insertBefore(div, addCol);
         window._colResizeObserver?.observe(div);
@@ -3398,6 +3415,7 @@ function renderOpColumns(){
         <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
         <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
         <button class="details-footer-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
+        <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet">⬇ CALLSHEET</button>
       </div>`;
     grid.insertBefore(div, addCol);
   });
@@ -4597,6 +4615,229 @@ function updateHubCountdowns(){
   });
 }
 
+// \u2500\u2500 CALLSHEET IMPORT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+let _csMi=-1, _csData=null, _csFilter='all', _csSort='time';
+
+function opImportCallsheet(col){
+  const si=opSlotMap[col];
+  if(si===undefined){ toast('NO MATCH'); return; }
+  _csMi=si; _csData=null; _csFilter='all'; _csSort='time';
+  const m=matchMeta[si];
+  document.getElementById('cs-match-label').textContent=m.label||`MATCH ${col+1}`;
+  document.getElementById('cs-drop-zone').classList.remove('hidden');
+  ['cs-job-info','cs-filter-bar','cs-items-list'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('cs-file-input').value='';
+  document.getElementById('cs-check-all').checked=false;
+  ['cs-flt-all','cs-srt-time'].forEach(id=>document.getElementById(id)?.classList.add('active'));
+  ['cs-flt-site','cs-flt-hub','cs-srt-role'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
+  document.getElementById('modal-callsheet').classList.remove('hidden');
+}
+
+function csDrop(e){
+  e.preventDefault();
+  document.getElementById('cs-drop-zone').classList.remove('drag-over');
+  const file=e.dataTransfer?.files?.[0];
+  if(file) _csProcessFile(file);
+}
+function csFileChosen(e){ const file=e.target.files?.[0]; if(file) _csProcessFile(file); }
+
+async function _csProcessFile(file){
+  if(!/\.xlsx?$/i.test(file.name)){ toast('XLSX FILES ONLY'); return; }
+  try{
+    await _loadXLSX();
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:false,raw:false});
+    _csData=_parseCallsheet(wb);
+    _csRenderParsed();
+    _csSaveToDb(_csData);
+  } catch(err){ console.error('Callsheet parse error:',err); toast('PARSE ERROR \u2014 SEE CONSOLE'); }
+}
+
+function _loadXLSX(){
+  return new Promise((resolve,reject)=>{
+    if(window.XLSX){ resolve(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=resolve; s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+
+function _parseCallsheetTime(raw){
+  if(raw===null||raw===undefined||raw==='') return null;
+  if(typeof raw==='number'){
+    const totalMins=Math.round(raw*24*60);
+    const h=Math.floor(totalMins/60), m=totalMins%60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+  const s=String(raw).trim();
+  let mm=s.match(/^\s*(\d{1,2}):(\d{2})/);
+  if(mm) return `${String(parseInt(mm[1])).padStart(2,'0')}:${mm[2]}`;
+  mm=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+  if(mm){
+    let h=parseInt(mm[1]); const min=mm[2], ampm=mm[3].toUpperCase();
+    if(ampm==='PM'&&h!==12) h+=12; if(ampm==='AM'&&h===12) h=0;
+    return `${String(h).padStart(2,'0')}:${min}`;
+  }
+  return null;
+}
+
+function _parseCallsheet(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rowsFmt=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+  const rowsRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const result={jobName:null,jobId:null,venue:null,state:null,controlUnit:null,
+                 date:null,onAir:null,matchStart:null,roles:[]};
+  let inData=false, currentRefTz='site', currentSection='SITE CREW';
+  for(let ri=0;ri<rowsFmt.length;ri++){
+    const row=rowsFmt[ri], rowR=rowsRaw[ri];
+    const c1=row[1]?String(row[1]).trim():'';
+    const c4=row[4]?String(row[4]).trim():'';
+    if(c1==='Job Name')    result.jobName    =row[2]?String(row[2]).trim():null;
+    if(c1==='Job ID')      result.jobId      =row[2]?String(row[2]).trim():null;
+    if(c1==='Venue')       result.venue      =row[2]?String(row[2]).trim():null;
+    if(c1==='State')       result.state      =row[2]?String(row[2]).trim():null;
+    if(c4==='Control Unit')result.controlUnit=row[5]?String(row[5]).trim():null;
+    if(c4==='On Air'&&row[5]){
+      result.onAir=_parseCallsheetTime(String(row[5]).trim())||_parseCallsheetTime(rowR[5]);
+    }
+    if(c4==='From'&&row[5]){
+      const parts=String(row[5]).split('/');
+      if(parts.length===3) result.date=`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    }
+    for(const cell of row){
+      if(typeof cell==='string'&&/CENTRE PASS/i.test(cell)){
+        const cm=cell.match(/(\d{1,2}:\d{2})/); if(cm) result.matchStart=cm[1];
+      }
+    }
+    if(c1&&/^(AHS|AHM)/i.test(c1)&&!row[2]&&!row[3]){
+      currentRefTz='hub'; currentSection=c1; inData=false; continue;
+    }
+    if(c1==='WORK ROLE'){ inData=true; continue; }
+    if(!inData||!c1) continue;
+    const timeStr=_parseCallsheetTime(rowR[6])||_parseCallsheetTime(row[6]);
+    if(!timeStr) continue;
+    result.roles.push({
+      id:`cs_${ri}_${Math.random().toString(36).slice(2,6)}`,
+      role:c1, name:row[3]?String(row[3]).trim():'',
+      company:row[2]?String(row[2]).trim():'',
+      personState:row[5]?String(row[5]).trim():'',
+      timeStr, refTz:currentRefTz, section:currentSection
+    });
+  }
+  const seen=new Set();
+  result.roles=result.roles.filter(r=>{
+    const k=`${r.role}|${r.name}|${r.timeStr}`;
+    if(seen.has(k)) return false; seen.add(k); return true;
+  });
+  return result;
+}
+
+function _csRenderParsed(){
+  const d=_csData;
+  document.getElementById('cs-info-job').textContent=(d.jobId||'')+(d.jobName?' \u00b7 '+d.jobName:'');
+  document.getElementById('cs-info-venue').textContent=d.venue||'\u2014';
+  document.getElementById('cs-info-onair').textContent=d.onAir||'\u2014';
+  document.getElementById('cs-info-start').textContent=d.matchStart||'\u2014';
+  document.getElementById('cs-info-state').textContent=d.state||'\u2014';
+  document.getElementById('cs-drop-zone').classList.add('hidden');
+  ['cs-job-info','cs-filter-bar','cs-items-list'].forEach(id=>document.getElementById(id).classList.remove('hidden'));
+  _csRenderList();
+}
+
+function _csRenderList(){
+  if(!_csData) return;
+  const d=_csData;
+  let items=[];
+  if(d.onAir)      items.push({id:'__onair',    role:'ON AIR',    name:'',timeStr:d.onAir,     refTz:'site',section:'MATCH INFO',isSpecial:true});
+  if(d.matchStart) items.push({id:'__matchstart',role:'MATCH START',name:'',timeStr:d.matchStart,refTz:'site',section:'MATCH INFO',isSpecial:true});
+  items=items.concat(d.roles);
+  if(_csFilter!=='all') items=items.filter(it=>it.refTz===_csFilter);
+  if(_csSort==='time'){
+    items.sort((a,b)=>{
+      if(a.isSpecial&&!b.isSpecial) return -1;
+      if(!a.isSpecial&&b.isSpecial) return 1;
+      return a.timeStr.localeCompare(b.timeStr);
+    });
+  } else {
+    items.sort((a,b)=>a.role.localeCompare(b.role));
+  }
+  const showSections=(_csFilter==='all'&&_csSort==='time');
+  let html='', lastSection=null;
+  for(const it of items){
+    if(showSections&&it.section!==lastSection){
+      lastSection=it.section;
+      const hubLbl=it.refTz==='hub'?' <span class="cs-badge-hub">HUB</span>':'';
+      html+=`<div class="cs-section-hdr">${esc(it.section)}${hubLbl}</div>`;
+    }
+    const badge=it.refTz==='hub'
+      ?'<span class="cs-badge-hub">HUB</span>'
+      :'<span class="cs-badge-site">SITE</span>';
+    html+=`<label class="cs-row">
+      <input type="checkbox" class="cs-chk" data-id="${it.id}" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+      ${badge}
+      <div style="min-width:0">
+        <div class="cs-role">${esc(it.role)}</div>
+        ${it.name?`<div class="cs-person">${esc(it.name)}</div>`:''}
+      </div>
+      <div class="cs-time">${it.timeStr}</div>
+    </label>`;
+  }
+  document.getElementById('cs-items-list').innerHTML=html||
+    '<div style="color:var(--text-dim);font-size:12px;padding:24px;text-align:center">No items match filter</div>';
+}
+
+function csSetFilter(f){
+  _csFilter=f;
+  ['all','site','hub'].forEach(x=>document.getElementById(`cs-flt-${x}`)?.classList.toggle('active',x===f));
+  _csRenderList();
+}
+function csSetSort(s){
+  _csSort=s;
+  ['time','role'].forEach(x=>document.getElementById(`cs-srt-${x}`)?.classList.toggle('active',x===s));
+  _csRenderList();
+}
+function csToggleAll(checked){
+  document.querySelectorAll('#cs-items-list .cs-chk').forEach(el=>{ el.checked=checked; });
+}
+
+function confirmCallsheetImport(){
+  if(_csMi<0||!_csData){ toast('NO DATA'); return; }
+  const checkedIds=new Set([...document.querySelectorAll('#cs-items-list .cs-chk:checked')].map(el=>el.dataset.id));
+  if(!checkedIds.size){ toast('NOTHING SELECTED'); return; }
+  const d=_csData;
+  const allItems=[];
+  if(d.onAir)      allItems.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site'});
+  if(d.matchStart) allItems.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site'});
+  d.roles.forEach(r=>allItems.push(r));
+  let count=0;
+  allItems.filter(it=>checkedIds.has(it.id)).forEach(it=>{
+    const refTzField=it.refTz==='hub'?'hub':null;
+    const resolvedTz=getTimerRefTz({refTz:refTzField},_csMi);
+    matchTimers[_csMi].push({
+      id:`t${Date.now()}${Math.random().toString(36).slice(2,6)}`,
+      name:it.role.toUpperCase(), core:false,
+      timeStr:it.timeStr,
+      targetUTC:localToUTC(it.timeStr,resolvedTz),
+      refTz:refTzField
+    });
+    count++;
+  });
+  closeModal('modal-callsheet');
+  renderAll(); scheduleSave();
+  toast(`IMPORTED ${count} TIMER${count!==1?'S':''}`);
+}
+
+async function _csSaveToDb(parsed){
+  if(!window._user||!window._fb) return;
+  try{
+    const {db,doc,setDoc,serverTimestamp}=window._fb;
+    const key=(parsed.jobId||'unknown').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const ref=doc(db,'users',window._user.uid,'callsheets',key);
+    await setDoc(ref,{...parsed,importedAt:serverTimestamp(),showfileId:sfId||null},{merge:false});
+  } catch(e){ console.warn('Callsheet DB save failed:',e); }
+}
+
 // ── TOAST ─────────────────────────────────────────────────
 let _t; function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>el.classList.remove('show'),2200); }
 </script>
@@ -4634,6 +4875,48 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
   <select id="match-tz-14" onchange="onMatchTzChange(14)"></select>
   <select id="match-tz-15" onchange="onMatchTzChange(15)"></select>
   <select id="match-tz-2" onchange="onMatchTzChange(2)"></select>
+</div>
+<!-- MODAL: Callsheet Import -->
+<div class="modal-overlay hidden" id="modal-callsheet">
+  <div class="modal-box" style="width:700px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border)">
+      ⬇ CALLSHEET IMPORT
+      <span id="cs-match-label" style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:1px;margin-left:10px"></span>
+    </div>
+    <div id="cs-drop-zone" class="cs-drop-zone"
+         ondrop="csDrop(event)" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+         onclick="document.getElementById('cs-file-input').click()">
+      <input type="file" id="cs-file-input" accept=".xlsx,.xls" style="display:none" onchange="csFileChosen(event)">
+      <div style="font-size:28px;opacity:.4;line-height:1">&#128203;</div>
+      <div style="font-size:12px;color:var(--text-mid);letter-spacing:1.5px;text-transform:uppercase">Drop Callsheet .xlsx Here</div>
+      <div style="font-size:10px;color:var(--text-dim)">or click to browse</div>
+    </div>
+    <div id="cs-job-info" class="hidden" style="flex-shrink:0;padding:8px 20px;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <span><span style="color:var(--text-dim);letter-spacing:1px">JOB&nbsp;</span><span id="cs-info-job" style="color:var(--text-mid)"></span></span>
+      <span><span style="color:var(--text-dim);letter-spacing:1px">VENUE&nbsp;</span><span id="cs-info-venue" style="color:var(--text-mid)"></span></span>
+      <span><span style="color:var(--text-dim);letter-spacing:1px">ON AIR&nbsp;</span><span id="cs-info-onair" style="font-family:var(--mono);color:var(--accent)"></span></span>
+      <span><span style="color:var(--text-dim);letter-spacing:1px">MATCH START&nbsp;</span><span id="cs-info-start" style="font-family:var(--mono);color:var(--accent)"></span></span>
+      <span><span style="color:var(--text-dim);letter-spacing:1px">STATE&nbsp;</span><span id="cs-info-state" style="color:var(--text-mid)"></span></span>
+    </div>
+    <div id="cs-filter-bar" class="hidden" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 20px;border-bottom:1px solid var(--border)">
+      <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">FILTER</span>
+      <button class="cs-flt active" id="cs-flt-all"  onclick="csSetFilter('all')">ALL</button>
+      <button class="cs-flt"        id="cs-flt-site" onclick="csSetFilter('site')">SITE</button>
+      <button class="cs-flt"        id="cs-flt-hub"  onclick="csSetFilter('hub')">HUB</button>
+      <div style="width:1px;background:var(--border);height:16px;align-self:center;margin:0 4px"></div>
+      <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">SORT</span>
+      <button class="cs-flt active" id="cs-srt-time" onclick="csSetSort('time')">TIME</button>
+      <button class="cs-flt"        id="cs-srt-role" onclick="csSetSort('role')">ROLE</button>
+      <label style="margin-left:auto;font-size:10px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">
+        <input type="checkbox" id="cs-check-all" onchange="csToggleAll(this.checked)">ALL ON
+      </label>
+    </div>
+    <div id="cs-items-list" class="hidden" style="flex:1;overflow-y:auto;padding:4px 16px 8px"></div>
+    <div style="flex-shrink:0;display:flex;gap:10px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border)">
+      <button class="btn btn-cancel" onclick="closeModal('modal-callsheet')">CANCEL</button>
+      <button class="btn btn-confirm" onclick="confirmCallsheetImport()">IMPORT SELECTED</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
