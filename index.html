@@ -1620,6 +1620,7 @@ let hubRangeEnd   = null; // hub view date range end   (ISO string or null = no 
 let _calPopupYM   = null;  // {year,month} currently displayed in popup
 // Operator view: maps display column (0/1/2) → actual match slot index (0-15)
 let opSlotMap    = []; // dynamically sized: real slot indices currently shown in operator view
+let opDismissedSlots = new Set(); // "slotIdx:isoDate" — columns hidden via ✕ in operator view; persisted so dismissal survives refresh
 let opDetailsExpanded = {}; // keyed by real slot index — true if details panel is open
 let hubTodayMode = false;   // true = hub range locked to today
 let showClockSeconds = true;  // false = hide seconds from TZ clock displays (timers always show seconds)
@@ -1941,6 +1942,7 @@ function buildPayload(name){
   // Build timerSortMode without sparse holes — Firestore rejects undefined (hole) values
   const _tsm=[]; for(let i=0;i<serLen;i++) _tsm.push(!!timerSortMode[i]);
   timerKeys.timerSortMode = _tsm;
+  timerKeys.opDismissedSlots = [...opDismissedSlots]; // persist operator-view dismissals
   return {
     name: name||sfName||'Untitled',
     updatedAt: window._fb.serverTimestamp(),
@@ -2053,6 +2055,9 @@ function applyState(s){
     s.matchTimers.forEach((mt,i)=>{
       if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
     });
+  }
+  if(Array.isArray(s.opDismissedSlots)){
+    opDismissedSlots = new Set(s.opDismissedSlots);
   }
   if(s.timerSortMode){
     s.timerSortMode.forEach((v,i)=>{ if(i<MAX_MATCHES) timerSortMode[i]=!!v; });
@@ -2686,11 +2691,16 @@ function addHubMatch(){
 }
 function removeMatch(col){
   // Operator view only: removes this column from the current view without deleting match data.
-  // Match remains in the schedule and will re-appear when navigating back to its day.
-  if(col>=0 && col<opSlotMap.length) opSlotMap.splice(col, 1);
+  // Dismissal is saved so it survives refresh; it's date-specific ("slotIdx:isoDate").
+  if(col>=0 && col<opSlotMap.length){
+    const si = opSlotMap[col];
+    const date = (matchMeta[si]&&matchMeta[si].isoDate) ? matchMeta[si].isoDate : calendarDate;
+    opDismissedSlots.add(`${si}:${date}`);
+    opSlotMap.splice(col, 1);
+  }
   renderOpColumns();
   renderAll();
-  // No scheduleSave() — this is a transient view change, not a data change
+  scheduleSave(); // persist the dismissed state
 }
 // Operator column wrappers — translate display column (0/1/2) → real match slot via opSlotMap
 function opEditMatch(col)  { openEditMatch(opSlotMap[col]); }
@@ -3498,7 +3508,10 @@ function _rebuildOpSlotMap(){
   for(let i=0;i<MAX_MATCHES;i++){
     if(matchVisible[i]){
       const d=matchMeta[i].isoDate;
-      if(!d||d===calendarDate) slots.push(i); // no date = always visible (backward compat)
+      if(!d||d===calendarDate){
+        // Skip slots the user has explicitly dismissed from this day's operator view
+        if(!opDismissedSlots.has(`${i}:${d||calendarDate}`)) slots.push(i);
+      }
     }
   }
   opSlotMap = slots; // dynamic — all matches for the day
