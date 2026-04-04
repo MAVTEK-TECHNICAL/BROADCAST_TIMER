@@ -701,10 +701,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   text-transform:uppercase;color:var(--text-mid);margin-top:3px;line-height:1.2;
   overflow:visible;white-space:nowrap;
 }
-.hub-teams span[style*="color"],
-.match-teams span[style*="color"]{
-  text-shadow:1px 2px 4px rgba(0,0,0,.95),0 1px 3px rgba(0,0,0,.85),-1px 1px 3px rgba(0,0,0,.7);
-}
+/* text-shadow for team name spans is set inline via _teamGlowShadow()
+   which applies a crisp 50% grey hard-offset shadow to all teams (no blur) */
 .hub-timers{
   flex:1;overflow-y:auto;padding:3px 5px;display:flex;flex-direction:column;
   gap:3px;min-height:0;
@@ -2025,6 +2023,12 @@ function _badgeTextColor(team){
   if(lum<0.12) return team.secondary;
   return '#ffffff';
 }
+/** Returns the appropriate text-shadow for a team colour string.
+ *  If the colour's luminance is below 30 % it will be dark on a dark
+ *  background, so we swap to a white glow for legibility. */
+function _teamGlowShadow(hex){
+  return '1px 1px 0px rgba(128,128,128,0.7),2px 2px 0px rgba(128,128,128,0.25)';
+}
 function _defTimers(){ return [{id:uid(),name:'ON AIR',core:true,timeStr:null,targetUTC:null},{id:uid(),name:'MATCH START',core:true,timeStr:null,targetUTC:null}]; }
 let matchTimers = Array.from({length:MAX_MATCHES}, ()=>_defTimers());
 let ctx = {}; // modal context
@@ -2792,17 +2796,17 @@ function renderHeaders(){
         if(logoSizeMode==='xl' && hBadge){
           el.innerHTML=`${hBadge}`;
         } else {
-          el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
+          el.innerHTML=`${hBadge}<span style="color:${m.homeColour};text-shadow:${_teamGlowShadow(m.homeColour)}">${esc(homeName)}</span>`;
         }
       } else {
         const aBadge=getTeamBadgeMiniHTML(m.awayTeamRef||null);
         const awayName=getTeamDisplayName(m.awayTeamRef, m.away||'—');
         if(logoSizeMode==='xl' && (hBadge||aBadge)){
-          const hPart=hBadge||`<span style="color:${m.homeColour}">${esc(homeName)}</span>`;
-          const aPart=aBadge||`<span style="color:${m.awayColour}">${esc(awayName)}</span>`;
+          const hPart=hBadge||`<span style="color:${m.homeColour};text-shadow:${_teamGlowShadow(m.homeColour)}">${esc(homeName)}</span>`;
+          const aPart=aBadge||`<span style="color:${m.awayColour};text-shadow:${_teamGlowShadow(m.awayColour)}">${esc(awayName)}</span>`;
           el.innerHTML=`${hPart}<span class="team-vs">VS</span>${aPart}`;
         } else {
-          el.innerHTML=`${hBadge}<span style="color:${m.homeColour}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour}">${esc(awayName)}</span>${aBadge}`;
+          el.innerHTML=`${hBadge}<span style="color:${m.homeColour};text-shadow:${_teamGlowShadow(m.homeColour)}">${esc(homeName)}</span><span class="team-vs">VS</span><span style="color:${m.awayColour};text-shadow:${_teamGlowShadow(m.awayColour)}">${esc(awayName)}</span>${aBadge}`;
         }
       }
     } else {
@@ -4164,12 +4168,12 @@ function buildHubCard(i,now,displayNum){
     const aBadge=showLogos?getTeamBadgeMiniHTML(m.awayTeamRef||null, hubLogoSize):'';
     if(m.away){
       teamsHtml=hBadge+
-                `<span style="color:${m.homeColour}">${esc(hName)}</span>`+
+                `<span style="color:${m.homeColour};text-shadow:${_teamGlowShadow(m.homeColour)}">${esc(hName)}</span>`+
                 `<span style="color:var(--text-dim);font-size:8px;margin:0 2px">VS</span>`+
-                `<span style="color:${m.awayColour}">${esc(aName)}</span>`+
+                `<span style="color:${m.awayColour};text-shadow:${_teamGlowShadow(m.awayColour)}">${esc(aName)}</span>`+
                 aBadge;
     } else {
-      teamsHtml=hBadge+`<span style="color:${m.homeColour}">${esc(hName)}</span>`;
+      teamsHtml=hBadge+`<span style="color:${m.homeColour};text-shadow:${_teamGlowShadow(m.homeColour)}">${esc(hName)}</span>`;
     }
   }
 
