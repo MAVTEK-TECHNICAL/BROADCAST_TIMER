@@ -2027,7 +2027,26 @@ function applyState(s){
       if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
     });
   }
-  if(s.timerSortMode){ s.timerSortMode.forEach((v,i)=>{ if(i<MAX_MATCHES) timerSortMode[i]=!!v; }); }
+  if(s.timerSortMode){
+    s.timerSortMode.forEach((v,i)=>{ if(i<MAX_MATCHES) timerSortMode[i]=!!v; });
+    // Re-sort in-place with fresh now so order is correct regardless of when save happened
+    const _now=Date.now();
+    timerSortMode.forEach((sorted,i)=>{
+      if(sorted && matchTimers[i] && matchTimers[i].length>1){
+        matchTimers[i].sort((a,b)=>{
+          if(!a.targetUTC && !b.targetUTC) return 0;
+          if(!a.targetUTC) return 1;
+          if(!b.targetUTC) return -1;
+          const da=a.targetUTC-_now, db=b.targetUTC-_now;
+          const futureA=da>=0, futureB=db>=0;
+          if(futureA && !futureB) return -1;
+          if(!futureA && futureB) return 1;
+          if(futureA) return da-db;
+          return db-da;
+        });
+      }
+    });
+  }
   // Sync hidden TZ selects for all 16 slots
   for(let i=0;i<MAX_MATCHES;i++){
     const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
