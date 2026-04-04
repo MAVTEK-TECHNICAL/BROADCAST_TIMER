@@ -424,7 +424,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .sort-timer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap; }
 .sort-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .sort-timer-btn.sort-active{ border-color:var(--accent);color:var(--accent);border-style:solid; }
-.timer-section-spacer{ display:none; }
+.timer-section-spacer{ display:block;height:2px;margin:4px 0;background:linear-gradient(90deg,transparent,var(--border-bright),transparent);flex-shrink:0; }
 .timer-remove{ display:none;background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0; }
 .timer-row.optional:hover .timer-remove{ display:block; }
 .hidden-match{ display:none; }
@@ -1054,6 +1054,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="sec-off" onclick="setShowSeconds(false)">OFF</button>
             </div>
           </div>
+          <div class="opts-row opts-view-hub hidden-view">
+            <span class="opts-label">DIVIDER</span>
+            <div class="name-mode-btns">
+              <button class="nmb"        id="hubtd-on"  onclick="setHubTimerDivider(true)">ON</button>
+              <button class="nmb active" id="hubtd-off" onclick="setHubTimerDivider(false)">OFF</button>
+            </div>
+          </div>
           <div class="opts-row opts-view-op">
             <span class="opts-label">OP TZ</span>
             <select id="op-tz" onchange="onOpTzChange()"></select>
@@ -1080,6 +1087,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <div class="name-mode-btns">
               <button class="nmb active" id="lbg-op-on"  onclick="setLogoBg(true)">ON</button>
               <button class="nmb"        id="lbg-op-off" onclick="setLogoBg(false)">OFF</button>
+            </div>
+          </div>
+          <div class="opts-row opts-view-op">
+            <span class="opts-label">DIVIDER</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="optd-on"  onclick="setOpTimerDivider(true)">ON</button>
+              <button class="nmb"        id="optd-off" onclick="setOpTimerDivider(false)">OFF</button>
             </div>
           </div>
         </div>
@@ -1567,6 +1581,8 @@ let opSlotMap    = []; // dynamically sized: real slot indices currently shown i
 let opDetailsExpanded = {}; // keyed by real slot index — true if details panel is open
 let hubTodayMode = false;   // true = hub range locked to today
 let showClockSeconds = true;  // false = hide seconds from TZ clock displays (timers always show seconds)
+let opTimerDivider  = true;   // true = show past/future divider line in operator view
+let hubTimerDivider = false;  // true = show past/future divider line in hub view
 let hubWeekMode  = false;   // true = hub range locked to current Mon–Sun week
 
 // Returns true when match i should be visible given current date filter
@@ -1888,6 +1904,8 @@ function buildPayload(name){
       brandColor,
       hubTz,
       showClockSeconds,
+      opTimerDivider,
+      hubTimerDivider,
       matchHubTzs:matchHubTzs.slice(0,serLen),
       teamDisplayMode:opTeamDisplayMode,
       hubTeamDisplayMode,
@@ -1913,6 +1931,8 @@ function applyState(s){
   if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
   if(s.matchHubTzs){ matchHubTzs=Array(MAX_MATCHES).fill('Australia/Sydney'); s.matchHubTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES&&tz) matchHubTzs[i]=tz; }); }
   if(typeof s.showClockSeconds==='boolean'){ showClockSeconds=s.showClockSeconds; document.getElementById('sec-on')?.classList.toggle('active',showClockSeconds); document.getElementById('sec-off')?.classList.toggle('active',!showClockSeconds); }
+  if(typeof s.opTimerDivider==='boolean'){  opTimerDivider =s.opTimerDivider;  document.getElementById('optd-on')?.classList.toggle('active', opTimerDivider);  document.getElementById('optd-off')?.classList.toggle('active',!opTimerDivider);  }
+  if(typeof s.hubTimerDivider==='boolean'){ hubTimerDivider=s.hubTimerDivider; document.getElementById('hubtd-on')?.classList.toggle('active', hubTimerDivider); document.getElementById('hubtd-off')?.classList.toggle('active',!hubTimerDivider); }
   if(s.teamDisplayMode)    { setNameMode(s.teamDisplayMode, true); }
   if(s.hubTeamDisplayMode) { setHubNameMode(s.hubTeamDisplayMode, true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
@@ -2270,6 +2290,18 @@ function setShowSeconds(v){
   document.getElementById('sec-off')?.classList.toggle('active', v===false);
   scheduleSave();
 }
+function setOpTimerDivider(v){
+  opTimerDivider=v;
+  document.getElementById('optd-on') ?.classList.toggle('active', v===true);
+  document.getElementById('optd-off')?.classList.toggle('active', v===false);
+  renderTimers(); scheduleSave();
+}
+function setHubTimerDivider(v){
+  hubTimerDivider=v;
+  document.getElementById('hubtd-on') ?.classList.toggle('active', v===true);
+  document.getElementById('hubtd-off')?.classList.toggle('active', v===false);
+  if(viewMode==='hub') renderHubGrid(); scheduleSave();
+}
 
 // ── TIMER REFERENCE MODE ──────────────────────────────────────────────
 let _addTimerRef='site', _editTimerRef='site';
@@ -2462,7 +2494,7 @@ function renderTimers(){
     matchTimers[si].forEach((t,idx)=>{
       const diff=t.targetUTC ? t.targetUTC-now : null;
       // Insert spacer between future and past groups when in sort mode
-      if(timerSortMode[si] && !_spacerInserted && idx>0 && diff!==null && diff<0){
+      if(opTimerDivider && timerSortMode[si] && !_spacerInserted && idx>0 && diff!==null && diff<0){
         const prevT=matchTimers[si][idx-1];
         const prevDiff=prevT.targetUTC ? prevT.targetUTC-now : null;
         if(prevDiff!==null && prevDiff>=0){
@@ -3776,8 +3808,15 @@ function buildHubCard(i,now,displayNum){
 
   // Timer rows — stacked: name on top, time-set left / countdown right
   const nameAlign=m.timerNameAlign||'left';
-  const timersHtml=timers.map(t=>{
+  let timersHtml='', _hubSpacerInserted=false;
+  timers.forEach((t,idx)=>{
     const diff=t.targetUTC?t.targetUTC-now:null;
+    // Insert spacer between future→past when hubTimerDivider is on and timers are sorted
+    if(hubTimerDivider && timerSortMode[i] && !_hubSpacerInserted && idx>0 && diff!==null && diff<0){
+      const prevT=timers[idx-1];
+      const prevDiff=prevT.targetUTC?prevT.targetUTC-now:null;
+      if(prevDiff!==null&&prevDiff>=0){ timersHtml+='<div class="timer-section-spacer"></div>'; _hubSpacerInserted=true; }
+    }
     let cls='positive',txt='--:--';
     if(diff!==null){
       if(diff<0)      {cls='past';   txt=fmtCountdown(diff);}
@@ -3786,7 +3825,7 @@ function buildHubCard(i,now,displayNum){
       else             {cls='positive';txt=fmtCountdown(diff);}
     }
     const rowCls=(t.core?'core':'')+(diff!==null&&diff>=0&&diff<6e4?' countdown-live':diff!==null&&diff>=0&&diff<6e5?' countdown-warning':'');
-    return `<div class="hub-timer-row ${rowCls}">
+    timersHtml+=`<div class="hub-timer-row ${rowCls}">
       <div class="hub-t-name" style="text-align:${nameAlign}">${esc(t.name)}</div>
       <div class="hub-t-time-row">
         <div class="hub-t-time" onclick="openSetTime(${i},'${t.id}')" title="Set time">${t.timeStr||'--:--'}</div>
@@ -3794,7 +3833,7 @@ function buildHubCard(i,now,displayNum){
         <div class="hub-t-cd ${cls}" data-hub-tid="${t.id}">${txt}</div>
       </div>
     </div>`;
-  }).join('');
+  });
 
   // Info grid (schedule data)
   const hubResolved=resolveHubCode(m.hub);
