@@ -1913,7 +1913,9 @@ function buildPayload(name){
       timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null,refTz:t.refTz||null}));
     }
   }
-  timerKeys.timerSortMode = timerSortMode.slice(0,serLen);
+  // Build timerSortMode without sparse holes — Firestore rejects undefined (hole) values
+  const _tsm=[]; for(let i=0;i<serLen;i++) _tsm.push(!!timerSortMode[i]);
+  timerKeys.timerSortMode = _tsm;
   return {
     name: name||sfName||'Untitled',
     updatedAt: window._fb.serverTimestamp(),
@@ -2062,13 +2064,18 @@ function scheduleSave(){
   clearTimeout(asTimer);
   asTimer = setTimeout(doSave, 1600);
 }
-async function doSave(){
+let _saveQueue = Promise.resolve(); // serialises Firebase writes — prevents race conditions
+function doSave(){
   if (!sfId||!window._user) return;
-  try {
-    await window._fb.setDoc(sfDocRef(sfId), buildPayload(), {merge:true});
-    setPip('saved');
-    document.getElementById('as-text').textContent = `Auto-saved · ${sfName}`;
-  } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; }
+  const payload = buildPayload(); // capture state NOW, synchronously, before any async delay
+  setPip('saving');
+  _saveQueue = _saveQueue.catch(()=>{}).then(async ()=>{
+    try {
+      await window._fb.setDoc(sfDocRef(sfId), payload, {merge:true});
+      setPip('saved');
+      document.getElementById('as-text').textContent = `Auto-saved · ${sfName}`;
+    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; }
+  });
 }
 function setPip(s){
   const dot=document.getElementById('as-dot'); const pip=document.getElementById('nav-pip');
