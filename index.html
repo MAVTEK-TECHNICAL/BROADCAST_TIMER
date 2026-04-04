@@ -2497,7 +2497,40 @@ function addMatch(){
       matchVisible[i]=matchEnabled[i]=true;
       matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
       matchTimers[i] = _defTimers();
-      _rebuildOpSlotMap(); renderAll(); scheduleSave(); return;
+      // Append to the *current* opSlotMap rather than rebuilding it from scratch.
+      // Rebuilding would restore any columns the user previously dismissed with ✕.
+      const col = opSlotMap.length;
+      opSlotMap.push(i);
+      // Inject just the new column into the DOM
+      const grid   = document.getElementById('matches-grid');
+      const addCol = document.getElementById('add-match-col');
+      if(grid && addCol){
+        const div = document.createElement('div');
+        div.className = 'match-col';
+        div.id = `match-col-${col}`;
+        const detailsOpen = opDetailsExpanded[i] ? '' : ' hidden';
+        div.innerHTML = `
+          <div class="match-header">
+            <button class="remove-match-btn" onclick="removeMatch(${col})" title="Remove from view">✕</button>
+            <div class="match-title-row">
+              <div class="match-label" id="match-label-${col}">MATCH ${col+1}</div>
+              <button class="edit-match-btn" onclick="opEditMatch(${col})" title="Edit match">✎</button>
+            </div>
+            <div class="match-teams" id="match-teams-${col}"></div>
+            <div class="match-local-time" id="match-clock-${col}">--:--:--</div>
+            <div class="match-date-line" id="match-date-${col}">${_opDateText(i)}</div>
+          </div>
+          <div class="timers-list" id="timers-${col}"></div>
+          <div class="op-details-panel${detailsOpen}" id="op-details-${col}"></div>
+          <div class="timer-footer">
+            <button class="add-timer-btn" onclick="opAddTimer(${col})">+ ADD TIMER</button>
+            <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining">⇅ SORT</button>
+            <button class="details-footer-btn${opDetailsExpanded[i]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details">≡ DETAILS</button>
+          </div>`;
+        grid.insertBefore(div, addCol);
+        window._colResizeObserver?.observe(div);
+      }
+      renderAll(); scheduleSave(); return;
     }
   }
   toast('SCHEDULE FULL');
