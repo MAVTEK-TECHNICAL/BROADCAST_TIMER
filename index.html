@@ -395,7 +395,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .match-header{ display:flex;flex-direction:column;align-items:center;padding:10px 12px 8px;background:var(--surface2);border-bottom:2px solid var(--brand-color);gap:4px;flex-shrink:0;position:relative; }
 .match-local-time{ font-family:var(--mono);font-size:48px;font-weight:700;color:#fff;letter-spacing:.06em;line-height:1;width:100%;text-align:center;white-space:nowrap;overflow:hidden; }
 .timers-list{ display:flex;flex-direction:column;flex:1;overflow-y:auto;padding:6px;gap:4px; }
-.timer-row{ display:grid;grid-template-columns:8px 1fr 62px 140px 20px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px 6px 0;gap:8px;height:52px;overflow:hidden;transition:border-color .2s,opacity .15s; }
+.timer-row{ display:grid;grid-template-columns:8px 1fr 62px auto 140px 20px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px 6px 0;gap:8px;height:52px;overflow:hidden;transition:border-color .2s,opacity .15s; }
 /* colour chip — flush left, full height, replaces the old 3-line drag handle.
    margin:-6px 0 escapes the row's top/bottom padding so the chip spans the
    full 52px row height; overflow:hidden on the row clips the corners. */
@@ -718,6 +718,18 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .hub-timer-row.core{ border-left-color:var(--accent2); }
 .hub-timer-row.countdown-warning{ background:rgba(255,214,0,.06); }
 .hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);animation:pulse-border 1s infinite; }
+/* ── Hub card 2-row clock ─────────────────────────────────────────── */
+.hub-clock-wrap{ width:100%;display:flex;flex-direction:column;gap:1px;margin-top:3px; }
+.hub-clock-row{ display:flex;align-items:baseline;justify-content:space-between;width:100%; }
+.hub-clock-label{ font-family:var(--display);font-size:calc(7px * var(--hub-fs,1));font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;padding-right:4px; }
+.hub-clock-val{ font-family:var(--mono);font-size:calc(11px * var(--hub-fs,1));font-weight:700;color:#fff;letter-spacing:.06em;line-height:1.2;text-align:right;white-space:nowrap;flex:1; }
+/* ── Timer reference badges (operator view) ─────────────────────── */
+.timer-hub-badge{ display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--red);border-radius:2px;color:var(--red);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1px;padding:0 3px;line-height:14px;white-space:nowrap;flex-shrink:0; }
+.timer-tz-badge{ display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--text-dim);border-radius:2px;color:var(--text-dim);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:.5px;padding:0 3px;line-height:14px;white-space:nowrap;flex-shrink:0; }
+.timer-badge-cell{ display:flex;align-items:center;justify-content:center; }
+/* ── Timer reference badges (hub card) ───────────────────────────── */
+.hub-timer-hub-badge{ display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--red);border-radius:2px;color:var(--red);font-family:var(--display);font-size:calc(6px * var(--hub-fs,1));font-weight:700;letter-spacing:.5px;padding:0 2px;line-height:calc(12px * var(--hub-fs,1));white-space:nowrap;flex-shrink:0;margin:0 2px; }
+.hub-timer-tz-badge{ display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--text-dim);border-radius:2px;color:var(--text-dim);font-family:var(--display);font-size:calc(6px * var(--hub-fs,1));font-weight:700;letter-spacing:.5px;padding:0 2px;line-height:calc(12px * var(--hub-fs,1));white-space:nowrap;flex-shrink:0;margin:0 2px; }
 .hub-t-name{
   font-family:var(--ui);font-size:calc(9px * var(--hub-fs,1));font-weight:600;letter-spacing:.5px;
   text-transform:uppercase;color:var(--text-mid);white-space:nowrap;
@@ -1009,6 +1021,13 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="lbg-hub-off" onclick="setLogoBg(false)">OFF</button>
             </div>
           </div>
+          <div class="opts-row opts-view-hub hidden-view">
+            <span class="opts-label">SECONDS</span>
+            <div class="name-mode-btns">
+              <button class="nmb active" id="sec-on"  onclick="setShowSeconds(true)">ON</button>
+              <button class="nmb"        id="sec-off" onclick="setShowSeconds(false)">OFF</button>
+            </div>
+          </div>
           <div class="opts-row opts-view-op">
             <span class="opts-label">OP TZ</span>
             <select id="op-tz" onchange="onOpTzChange()"></select>
@@ -1121,6 +1140,17 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
       </div>
     </div>
+    <div class="modal-field">
+      <label>Reference Time</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="name-mode-btns" style="width:100%">
+          <button class="nmb active" id="et-ref-site"  onclick="setEditTimerRef('site')"  style="flex:1">SITE</button>
+          <button class="nmb"        id="et-ref-hub"   onclick="setEditTimerRef('hub')"   style="flex:1">HUB</button>
+          <button class="nmb"        id="et-ref-other" onclick="setEditTimerRef('other')" style="flex:1">OTHER</button>
+        </div>
+        <select class="modal-input" id="et-ref-tz" style="display:none;font-family:var(--ui);font-size:12px;"></select>
+      </div>
+    </div>
     <div class="modal-buttons">
       <button class="btn btn-danger"  onclick="clearEditTimerTime()">CLEAR TIME</button>
       <button class="btn btn-cancel"  onclick="closeModal('modal-edit-timer')">CANCEL</button>
@@ -1171,6 +1201,17 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         </div>
       </div>
     </div>
+    <div class="modal-field">
+      <label>Reference Time</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="name-mode-btns" style="width:100%">
+          <button class="nmb active" id="add-ref-site"  onclick="setAddTimerRef('site')"  style="flex:1">SITE</button>
+          <button class="nmb"        id="add-ref-hub"   onclick="setAddTimerRef('hub')"   style="flex:1">HUB</button>
+          <button class="nmb"        id="add-ref-other" onclick="setAddTimerRef('other')" style="flex:1">OTHER</button>
+        </div>
+        <select class="modal-input" id="add-ref-tz" style="display:none;font-family:var(--ui);font-size:12px;"></select>
+      </div>
+    </div>
     <div class="modal-buttons">
       <button class="btn btn-cancel"  onclick="closeModal('modal-add-timer')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmAddTimer()">ADD</button>
@@ -1192,8 +1233,12 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <input class="modal-input" id="em-label" type="text" style="font-family:var(--ui);font-size:14px;letter-spacing:2px;" />
         </div>
         <div class="modal-field">
-          <label>Time Zone</label>
+          <label>Site Timezone</label>
           <select class="modal-input" id="em-tz" style="font-family:var(--ui);font-size:13px;"></select>
+        </div>
+        <div class="modal-field">
+          <label>Hub Timezone</label>
+          <select class="modal-input" id="em-hub-tz" style="font-family:var(--ui);font-size:13px;"></select>
         </div>
         <div class="em-col-title" style="margin-top:14px">HUB DISPLAY</div>
         <div class="opts-row" style="padding:4px 0">
@@ -1493,6 +1538,7 @@ let _calPopupYM   = null;  // {year,month} currently displayed in popup
 let opSlotMap    = []; // dynamically sized: real slot indices currently shown in operator view
 let opDetailsExpanded = {}; // keyed by real slot index — true if details panel is open
 let hubTodayMode = false;   // true = hub range locked to today
+let showClockSeconds = true;  // false = hide seconds from TZ clock displays (timers always show seconds)
 let hubWeekMode  = false;   // true = hub range locked to current Mon–Sun week
 
 // Returns true when match i should be visible given current date filter
@@ -1515,6 +1561,7 @@ function _isSlotEmpty(i){ return !matchVisible[i] && !matchEnabled[i] && !matchM
 // Returns the first N free slot indices, filling from index 0 upward
 function _findFreeSlots(n){ const slots=[]; for(let i=0;i<MAX_MATCHES&&slots.length<n;i++) if(_isSlotEmpty(i)) slots.push(i); return slots; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
+let matchHubTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
 let matchMeta   = Array.from({length:MAX_MATCHES}, (_,i)=>_defMeta(i));
@@ -1802,7 +1849,7 @@ function buildPayload(name){
   const timerKeys = {};
   for(let i=0;i<serLen;i++){
     if(matchVisible[i]){
-      timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null}));
+      timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null,refTz:t.refTz||null}));
     }
   }
   return {
@@ -1812,6 +1859,8 @@ function buildPayload(name){
     state:{
       brandColor,
       hubTz,
+      showClockSeconds,
+      matchHubTzs:matchHubTzs.slice(0,serLen),
       teamDisplayMode:opTeamDisplayMode,
       hubTeamDisplayMode,
       logoSizeMode,
@@ -1834,6 +1883,8 @@ function buildPayload(name){
 function applyState(s){
   if(s.brandColor)     { setBrandColor(s.brandColor, true); }
   if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
+  if(s.matchHubTzs){ matchHubTzs=Array(MAX_MATCHES).fill('Australia/Sydney'); s.matchHubTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES&&tz) matchHubTzs[i]=tz; }); }
+  if(typeof s.showClockSeconds==='boolean'){ showClockSeconds=s.showClockSeconds; document.getElementById('sec-on')?.classList.toggle('active',showClockSeconds); document.getElementById('sec-off')?.classList.toggle('active',!showClockSeconds); }
   if(s.teamDisplayMode)    { setNameMode(s.teamDisplayMode, true); }
   if(s.hubTeamDisplayMode) { setHubNameMode(s.hubTeamDisplayMode, true); }
   if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
@@ -1901,13 +1952,13 @@ function applyState(s){
     for(let i=0;i<MAX_MATCHES;i++){
       const key=`timers${i}`;
       if(s[key]){
-        matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,matchTzs[i]):null}));
+        matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
       }
     }
   } else if(s.matchTimers){
     // Legacy nested array format
     s.matchTimers.forEach((mt,i)=>{
-      if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,matchTzs[i]):null}));
+      if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
     });
   }
   // Sync hidden TZ selects for all 16 slots
@@ -2029,7 +2080,7 @@ async function importJSON(e){
       const src=srcSlots[ii];
       const dst=freeSlots[ii];
       matchMeta[dst]   = srcMeta[src]    ? {..._defMeta(dst), ...srcMeta[src], label:srcMeta[src].label||`MATCH ${dst+1}`} : _defMeta(dst);
-      matchTimers[dst] = (srcTimers[src] && srcTimers[src].length) ? srcTimers[src].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,srcTzs[src]||'Australia/Sydney'):null})) : _defTimers();
+      matchTimers[dst] = (srcTimers[src] && srcTimers[src].length) ? srcTimers[src].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},dst)):null})) : _defTimers();
       matchTzs[dst]    = srcTzs[src]    || 'Australia/Sydney';
       matchVisible[dst]= srcVisible[src] || false;
       matchEnabled[dst]= srcEnabled[src] || false;
@@ -2055,7 +2106,7 @@ async function importJSON(e){
 
 // ── SELECTS ──────────────────────────────────────────────
 function populateSelects(){
-  const tzSelIds = ['hub-tz', 'op-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz'];
+  const tzSelIds = ['hub-tz', 'op-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz', 'em-hub-tz', 'add-ref-tz', 'et-ref-tz'];
   tzSelIds.forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel||sel.options.length) return;
@@ -2082,13 +2133,14 @@ function _applyBroadcastTz(tz){
   hubTz=tz;
   for(let i=0;i<MAX_MATCHES;i++){
     matchTzs[i]=tz;
+    matchHubTzs[i]=tz;
     const hidden=document.getElementById(`match-tz-${i}`);
     if(hidden) hidden.value=tz;
-    matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,tz); });
+    matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i)); });
   }
   // Update clocks immediately without waiting for next tick
-  document.getElementById('hub-clock').textContent=getTimeInTz(tz);
-  [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(tz); });
+  document.getElementById('hub-clock').textContent=getClockTime(tz);
+  [0,1,2].forEach(i=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getClockTime(tz); });
   // Sync both selectors
   const hubEl=document.getElementById('hub-tz'); if(hubEl) hubEl.value=tz;
   const opEl=document.getElementById('op-tz');   if(opEl)  opEl.value=tz;
@@ -2098,12 +2150,151 @@ function onHubTzChange(){ _applyBroadcastTz(document.getElementById('hub-tz').va
 function onOpTzChange(){  _applyBroadcastTz(document.getElementById('op-tz').value);  }
 function onMatchTzChange(i){
   matchTzs[i]=document.getElementById(`match-tz-${i}`).value;
-  matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
+  matchTimers[i].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
   scheduleSave();
 }
 
 // ── TIME HELPERS ─────────────────────────────────────────
 function getTimeInTz(tz){ return new Date().toLocaleTimeString('en-GB',{timeZone:tz,hour12:false}); }
+
+// ── EXTENDED TZ / CLOCK HELPERS ──────────────────────────────────────
+/** Clock display — respects showClockSeconds (true = HH:MM:SS, false = HH:MM) */
+function getClockTime(tz){
+  const opts={timeZone:tz,hour12:false,hour:'2-digit',minute:'2-digit'};
+  if(showClockSeconds) opts.second='2-digit';
+  return new Date().toLocaleTimeString('en-GB',opts);
+}
+
+/** Maps AU state abbreviation → IANA timezone. Returns null for unknowns. */
+function resolveStateTz(state){
+  const s=(state||'').trim().toUpperCase();
+  const m={VIC:'Australia/Melbourne',NSW:'Australia/Sydney',QLD:'Australia/Brisbane',
+           WA:'Australia/Perth',SA:'Australia/Adelaide',NT:'Australia/Darwin',
+           TAS:'Australia/Hobart',ACT:'Australia/ACT'};
+  return m[s]||null;
+}
+
+/** Maps hub code prefix → physical site IANA timezone. Returns null for unknowns.
+ *  FF  → VIC (Fox Flemington, Melbourne)
+ *  AHM → VIC (Artarmon Hub Melbourne)
+ *  AHS → SYD (Artarmon Hub Sydney)       */
+function resolveHubTz(hub){
+  const s=(hub||'').trim().toUpperCase();
+  if(/^FF(\b|\d|CR)/.test(s))  return 'Australia/Melbourne';
+  if(/^AHM(\b|\d|CR)/.test(s)) return 'Australia/Melbourne';
+  if(/^AHS(\b|\d|CR)/.test(s)) return 'Australia/Sydney';
+  return null;
+}
+
+/** Returns a 3-char display code for a timezone string (e.g. SYD, MEL, QLD). */
+function tzShorthand(tz){
+  const m={'Australia/Sydney':'SYD','Australia/Melbourne':'MEL','Australia/Brisbane':'QLD',
+           'Australia/Perth':'PER','Australia/Adelaide':'ADL','Australia/Darwin':'DRW',
+           'Australia/Hobart':'HOB','Australia/ACT':'ACT','UTC':'UTC',
+           'Europe/London':'LON','America/New_York':'NYC','America/Los_Angeles':'LAX',
+           'Asia/Tokyo':'TYO','Asia/Singapore':'SGP','Pacific/Auckland':'AKL'};
+  if(m[tz]) return m[tz];
+  const parts=tz.split('/');
+  return parts[parts.length-1].substring(0,3).toUpperCase();
+}
+
+/** Resolves the effective IANA timezone for a timer based on its refTz field.
+ *  'site' (or null) → matchTzs[mi]  |  'hub' → matchHubTzs[mi]  |  else → t.refTz  */
+function getTimerRefTz(t,mi){
+  if(!t.refTz||t.refTz==='site') return matchTzs[mi];
+  if(t.refTz==='hub')            return matchHubTzs[mi]||matchTzs[mi];
+  return t.refTz;
+}
+
+/** Returns badge HTML for timer ref indicator, or '' for site (no badge).
+ *  hubCard=true uses smaller hub-card badge classes. */
+function timerRefBadgeHtml(t,hubCard){
+  if(!t.refTz||t.refTz==='site') return '';
+  if(t.refTz==='hub'){
+    return hubCard
+      ? '<span class="hub-timer-hub-badge">HUB</span>'
+      : '<span class="timer-hub-badge">HUB</span>';
+  }
+  const code=tzShorthand(t.refTz);
+  return hubCard
+    ? `<span class="hub-timer-tz-badge">${code}</span>`
+    : `<span class="timer-tz-badge">${code}</span>`;
+}
+
+/** Populates a <select> element with TZ_GROUPS options (no-op if already populated). */
+function populateSelectEl(sel){
+  if(!sel||sel.options.length>0) return;
+  TZ_GROUPS.forEach(g=>{
+    const og=document.createElement('optgroup');
+    og.label=g.group;
+    g.zones.forEach(z=>{
+      const o=document.createElement('option');
+      o.value=z.tz; o.textContent=z.label;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+
+function setShowSeconds(v){
+  showClockSeconds=v;
+  document.getElementById('sec-on') ?.classList.toggle('active', v===true);
+  document.getElementById('sec-off')?.classList.toggle('active', v===false);
+  scheduleSave();
+}
+
+// ── TIMER REFERENCE MODE ──────────────────────────────────────────────
+let _addTimerRef='site', _editTimerRef='site';
+
+function setAddTimerRef(mode){
+  _addTimerRef=mode;
+  ['site','hub','other'].forEach(m=>document.getElementById(`add-ref-${m}`)?.classList.toggle('active',m===mode));
+  const sel=document.getElementById('add-ref-tz');
+  if(sel) sel.style.display=(mode==='other')?'':'none';
+}
+function setEditTimerRef(mode){
+  _editTimerRef=mode;
+  ['site','hub','other'].forEach(m=>document.getElementById(`et-ref-${m}`)?.classList.toggle('active',m===mode));
+  const sel=document.getElementById('et-ref-tz');
+  if(sel) sel.style.display=(mode==='other')?'':'none';
+}
+
+// ── FRINGE TIMEZONE RESOLUTION ────────────────────────────────────────
+let _fringeCallback=null;
+function openFringeTzModal(slots,callback){
+  _fringeCallback=callback;
+  const desc=document.getElementById('fringe-tz-desc');
+  desc.textContent=`${slots.length} match${slots.length!==1?' locations':' location'} could not be auto-resolved to a timezone (e.g. unknown STATE or HUB code). Select a timezone to apply to all unresolved matches, or skip to keep defaults.`;
+  const sel=document.getElementById('fringe-tz-sel');
+  sel.innerHTML='';
+  TZ_GROUPS.forEach(g=>{
+    const og=document.createElement('optgroup');
+    og.label=g.group;
+    g.zones.forEach(z=>{
+      const o=document.createElement('option');
+      o.value=z.tz; o.textContent=z.label;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  sel.value='Australia/Sydney';
+  document.getElementById('modal-fringe-tz').classList.remove('hidden');
+}
+function resolveFringeTz(apply){
+  const fSite=window._fringeSite||new Set();
+  const fHub =window._fringeHub ||new Set();
+  if(apply){
+    const tz=document.getElementById('fringe-tz-sel').value;
+    (window._fringeSlots||[]).forEach(i=>{
+      if(fSite.has(i)) matchTzs[i]=tz;
+      if(fHub.has(i))  matchHubTzs[i]=tz;
+      // Recompute targetUTCs with updated TZs
+      matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i)); });
+    });
+  }
+  document.getElementById('modal-fringe-tz').classList.add('hidden');
+  if(_fringeCallback){ _fringeCallback(); _fringeCallback=null; }
+}
 
 function localToUTC(timeStr, tz){
   if(!timeStr) return null;
@@ -2278,6 +2469,7 @@ function renderTimers(){
         <div class="timer-color-chip" style="background:${chipColor}"></div>
         <div class="timer-name timer-name-edit" onclick="openEditTimer(${si},'${t.id}')" title="Edit name &amp; time">${esc(t.name)}</div>
         <div class="timer-time-set" onclick="openEditTimer(${si},'${t.id}')">${t.timeStr||'--:--'}</div>
+        <div class="timer-badge-cell">${timerRefBadgeHtml(t,false)}</div>
         <div class="timer-countdown ${cls}" data-tid="${t.id}">${txt}</div>
         ${!t.core?`<button class="timer-remove" onclick="removeTimer(${si},'${t.id}')">✕</button>`:'<span></span>'}`;
       list.appendChild(div);
@@ -2288,9 +2480,9 @@ function renderTimers(){
 // ── CLOCK ─────────────────────────────────────────────────
 function startClock(){
   function tick(){
-    document.getElementById('hub-clock').textContent  = getTimeInTz(hubTz);
+    document.getElementById('hub-clock').textContent  = getClockTime(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
-    opSlotMap.forEach((si,i)=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getTimeInTz(matchTzs[si]); });
+    opSlotMap.forEach((si,i)=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getClockTime(matchTzs[si]); });
     if(viewMode==='operator') renderTimers();
     else updateHubCountdowns();
   }
@@ -2473,6 +2665,12 @@ function openEditTimer(mi, tid){
   const hh=document.getElementById('et-hh'), mm=document.getElementById('et-mm');
   if(t.timeStr){ const [h,m]=t.timeStr.split(':'); hh.value=h; mm.value=m; }
   else { hh.value='00'; mm.value='00'; }
+  // Populate reference time selector from timer's refTz
+  const _etrRaw=t.refTz||'site';
+  const _etrMode=(_etrRaw==='site'||_etrRaw==='hub')?_etrRaw:'other';
+  populateSelectEl(document.getElementById('et-ref-tz'));
+  if(_etrMode==='other'){ const sel=document.getElementById('et-ref-tz'); if(sel) sel.value=_etrRaw; }
+  setEditTimerRef(_etrMode);
   document.getElementById('modal-edit-timer').classList.remove('hidden');
   setTimeout(()=>document.getElementById('et-name').focus(),50);
 }
@@ -2486,7 +2684,10 @@ function confirmEditTimer(){
   if(tsRaw&&!ts){ toast('INVALID TIME — use HH:MM or HHMM'); return; }
   t.name=newName;
   t.timeStr=ts||null;
-  t.targetUTC=ts?localToUTC(ts,matchTzs[ctx.mi]):null;
+  const _etRef=_editTimerRef;
+  const _etRefTz=(_etRef==='other')?(document.getElementById('et-ref-tz')?.value||'Australia/Sydney'):_etRef;
+  t.refTz=_etRefTz;
+  t.targetUTC=ts?localToUTC(ts,getTimerRefTz(t,ctx.mi)):null;
   closeModal('modal-edit-timer'); renderAll(); scheduleSave();
   // Refresh em panel if Edit Match modal is open
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
@@ -2504,6 +2705,8 @@ function openAddTimer(mi){
   ctx={mi};
   document.getElementById('add-name').value='';
   document.getElementById('add-typed').value='';
+  setAddTimerRef('site');
+  populateSelectEl(document.getElementById('add-ref-tz'));
   document.getElementById('modal-add-timer').classList.remove('hidden');
   setTimeout(()=>document.getElementById('add-name').focus(),50);
 }
@@ -2511,7 +2714,10 @@ function confirmAddTimer(){
   const name=(document.getElementById('add-name').value.trim().toUpperCase())||'CUSTOM';
   const v=document.getElementById('add-typed').value.trim();
   const ts = v ? parseTimeInput(v) : null;
-  matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,matchTzs[ctx.mi]):null});
+  const _aRef=_addTimerRef;
+  const _aRefTz=(_aRef==='other')?(document.getElementById('add-ref-tz')?.value||'Australia/Sydney'):_aRef;
+  const _aEffTz=getTimerRefTz({refTz:_aRefTz},ctx.mi);
+  matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,_aEffTz):null,refTz:_aRefTz});
   closeModal('modal-add-timer'); scheduleSave();
   // Refresh em panel if Edit Match modal is open
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
@@ -2557,6 +2763,7 @@ function openEditMatch(i){
   renderTeamPicker('home',sport);
   renderTeamPicker('away',sport);
   document.getElementById('em-tz').value=matchTzs[i];
+  document.getElementById('em-hub-tz').value=matchHubTzs[i]||matchTzs[i];
   setEmAlign(m.timerNameAlign||'left');
   // Schedule data fields
   document.getElementById('em-schedule').value='';
@@ -2602,7 +2809,12 @@ function confirmEditMatch(){
     matchTzs[mi]=newTz;
     const hiddenSel=document.getElementById(`match-tz-${mi}`);
     if(hiddenSel) hiddenSel.value=newTz;
-    matchTimers[mi].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,newTz); });
+    matchTimers[mi].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,newTz); });
+  }
+  const newHubTz=document.getElementById('em-hub-tz')?.value;
+  if(newHubTz && newHubTz!==matchHubTzs[mi]){
+    matchHubTzs[mi]=newHubTz;
+    matchTimers[mi].forEach(t=>{ if(t.timeStr&&t.refTz==='hub') t.targetUTC=localToUTC(t.timeStr,newHubTz); });
   }
   const _prevMeta = matchMeta[mi]; // preserve fields not in the edit form
   matchMeta[mi]={
@@ -3513,6 +3725,7 @@ function buildHubCard(i,now,displayNum){
       <div class="hub-t-name" style="text-align:${nameAlign}">${esc(t.name)}</div>
       <div class="hub-t-time-row">
         <div class="hub-t-time" onclick="openSetTime(${i},'${t.id}')" title="Set time">${t.timeStr||'--:--'}</div>
+        ${timerRefBadgeHtml(t,true)}
         <div class="hub-t-cd ${cls}" data-hub-tid="${t.id}">${txt}</div>
       </div>
     </div>`;
@@ -3563,7 +3776,16 @@ function buildHubCard(i,now,displayNum){
         const minH=hubLogoSize!=='off'?`min-height:${logoMinH[hubLogoSize]||'26px'};`:'';
         return (teamsHtml||hubLogoSize!=='off')?`<div class="hub-teams" style="${minH}">${teamsHtml}</div>`:'';
       })()}
-      <div class="hub-local-time" data-hub-clock-mi="${i}">${getTimeInTz(matchTzs[i])}</div>
+      <div class="hub-clock-wrap">
+        <div class="hub-clock-row">
+          <span class="hub-clock-label">HUB</span>
+          <span class="hub-clock-val" data-hub-time-mi="${i}">${getClockTime(matchHubTzs[i])}</span>
+        </div>
+        <div class="hub-clock-row">
+          <span class="hub-clock-label">LOCAL</span>
+          <span class="hub-clock-val" data-hub-clock-mi="${i}">${getClockTime(matchTzs[i])}</span>
+        </div>
+      </div>
       ${(()=>{
         if(!m.isoDate) return '';
         const tzLbl=_tzLabel(matchTzs[i]);
@@ -3706,6 +3928,7 @@ async function handleScheduleFile(file){
     const droneColI  =colIdx('DRONE');
     const tacticColI =colIdx('TACTIC');
     const trackerColI=colIdx('TRACKER');
+    const stateColI  =colIdx('STATE');
 
     // Two-pass extraction:
     // Pass 1 – separate "anchor" rows (have items at DAY/GAME x range) from "floaters"
@@ -3752,6 +3975,7 @@ async function handleScheduleFile(file){
         day,game,
         location:locColI  >=0?cells[locColI].trim()  :'',
         hub:     hubColI  >=0?cells[hubColI].trim()  :'',
+        state:   stateColI>=0?cells[stateColI].trim():'',
         host:    hostColI >=0?cells[hostColI].trim() :'',
         truck:   truckColI>=0?cells[truckColI].trim():'',
         main:    mainColI   >=0?cells[mainColI].trim()   :'',
@@ -3963,13 +4187,13 @@ function parseScheduleImport(){
 
   const sep=lines[0].includes('\t')?'\t':',';
   const firstCols=lines[0].split(sep).map(c=>c.trim().replace(/"/g,'').toUpperCase());
-  let dayCol=0,gameCol=2,locCol=3,hubCol=5,hostCol=7,truckCol=8,mainCol=9,backupCol=10,arCol=-1,trackerCol=-1,droneCol=-1,tacticCol=-1,dataStart=0;
+  let dayCol=0,gameCol=2,locCol=3,hubCol=5,stateCol=6,hostCol=7,truckCol=8,mainCol=9,backupCol=10,arCol=-1,trackerCol=-1,droneCol=-1,tacticCol=-1,dataStart=0;
 
   if(firstCols.some(c=>c==='DAY'||c.includes('GAME'))){
     dataStart=1;
     const fi=h=>firstCols.findIndex(c=>c.includes(h));
     dayCol=fi('DAY'); gameCol=fi('GAME'); locCol=fi('LOCATION');
-    hubCol=fi('HUB'); hostCol=fi('HOST'); truckCol=fi('TRUCK');
+    hubCol=fi('HUB'); stateCol=fi('STATE'); hostCol=fi('HOST'); truckCol=fi('TRUCK');
     mainCol=fi('MAIN'); backupCol=fi('BACKUP');
     arCol=fi('AR')<0?fi('CAM 2 AR'):fi('AR'); trackerCol=fi('TRACKER');
     droneCol=fi('DRONE'); tacticCol=fi('TACTIC');
@@ -3984,6 +4208,7 @@ function parseScheduleImport(){
     matches.push({
       day:col(cols,dayCol), game,
       location:col(cols,locCol), hub:col(cols,hubCol),
+      state:col(cols,stateCol),
       host:col(cols,hostCol),   truck:col(cols,truckCol),
       main:col(cols,mainCol),   backup:col(cols,backupCol),
       ...parseArField(col(cols,arCol)),
@@ -4006,6 +4231,9 @@ function detectSportFromHost(host,game){
 }
 
 function confirmScheduleImport(){
+  window._fringeSlots=[];
+  window._fringeSite=new Set();
+  window._fringeHub=new Set();
   // Round start date — used to map bare day names ("Sat") to actual ISO dates
   const schedRefISO=document.getElementById('sched-round-start')?.value || calendarDate;
 
@@ -4058,6 +4286,15 @@ function confirmScheduleImport(){
       customFields:[],
       day:m.day||'', isoDate,
     };
+    // Resolve site timezone (STATE column) and hub timezone (HUB column prefix)
+    const _rawState=(m.state||'').trim();
+    const _rawHub  =(m.hub  ||'').trim();
+    const _siteTz  =resolveStateTz(_rawState);
+    const _hubTz   =resolveHubTz(_rawHub);
+    matchTzs[i]    = _siteTz || 'Australia/Sydney';
+    matchHubTzs[i] = _hubTz  || matchTzs[i];      // default hub = site when unresolved
+    if(!_siteTz && _rawState){ window._fringeSite.add(i); window._fringeSlots.push(i); }
+    if(!_hubTz  && _rawHub)  { window._fringeHub.add(i);  if(!window._fringeSite.has(i)) window._fringeSlots.push(i); }
     matchTimers[i]=_defTimers();
     matchVisible[i]=true; matchEnabled[i]=true;
     if(!firstNewDate && isoDate) firstNewDate=isoDate;
@@ -4067,10 +4304,19 @@ function confirmScheduleImport(){
   if(firstNewDate) calendarDate=firstNewDate;
   updateAddMatchBtn();
   closeModal('modal-sched-import');
-  switchView('hub'); renderAll();
-  _applyCalendarDate(true); // refresh label + column visibility (silent, scheduleSave below)
-  scheduleSave();
-  toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
+  // Deduplicate fringe slot indices
+  window._fringeSlots=[...new Set(window._fringeSlots||[])];
+  function _finishImport(){
+    switchView('hub'); renderAll();
+    _applyCalendarDate(true);
+    scheduleSave();
+    toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
+  }
+  if(window._fringeSlots.length>0){
+    openFringeTzModal(window._fringeSlots, _finishImport);
+  } else {
+    _finishImport();
+  }
 }
 
 // ── SCHEDULE PARSER ──────────────────────────────────────
@@ -4283,7 +4529,11 @@ function updateHubCountdowns(){
   // Update local clocks on each hub card
   document.querySelectorAll('[data-hub-clock-mi]').forEach(el=>{
     const mi=parseInt(el.dataset.hubClockMi);
-    el.textContent=getTimeInTz(matchTzs[mi]);
+    el.textContent=getClockTime(matchTzs[mi]);
+  });
+  document.querySelectorAll('[data-hub-time-mi]').forEach(el=>{
+    const mi=parseInt(el.dataset.hubTimeMi);
+    el.textContent=getClockTime(matchHubTzs[mi]||matchTzs[mi]);
   });
   document.querySelectorAll('[data-hub-tid]').forEach(el=>{
     const tid=el.dataset.hubTid;
@@ -4315,6 +4565,22 @@ function updateHubCountdowns(){
 // ── TOAST ─────────────────────────────────────────────────
 let _t; function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>el.classList.remove('show'),2200); }
 </script>
+<!-- MODAL: Fringe Timezone Resolution -->
+<div class="modal-overlay hidden" id="modal-fringe-tz">
+  <div class="modal">
+    <div class="modal-title">RESOLVE TIMEZONES</div>
+    <div style="font-size:11px;color:var(--text-dim);letter-spacing:.5px;line-height:1.6;margin-bottom:4px" id="fringe-tz-desc"></div>
+    <div class="modal-field">
+      <label>Apply Timezone to All Unresolved Matches</label>
+      <select class="modal-input" id="fringe-tz-sel" style="font-family:var(--ui);font-size:13px;"></select>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-cancel"  onclick="resolveFringeTz(false)">SKIP</button>
+      <button class="btn btn-confirm" onclick="resolveFringeTz(true)">APPLY &amp; IMPORT</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hidden match TZ selects — kept for populateSelects / applyState compatibility -->
 <div style="display:none" aria-hidden="true">
   <select id="match-tz-0"  onchange="onMatchTzChange(0)"></select>
