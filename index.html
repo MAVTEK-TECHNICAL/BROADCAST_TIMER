@@ -733,13 +733,27 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .cs-section-hdr{ font-size:9px;letter-spacing:2px;color:var(--text-dim);padding:10px 6px 4px;text-transform:uppercase;display:flex;align-items:center;gap:8px; }
 .cs-badge-site{ font-size:9px;padding:2px 5px;border-radius:3px;border:1px solid var(--text-dim);color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;white-space:nowrap; }
 .cs-badge-hub{ font-size:9px;padding:2px 5px;border-radius:3px;border:1px solid var(--red);color:var(--red);background:rgba(231,76,60,.1);letter-spacing:1px;font-weight:700;text-transform:uppercase;white-space:nowrap; }
-.cs-role{ font-size:14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500; }
-.cs-person{ font-size:12px;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.cs-company{ font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.5px; }
-.cs-time{ font-family:var(--mono);font-size:15px;color:var(--accent);text-align:right;white-space:nowrap;font-weight:600; }
+.cs-company{ font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.5px; }
 .cs-search{ width:100%;background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;color:var(--text);font-family:var(--ui);font-size:13px;padding:6px 10px;outline:none;transition:border-color .15s;box-sizing:border-box; }
 .cs-search:focus{ border-color:var(--accent); }
 .cs-search::placeholder{ color:var(--text-dim); }
+.cs-body{ display:flex;flex-direction:row;flex:1;overflow:hidden; }
+.cs-left{ display:flex;flex-direction:column;flex:1;min-width:0;overflow:hidden; }
+.cs-right{ width:230px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface); }
+.cs-right-hdr{ padding:8px 12px 6px;font-size:9px;letter-spacing:2px;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+.cs-sel-count{ font-size:9px;color:var(--accent);letter-spacing:1px; }
+.cs-selected-list{ flex:1;overflow-y:auto; }
+.cs-sel-row{ display:flex;align-items:flex-start;gap:5px;padding:7px 10px 7px 8px;border-bottom:1px solid rgba(255,255,255,.05); }
+.cs-sel-row:hover{ background:var(--surface2); }
+.cs-sel-role{ font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500; }
+.cs-sel-name{ font-size:11px;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cs-sel-time{ font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap; }
+.cs-sel-remove{ background:none;border:none;color:var(--text-dim);font-size:10px;cursor:pointer;padding:1px 3px;line-height:1;border-radius:2px;flex-shrink:0;margin-top:1px; }
+.cs-sel-remove:hover{ color:var(--text);background:rgba(255,255,255,.1); }
+/* Callsheet list: larger legible fonts */
+.cs-role{ font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500; }
+.cs-person{ font-size:13px;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cs-time{ font-family:var(--mono);font-size:16px;color:var(--accent);text-align:right;white-space:nowrap;font-weight:600; }
 .hub-clock-row{ display:flex;align-items:baseline;justify-content:space-between;width:100%; }
 .hub-clock-label{ font-family:var(--display);font-size:calc(7px * var(--hub-fs,1));font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;padding-right:4px; }
 .hub-clock-val{ font-family:var(--mono);font-size:calc(11px * var(--hub-fs,1));font-weight:700;color:#fff;letter-spacing:.06em;line-height:1.2;text-align:right;white-space:nowrap;flex:1; }
@@ -4620,21 +4634,21 @@ function updateHubCountdowns(){
 }
 
 // \u2500\u2500 CALLSHEET IMPORT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-let _csMi=-1, _csData=null, _csFilter='all', _csSort='time', _csSearch='';
+let _csMi=-1, _csData=null, _csFilter='all', _csSort='time', _csSearch='', _csChecked=new Set();
 
 function opImportCallsheet(col){
   const si=opSlotMap[col];
   if(si===undefined){ toast('NO MATCH'); return; }
-  _csMi=si; _csData=null; _csFilter='all'; _csSort='time';
+  _csMi=si; _csData=null; _csFilter='all'; _csSort='time'; _csChecked=new Set();
   const m=matchMeta[si];
   document.getElementById('cs-match-label').textContent=m.label||`MATCH ${col+1}`;
   document.getElementById('cs-drop-zone').classList.remove('hidden');
-  ['cs-job-info','cs-filter-bar','cs-items-list'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('cs-body').classList.add('hidden');
   document.getElementById('cs-file-input').value='';
   document.getElementById('cs-check-all').checked=false;
   _csSearch='';
   ['cs-flt-all','cs-srt-time'].forEach(id=>document.getElementById(id)?.classList.add('active'));
-  ['cs-flt-site','cs-flt-hub','cs-srt-role','cs-srt-company'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
+  ['cs-flt-site','cs-flt-hub','cs-srt-role','cs-srt-nep'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
   const _csSI=document.getElementById('cs-search-input'); if(_csSI) _csSI.value='';
   document.getElementById('modal-callsheet').classList.remove('hidden');
 }
@@ -4791,9 +4805,14 @@ function _csRenderParsed(){
   document.getElementById('cs-info-onair').textContent=d.onAir||'\u2014';
   document.getElementById('cs-info-start').textContent=d.matchStart||'\u2014';
   document.getElementById('cs-info-state').textContent=d.state||'\u2014';
+  // Default: pre-check only special items (ON AIR / MATCH START)
+  _csChecked=new Set();
+  if(d.onAir)      _csChecked.add('__onair');
+  if(d.matchStart) _csChecked.add('__matchstart');
   document.getElementById('cs-drop-zone').classList.add('hidden');
-  ['cs-job-info','cs-filter-bar','cs-items-list'].forEach(id=>document.getElementById(id).classList.remove('hidden'));
+  document.getElementById('cs-body').classList.remove('hidden');
   _csRenderList();
+  _csRenderSelected();
 }
 
 function _csHighlight(text, q){
@@ -4836,7 +4855,7 @@ function _csRenderList(){
       if(!a.isSpecial&&b.isSpecial) return 1;
       return a.timeStr.localeCompare(b.timeStr);
     });
-  } else if(_csSort==='company'){
+  } else if(_csSort==='nep'){
     items.sort((a,b)=>(a.company||'').localeCompare(b.company||'')||a.timeStr.localeCompare(b.timeStr));
   } else {
     items.sort((a,b)=>a.role.localeCompare(b.role));
@@ -4855,9 +4874,9 @@ function _csRenderList(){
       ?'<span class="cs-badge-hub">HUB</span>'
       :'<span class="cs-badge-site">SITE</span>';
     // Company tag: shown when sorted by company, or when search is active
-    const showCompany = it.company && (_csSort==='company'||q);
+    const showCompany = it.company && (_csSort==='nep'||q);
     html+=`<label class="cs-row">
-      <input type="checkbox" class="cs-chk" data-id="${it.id}" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+      <input type="checkbox" class="cs-chk" data-id="${it.id}" ${_csChecked.has(it.id)?'checked':''} onchange="csToggleItem(this.dataset.id,this.checked)" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
       ${badge}
       <div style="min-width:0">
         <div class="cs-role">${_csHighlight(it.role,q)}</div>
@@ -4878,20 +4897,66 @@ function csSetFilter(f){
 }
 function csSetSort(s){
   _csSort=s;
-  ['time','role','company'].forEach(x=>document.getElementById(`cs-srt-${x}`)?.classList.toggle('active',x===s));
+  ['time','role','nep'].forEach(x=>document.getElementById(`cs-srt-${x}`)?.classList.toggle('active',x===s));
   _csRenderList();
 }
 function csSetSearch(val){
   _csSearch=val;
   _csRenderList();
 }
+function csToggleItem(id, checked){
+  if(checked) _csChecked.add(id); else _csChecked.delete(id);
+  _csRenderSelected();
+}
 function csToggleAll(checked){
-  document.querySelectorAll('#cs-items-list .cs-chk').forEach(el=>{ el.checked=checked; });
+  document.querySelectorAll('#cs-items-list .cs-chk').forEach(el=>{
+    el.checked=checked;
+    if(checked) _csChecked.add(el.dataset.id); else _csChecked.delete(el.dataset.id);
+  });
+  _csRenderSelected();
+}
+function _csAllItems(){
+  if(!_csData) return [];
+  const d=_csData, items=[];
+  if(d.onAir)      items.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site',isSpecial:true});
+  if(d.matchStart) items.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site',isSpecial:true});
+  return items.concat(d.roles);
+}
+function _csRenderSelected(){
+  const all=_csAllItems();
+  const sel=all.filter(it=>_csChecked.has(it.id));
+  sel.sort((a,b)=>{
+    if(a.isSpecial&&!b.isSpecial) return -1;
+    if(!a.isSpecial&&b.isSpecial) return 1;
+    return a.timeStr.localeCompare(b.timeStr);
+  });
+  const count=sel.length;
+  document.getElementById('cs-sel-count').textContent=count?`${count} selected`:'';
+  let html='';
+  for(const it of sel){
+    const badge=it.refTz==='hub'
+      ?'<span class="cs-badge-hub" style="font-size:8px;padding:1px 3px">HUB</span>'
+      :(it.isSpecial?'<span style="font-size:8px;color:var(--accent);letter-spacing:.5px">CORE</span>':'');
+    const removeJs=`csToggleItem('${it.id}',false);const _el=document.querySelector('.cs-chk[data-id=\'${it.id}\']');if(_el)_el.checked=false;`;
+    html+=`<div class="cs-sel-row">`
+      +`<button class="cs-sel-remove" onclick="${removeJs}" title="Remove">✕</button>`
+      +`<div style="flex:1;min-width:0">`
+      +`<div class="cs-sel-role">${esc(it.role)}</div>`
+      +(it.name?`<div class="cs-sel-name">${esc(it.name)}</div>`:'')
+      +`</div>`
+      +`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">`
+      +`<div class="cs-sel-time">${it.timeStr}</div>`
+      +badge
+      +`</div>`
+      +`</div>`;
+  }
+  document.getElementById('cs-selected-list').innerHTML=html||
+    '<div style="color:var(--text-dim);font-size:11px;padding:20px 12px;text-align:center;line-height:1.8">Nothing selected.<br>Tick items on the left.</div>';
 }
 
 function confirmCallsheetImport(){
   if(_csMi<0||!_csData){ toast('NO DATA'); return; }
-  const checkedIds=new Set([...document.querySelectorAll('#cs-items-list .cs-chk:checked')].map(el=>el.dataset.id));
+  const checkedIds=_csChecked;
   if(!checkedIds.size){ toast('NOTHING SELECTED'); return; }
   const d=_csData;
   const allItems=[];
@@ -4976,7 +5041,7 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
 </div>
 <!-- MODAL: Callsheet Import -->
 <div class="modal-overlay hidden" id="modal-callsheet">
-  <div class="modal" style="width:700px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
+  <div class="modal" style="width:940px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
     <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border)">
       ⬇ CALLSHEET IMPORT
       <span id="cs-match-label" style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:1px;margin-left:10px"></span>
@@ -4989,33 +5054,48 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
       <div style="font-size:12px;color:var(--text-mid);letter-spacing:1.5px;text-transform:uppercase">Drop Callsheet .xlsx Here</div>
       <div style="font-size:10px;color:var(--text-dim)">or click to browse</div>
     </div>
-    <div id="cs-job-info" class="hidden" style="flex-shrink:0;padding:8px 20px;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
-      <span><span style="color:var(--text-dim);letter-spacing:1px">JOB&nbsp;</span><span id="cs-info-job" style="color:var(--text-mid)"></span></span>
-      <span><span style="color:var(--text-dim);letter-spacing:1px">VENUE&nbsp;</span><span id="cs-info-venue" style="color:var(--text-mid)"></span></span>
-      <span><span style="color:var(--text-dim);letter-spacing:1px">ON AIR&nbsp;</span><span id="cs-info-onair" style="font-family:var(--mono);color:var(--accent)"></span></span>
-      <span><span style="color:var(--text-dim);letter-spacing:1px">MATCH START&nbsp;</span><span id="cs-info-start" style="font-family:var(--mono);color:var(--accent)"></span></span>
-      <span><span style="color:var(--text-dim);letter-spacing:1px">STATE&nbsp;</span><span id="cs-info-state" style="color:var(--text-mid)"></span></span>
-    </div>
-    <div id="cs-filter-bar" class="hidden" style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;padding:8px 20px 10px;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">FILTER</span>
-        <button class="cs-flt active" id="cs-flt-all"  onclick="csSetFilter('all')">ALL</button>
-        <button class="cs-flt"        id="cs-flt-site" onclick="csSetFilter('site')">SITE</button>
-        <button class="cs-flt"        id="cs-flt-hub"  onclick="csSetFilter('hub')">HUB</button>
-        <div style="width:1px;background:var(--border);height:16px;align-self:center;margin:0 2px"></div>
-        <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">SORT</span>
-        <button class="cs-flt active" id="cs-srt-time"    onclick="csSetSort('time')">TIME</button>
-        <button class="cs-flt"        id="cs-srt-role"    onclick="csSetSort('role')">ROLE</button>
-        <button class="cs-flt"        id="cs-srt-company" onclick="csSetSort('company')">COMPANY</button>
-        <label style="margin-left:auto;font-size:10px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;white-space:nowrap">
-          <input type="checkbox" id="cs-check-all" onchange="csToggleAll(this.checked)">ALL ON
-        </label>
-      </div>
-      <input type="text" id="cs-search-input" class="cs-search"
-             placeholder="Search role, name, company… (e.g. GFX, CD, Kienan)"
-             oninput="csSetSearch(this.value)">
-    </div>
-    <div id="cs-items-list" class="hidden" style="flex:1;overflow-y:auto;padding:4px 16px 8px"></div>
+    <!-- Body: left list + right selected pane -->
+    <div id="cs-body" class="cs-body hidden">
+      <div class="cs-left">
+        <div id="cs-job-info" style="flex-shrink:0;padding:8px 20px;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+          <span><span style="color:var(--text-dim);letter-spacing:1px">JOB&nbsp;</span><span id="cs-info-job" style="color:var(--text-mid)"></span></span>
+          <span><span style="color:var(--text-dim);letter-spacing:1px">VENUE&nbsp;</span><span id="cs-info-venue" style="color:var(--text-mid)"></span></span>
+          <span><span style="color:var(--text-dim);letter-spacing:1px">ON AIR&nbsp;</span><span id="cs-info-onair" style="font-family:var(--mono);color:var(--accent)"></span></span>
+          <span><span style="color:var(--text-dim);letter-spacing:1px">MATCH START&nbsp;</span><span id="cs-info-start" style="font-family:var(--mono);color:var(--accent)"></span></span>
+          <span><span style="color:var(--text-dim);letter-spacing:1px">STATE&nbsp;</span><span id="cs-info-state" style="color:var(--text-mid)"></span></span>
+        </div>
+        <div id="cs-filter-bar" style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;padding:8px 20px 10px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">FILTER</span>
+            <button class="cs-flt active" id="cs-flt-all"  onclick="csSetFilter('all')">ALL</button>
+            <button class="cs-flt"        id="cs-flt-site" onclick="csSetFilter('site')">SITE</button>
+            <button class="cs-flt"        id="cs-flt-hub"  onclick="csSetFilter('hub')">HUB</button>
+            <div style="width:1px;background:var(--border);height:16px;align-self:center;margin:0 2px"></div>
+            <span style="font-size:9px;color:var(--text-dim);letter-spacing:2px">SORT</span>
+            <button class="cs-flt active" id="cs-srt-time" onclick="csSetSort('time')">TIME</button>
+            <button class="cs-flt"        id="cs-srt-role" onclick="csSetSort('role')">ROLE</button>
+            <button class="cs-flt"        id="cs-srt-nep"  onclick="csSetSort('nep')">NEP/FREE</button>
+            <label style="margin-left:auto;font-size:10px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;white-space:nowrap">
+              <input type="checkbox" id="cs-check-all" onchange="csToggleAll(this.checked)">ALL ON
+            </label>
+          </div>
+          <input type="text" id="cs-search-input" class="cs-search"
+                 placeholder="Search role, name, company… (e.g. GFX, CD, Kienan)"
+                 oninput="csSetSearch(this.value)">
+        </div>
+        <div id="cs-items-list" style="flex:1;overflow-y:auto;padding:4px 16px 8px"></div>
+      </div><!-- /.cs-left -->
+      <!-- Right pane: live selected preview -->
+      <div class="cs-right">
+        <div class="cs-right-hdr">
+          <span>TO IMPORT</span>
+          <span class="cs-sel-count" id="cs-sel-count"></span>
+        </div>
+        <div class="cs-selected-list" id="cs-selected-list">
+          <div style="color:var(--text-dim);font-size:11px;padding:20px 12px;text-align:center;line-height:1.8">Nothing selected.<br>Tick items on the left.</div>
+        </div>
+      </div><!-- /.cs-right -->
+    </div><!-- /#cs-body -->
     <div style="flex-shrink:0;display:flex;gap:10px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border)">
       <button class="btn btn-cancel" onclick="closeModal('modal-callsheet')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmCallsheetImport()">IMPORT SELECTED</button>
