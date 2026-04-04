@@ -2033,6 +2033,8 @@ function applyState(s){
     const _now=Date.now();
     timerSortMode.forEach((sorted,i)=>{
       if(sorted && matchTimers[i] && matchTimers[i].length>1){
+        console.log(`[DIVIDER DEBUG] Re-sorting slot ${i} with ${matchTimers[i].length} timers at _now=${_now}`);
+        matchTimers[i].forEach((t,idx)=>console.log(`  [${idx}] ${t.name} targetUTC=${t.targetUTC} diff=${t.targetUTC?t.targetUTC-_now:'null'}`));
         matchTimers[i].sort((a,b)=>{
           if(!a.targetUTC && !b.targetUTC) return 0;
           if(!a.targetUTC) return 1;
@@ -2044,8 +2046,14 @@ function applyState(s){
           if(futureA) return da-db;
           return db-da;
         });
+        console.log(`[DIVIDER DEBUG] After re-sort:`);
+        matchTimers[i].forEach((t,idx)=>console.log(`  [${idx}] ${t.name} diff=${t.targetUTC?t.targetUTC-_now:'null'}`));
+      } else {
+        console.log(`[DIVIDER DEBUG] Slot ${i}: sorted=${sorted}, timers=${matchTimers[i]?.length||0} — skipping re-sort`);
       }
     });
+  } else {
+    console.log('[DIVIDER DEBUG] s.timerSortMode is falsy:', s.timerSortMode);
   }
   // Sync hidden TZ selects for all 16 slots
   for(let i=0;i<MAX_MATCHES;i++){
