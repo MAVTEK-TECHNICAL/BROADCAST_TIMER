@@ -1348,19 +1348,48 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
           <label>Sport</label>
           <select class="sport-select" id="em-sport" onchange="onSportChange()">
             <option value="">— CUSTOM (free text) —</option>
-            <option value="AFL">AFL</option>
-            <option value="AFLW">AFLW</option>
-            <option value="VFL">VFL</option>
-            <option value="WAFL">WAFL</option>
-            <option value="NRL">NRL</option>
-            <option value="A-League">A-LEAGUE</option>
-            <option value="NBL">NBL</option>
-            <option value="BBL">BBL</option>
-            <option value="WBBL">WBBL</option>
-            <option value="Cricket (INT)">CRICKET — INTERNATIONAL</option>
-            <option value="Netball">SUPER NETBALL</option>
-            <option value="Golf (WPGA)">GOLF — WPGA TOUR</option>
-            <option value="Golf (PGA)">GOLF — PGA TOUR</option>
+            <optgroup label="── AUSTRALIAN RULES ──">
+              <option value="AFL">AFL — Men's</option>
+              <option value="AFLW">AFL — Women's (AFLW)</option>
+              <option value="VFL">VFL — Men's</option>
+              <option value="WAFL">WAFL — Men's</option>
+            </optgroup>
+            <optgroup label="── BASKETBALL ──">
+              <option value="NBL">NBL — Men's</option>
+              <option value="WNBL">WNBL — Women's</option>
+            </optgroup>
+            <optgroup label="── CRICKET ──">
+              <option value="Cricket (MINT)">Cricket — International Men's (MINT)</option>
+              <option value="Cricket (WINT)">Cricket — International Women's (WINT)</option>
+              <option value="BBL">BBL — Men's</option>
+              <option value="WBBL">WBBL — Women's</option>
+              <option value="Sheffield Shield">Sheffield Shield</option>
+            </optgroup>
+            <optgroup label="── FIELD HOCKEY ──">
+              <option value="Hockey One">Hockey One</option>
+            </optgroup>
+            <optgroup label="── ICE HOCKEY ──">
+              <option value="AIHL">AIHL — Men's</option>
+            </optgroup>
+            <optgroup label="── NETBALL ──">
+              <option value="Netball">Super Netball — Women's</option>
+            </optgroup>
+            <optgroup label="── RUGBY LEAGUE ──">
+              <option value="NRL">NRL — Men's</option>
+              <option value="NRLW">NRLW — Women's</option>
+            </optgroup>
+            <optgroup label="── RUGBY UNION ──">
+              <option value="Super Rugby">Super Rugby — Men's</option>
+              <option value="Super Rugby Women">Super Rugby — Women's</option>
+            </optgroup>
+            <optgroup label="── SOCCER ──">
+              <option value="A-League">A-League — Men's</option>
+              <option value="A-League Women">A-League — Women's</option>
+            </optgroup>
+            <optgroup label="── GOLF ──">
+              <option value="Golf (WPGA)">Golf — WPGA Tour</option>
+              <option value="Golf (PGA)">Golf — PGA Tour</option>
+            </optgroup>
           </select>
         </div>
         <!-- HOME -->
@@ -1809,7 +1838,7 @@ const SPORTS_DATA = {
     {name:'Sydney Kings',                short:'Kings',       abbr:'SYK', primary:'#660099', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/c/cb/Sydney_Kings_logo.svg/330px-Sydney_Kings_logo.svg.png'},
     {name:'Tasmania JackJumpers',        short:'JackJumpers', abbr:'TJJ', primary:'#B20000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/0e/Tasmania_JackJumpers_Logo.svg/330px-Tasmania_JackJumpers_Logo.svg.png'},
   ],
-  'Cricket (INT)':[
+  'Cricket (MINT)':[
     {name:'Australia',                   short:'Australia',   abbr:'AUS', primary:'#003087', secondary:'#FECB00', logo:'https://upload.wikimedia.org/wikipedia/en/3/3f/Cricket_Australia.png'},
     {name:'England',                     short:'England',     abbr:'ENG', primary:'#0C2340', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/51/England_and_Wales_Cricket_Board.svg/330px-England_and_Wales_Cricket_Board.svg.png'},
     {name:'India',                       short:'India',       abbr:'IND', primary:'#0057A8', secondary:'#FF6B00', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg/330px-Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg.png'},
@@ -1883,6 +1912,116 @@ const SPORTS_DATA = {
     {name:'Southport Sharks',            short:'Southport',   abbr:'SPT', primary:'#0057A8', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/3/32/SouthportSharks.webp'},
     {name:'Werribee',                    short:'Werribee',    abbr:'WER', primary:'#0057A8', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/New_WFC_Logo_2017_-_On_White.png/330px-New_WFC_Logo_2017_-_On_White.png'},
     {name:'Williamstown',                short:'Williamstown',abbr:'WIL', primary:'#CC0000', secondary:'#0057A8', logo:'https://upload.wikimedia.org/wikipedia/en/1/15/Williamstown_seagulls_logo.png'},
+  ],
+  NRLW:[
+    // Teams reuse NRL Men logos/colours
+    {name:'Brisbane Broncos Women',          short:'Broncos',    abbr:'BRI', primary:'#3D1152', secondary:'#F7A61F', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/9/94/Brisbane_Broncos_Logo_2026.svg/330px-Brisbane_Broncos_Logo_2026.svg.png'},
+    {name:'Canberra Raiders Women',          short:'Raiders',    abbr:'CAN', primary:'#00AD4D', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/44/Canberra_Raiders_Logo.svg/330px-Canberra_Raiders_Logo.svg.png'},
+    {name:'Gold Coast Titans Women',         short:'Titans',     abbr:'GCT', primary:'#0C2340', secondary:'#00C0C0', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/7/78/Gold_Coast_Titans_logo.svg/330px-Gold_Coast_Titans_logo.svg.png'},
+    {name:'Manly-Warringah Sea Eagles Women',short:'Sea Eagles', abbr:'MAN', primary:'#640032', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/b/ba/Manly_Warringah_Sea_Eagles_Logo.svg/330px-Manly_Warringah_Sea_Eagles_Logo.svg.png'},
+    {name:'Newcastle Knights Women',         short:'Knights',    abbr:'NEW', primary:'#0059A3', secondary:'#D81920', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/a/ae/Newcastle_Knights_logo.svg/330px-Newcastle_Knights_logo.svg.png'},
+    {name:'New Zealand Warriors Women',      short:'Warriors',   abbr:'NZW', primary:'#0C2951', secondary:'#8DC63F', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5b/Warriors_%28NRL%29_Logo.svg/330px-Warriors_%28NRL%29_Logo.svg.png'},
+    {name:'North Queensland Cowboys Women',  short:'Cowboys',    abbr:'NQC', primary:'#003D7C', secondary:'#FFB700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/d/d0/North_Queensland_Cowboys_logo.svg/330px-North_Queensland_Cowboys_logo.svg.png'},
+    {name:'Parramatta Eels Women',           short:'Eels',       abbr:'PAR', primary:'#0057A8', secondary:'#F8CA0D', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/46/Parramatta_Eels_logo.svg/330px-Parramatta_Eels_logo.svg.png'},
+    {name:'Penrith Panthers Women',          short:'Panthers',   abbr:'PEN', primary:'#2E0041', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Penrith_Panthers_Logo.svg/330px-Penrith_Panthers_Logo.svg.png'},
+    {name:'St George Illawarra Dragons Women',short:'Dragons',   abbr:'SGI', primary:'#C8102E', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/b/bc/St._George_Illawarra_Dragons_logo.svg/330px-St._George_Illawarra_Dragons_logo.svg.png'},
+    {name:'Sydney Roosters Women',           short:'Roosters',   abbr:'SYD', primary:'#002147', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/8/8c/Sydney_Roosters_logo.svg/330px-Sydney_Roosters_logo.svg.png'},
+  ],
+  'A-League Women':[
+    // Most clubs share logo/colours with A-League Men; Canberra United is independent
+    {name:'Adelaide United Women',           short:'Adelaide Utd',abbr:'ADU', primary:'#AA0000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Adelaide_United_FC.svg/330px-Adelaide_United_FC.svg.png'},
+    {name:'Auckland FC Women',               short:'Auckland',    abbr:'AKL', primary:'#002D72', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Auckland_FC_logo.svg/330px-Auckland_FC_logo.svg.png'},
+    {name:'Brisbane Roar Women',             short:'Brisbane',    abbr:'BRR', primary:'#FF6900', secondary:'#002F6C', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/8/88/Brisbane_Roar_FC_logo.svg/330px-Brisbane_Roar_FC_logo.svg.png'},
+    {name:'Canberra United',                 short:'Canberra',    abbr:'CBU', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/1/1f/Canberra_United_FC_logo.svg/330px-Canberra_United_FC_logo.svg.png'},
+    {name:'Central Coast Mariners Women',    short:'Mariners',    abbr:'CCM', primary:'#F9C00E', secondary:'#003087', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Central_Coast_Mariners.svg/330px-Central_Coast_Mariners.svg.png'},
+    {name:'Melbourne City Women',            short:'City',        abbr:'MLC', primary:'#6CADDF', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/0/0f/Melbourne_City_FC.svg/330px-Melbourne_City_FC.svg.png'},
+    {name:'Melbourne Victory Women',         short:'Victory',     abbr:'MLV', primary:'#003087', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/9/95/Melbourne_Victory.svg/330px-Melbourne_Victory.svg.png'},
+    {name:'Perth Glory Women',               short:'Perth',       abbr:'PTG', primary:'#6B2C91', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/8/87/Perth_Glory_FC_logo.svg/330px-Perth_Glory_FC_logo.svg.png'},
+    {name:'Sydney FC Women',                 short:'Sydney',      abbr:'SFC', primary:'#0057A8', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Sydney_FC_Logo.svg/330px-Sydney_FC_Logo.svg.png'},
+    {name:'Wellington Phoenix Women',        short:'Wellington',  abbr:'WLP', primary:'#FFD700', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/d/de/Wellington_Phoenix_FC_logo.svg/330px-Wellington_Phoenix_FC_logo.svg.png'},
+    {name:'Western Sydney Wanderers Women',  short:'Wanderers',   abbr:'WSW', primary:'#000000', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Western_Sydney_Wanderers_FC.svg/330px-Western_Sydney_Wanderers_FC.svg.png'},
+    {name:'Western United Women',            short:'Western Utd', abbr:'WEU', primary:'#000000', secondary:'#28A745', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Western_United_FC_logo.svg/330px-Western_United_FC_logo.svg.png'},
+  ],
+  'Sheffield Shield':[
+    {name:'New South Wales',                 short:'NSW Blues',   abbr:'NSW', primary:'#003A96', secondary:'#F4E900', logo:'https://upload.wikimedia.org/wikipedia/en/7/7c/NSW_Men%27s_cricket_team_logo.png'},
+    {name:'Victoria',                        short:'Victoria',    abbr:'VIC', primary:'#003087', secondary:'#F5C200', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/45/VictoriaCricketTeamLogo.svg/330px-VictoriaCricketTeamLogo.svg.png'},
+    {name:'Queensland',                      short:'Qld Bulls',   abbr:'QLD', primary:'#A50026', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/2/29/QueenslandBullsLogo.svg/330px-QueenslandBullsLogo.svg.png'},
+    {name:'Western Australia',               short:'WA Warriors', abbr:'WA',  primary:'#003A96', secondary:'#F4E900', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4f/Western_Australia_Women_Badge.png/330px-Western_Australia_Women_Badge.png'},
+    {name:'South Australia',                 short:'SA Redbacks', abbr:'SA',  primary:'#CC0000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/0/09/South_Australia_Cricket_Team_Logo.webp'},
+    {name:'Tasmania',                        short:'Tas Tigers',  abbr:'TAS', primary:'#FF6600', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/c/c1/Tasmaniancricketteamlogo.png'},
+  ],
+  'Super Rugby':[
+    {name:'Brumbies',                        short:'Brumbies',    abbr:'BRU', primary:'#002B5C', secondary:'#E8B32A', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Brumbies_Rugby_logo.svg/330px-Brumbies_Rugby_logo.svg.png'},
+    {name:'Blues',                           short:'Blues',       abbr:'BLU', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/c/cd/Auckland_Blues_rugby_logo.webp'},
+    {name:'Bulls',                           short:'Bulls',       abbr:'BUL', primary:'#003DA5', secondary:'#87CEEB', logo:'https://upload.wikimedia.org/wikipedia/en/c/cf/Bulls_rugby_logo.jpg'},
+    {name:'Chiefs',                          short:'Chiefs',      abbr:'CHI', primary:'#BB0000', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/8/87/Chiefs_rugby_union_logo.jpg'},
+    {name:'Crusaders',                       short:'Crusaders',   abbr:'CRU', primary:'#BB0000', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/b/bd/Crusaders_%28rugby_union%29_logo.png'},
+    {name:'Fijian Drua',                     short:'Drua',        abbr:'DRU', primary:'#000000', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/9/9c/FijianDruaLogo.svg/500px-FijianDruaLogo.svg.png'},
+    {name:'Highlanders',                     short:'Highlanders', abbr:'HIG', primary:'#1B2E3C', secondary:'#E8B32A', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/a/a7/Highlanders_NZ_rugby_union_team_logo.svg/330px-Highlanders_NZ_rugby_union_team_logo.svg.png'},
+    {name:'Hurricanes',                      short:'Hurricanes',  abbr:'HUR', primary:'#1B2E3C', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/2/28/Wellington_Hurricanes_logo.png/330px-Wellington_Hurricanes_logo.png'},
+    {name:'Lions',                           short:'Lions',       abbr:'LIO', primary:'#CC0000', secondary:'#000000', logo:''},
+    {name:'Moana Pasifika',                  short:'Moana',       abbr:'MPA', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/2/20/Moana_Pasifika_logo.jpg'},
+    {name:'Queensland Reds',                 short:'Reds',        abbr:'RED', primary:'#BB0000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/e/e1/QLD_reds_logo.svg/330px-QLD_reds_logo.svg.png'},
+    {name:'Sharks',                          short:'Sharks',      abbr:'SHK', primary:'#001F5A', secondary:'#00B7D1', logo:'https://upload.wikimedia.org/wikipedia/en/9/9f/Sharks_rugby_union_logo.png'},
+    {name:'Stormers',                        short:'Stormers',    abbr:'STO', primary:'#003DA5', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/e/e3/Stormers_logo.svg/330px-Stormers_logo.svg.png'},
+    {name:'NSW Waratahs',                    short:'Waratahs',    abbr:'WAR', primary:'#003DA5', secondary:'#1B82CC', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/6/6f/Waratahs_logo.svg/330px-Waratahs_logo.svg.png'},
+    {name:'Western Force',                   short:'W Force',     abbr:'WFO', primary:'#003DA5', secondary:'#F5A623', logo:'https://upload.wikimedia.org/wikipedia/en/0/01/Western_force_rugby_logo.png'},
+  ],
+  'Super Rugby Women':[
+    // Teams reuse Super Rugby Men logos/colours
+    {name:'ACT Brumbies Women',              short:'Brumbies',    abbr:'BRU', primary:'#002B5C', secondary:'#E8B32A', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Brumbies_Rugby_logo.svg/330px-Brumbies_Rugby_logo.svg.png'},
+    {name:'Fijian Drua Women',               short:'Drua',        abbr:'DRU', primary:'#000000', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/9/9c/FijianDruaLogo.svg/500px-FijianDruaLogo.svg.png'},
+    {name:'NSW Waratahs Women',              short:'Waratahs',    abbr:'WAR', primary:'#003DA5', secondary:'#1B82CC', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/6/6f/Waratahs_logo.svg/330px-Waratahs_logo.svg.png'},
+    {name:'Queensland Reds Women',           short:'Reds',        abbr:'RED', primary:'#BB0000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/e/e1/QLD_reds_logo.svg/330px-QLD_reds_logo.svg.png'},
+    {name:'Western Force Women',             short:'W Force',     abbr:'WFO', primary:'#003DA5', secondary:'#F5A623', logo:'https://upload.wikimedia.org/wikipedia/en/0/01/Western_force_rugby_logo.png'},
+  ],
+  'Cricket (WINT)':[
+    // Women's International Cricket — same nations as MINT
+    {name:'Australia',                       short:'Australia',   abbr:'AUS', primary:'#003087', secondary:'#FECB00', logo:'https://upload.wikimedia.org/wikipedia/en/3/3f/Cricket_Australia.png'},
+    {name:'England',                         short:'England',     abbr:'ENG', primary:'#0C2340', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/51/England_and_Wales_Cricket_Board.svg/330px-England_and_Wales_Cricket_Board.svg.png'},
+    {name:'India',                           short:'India',       abbr:'IND', primary:'#0057A8', secondary:'#FF6B00', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg/330px-Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg.png'},
+    {name:'Pakistan',                        short:'Pakistan',    abbr:'PAK', primary:'#004C1A', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7c/PakistancricketBoard-logo.svg/330px-PakistancricketBoard-logo.svg.png'},
+    {name:'Sri Lanka',                       short:'Sri Lanka',   abbr:'SLK', primary:'#002B7F', secondary:'#8B0000', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Flag_of_Sri_Lanka_Cricket.svg/330px-Flag_of_Sri_Lanka_Cricket.svg.png'},
+    {name:'South Africa',                    short:'South Africa',abbr:'SAF', primary:'#004B22', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5a/Cricket_South_Africa.svg/330px-Cricket_South_Africa.svg.png'},
+    {name:'West Indies',                     short:'West Indies', abbr:'WIN', primary:'#7B2534', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Cricket_West_Indies_Logo_2017.svg/330px-Cricket_West_Indies_Logo_2017.svg.png'},
+    {name:'New Zealand',                     short:'New Zealand', abbr:'NZL', primary:'#000000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/5/55/NZCricket.png'},
+    {name:'Bangladesh',                      short:'Bangladesh',  abbr:'BAN', primary:'#006837', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5c/Bangladesh_Cricket_Board_Logo.svg/330px-Bangladesh_Cricket_Board_Logo.svg.png'},
+    {name:'Zimbabwe',                        short:'Zimbabwe',    abbr:'ZIM', primary:'#CC0000', secondary:'#006837', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/4/48/Zimbabwe_Cricket_%28logo%29.svg/330px-Zimbabwe_Cricket_%28logo%29.svg.png'},
+    {name:'Afghanistan',                     short:'Afghanistan', abbr:'AFG', primary:'#0057A8', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Afghanistan_cricket_board_logo.jpg/330px-Afghanistan_cricket_board_logo.jpg'},
+    {name:'Ireland',                         short:'Ireland',     abbr:'IRE', primary:'#008000', secondary:'#003087', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/8/8e/Cricket_Ireland_logo.svg/330px-Cricket_Ireland_logo.svg.png'},
+  ],
+  WNBL:[
+    {name:'Adelaide Lightning',              short:'Lightning',   abbr:'ADL', primary:'#0057A8', secondary:'#FF6B35', logo:'https://upload.wikimedia.org/wikipedia/en/6/6b/Adelaide_Lightning_logo.png'},
+    {name:'Bendigo Spirit',                  short:'Spirit',      abbr:'BND', primary:'#6600CC', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/1/17/Bendigo_Spirit_new_logo.png/330px-Bendigo_Spirit_new_logo.png'},
+    {name:'Cairns Dolphins',                 short:'Dolphins',    abbr:'CAI', primary:'#0057A8', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/3/36/Cairns_Dolphins_Logo.png'},
+    {name:'Canberra Capitals',               short:'Capitals',    abbr:'CBR', primary:'#004B87', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/3/3c/Canberra_Capitals_logo_new.png'},
+    {name:'Geelong Venom',                   short:'Venom',       abbr:'GEL', primary:'#003087', secondary:'#FECB00', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Geelong_Venom_logo.png/330px-Geelong_Venom_logo.png'},
+    {name:'Perth Lynx',                      short:'Lynx',        abbr:'PTL', primary:'#CC0000', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/7/75/Perth_Lynx_new_logo.png'},
+    {name:'Sydney Flames',                   short:'Flames',      abbr:'SYF', primary:'#CC1133', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7a/Sydney_Flames_new_logo.png/330px-Sydney_Flames_new_logo.png'},
+    {name:'Townsville Fire',                 short:'Fire',        abbr:'TWF', primary:'#CC1133', secondary:'#F5A623', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/3/33/Townsville_Fire_2020.png/330px-Townsville_Fire_2020.png'},
+  ],
+  AIHL:[
+    {name:'Adelaide Adrenaline',             short:'Adrenaline',  abbr:'AAD', primary:'#003DA5', secondary:'#CC0000', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/57/Adelaide_Adrenaline_%282025%29_logo.png/330px-Adelaide_Adrenaline_%282025%29_logo.png'},
+    {name:'Brisbane Goannas',                short:'Goannas',     abbr:'BRG', primary:'#004B22', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/1/19/Brisbane_Goannas_logo.png'},
+    {name:'Canberra Knights',                short:'Knights',     abbr:'CBK', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/d/d4/Canberra_Knights_Logo.png'},
+    {name:'Melbourne Ice',                   short:'Ice',         abbr:'MLI', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/a/a0/Melbourne_Ice_Logo.png'},
+    {name:'Melbourne Mustangs',              short:'Mustangs',    abbr:'MLM', primary:'#CC0000', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/3/3a/Mustangs_IHC_Logo.png/330px-Mustangs_IHC_Logo.png'},
+    {name:'Newcastle Northstars',            short:'Northstars',  abbr:'NWN', primary:'#003DA5', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/1/11/Newcastle_Northstars_logo.png'},
+    {name:'Perth Thunder',                   short:'Thunder',     abbr:'PTT', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/f/f9/Perth_Thunder_Logo.png'},
+    {name:'Sydney Bears',                    short:'Bears',       abbr:'SYB', primary:'#BB0000', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/7/7f/Sydney_Bears_logo.png'},
+    {name:'Sydney Ice Dogs',                 short:'Ice Dogs',    abbr:'SID', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Sydney_Ice_Dogs_Logo.png/330px-Sydney_Ice_Dogs_Logo.png'},
+  ],
+  'Hockey One':[
+    {name:'Adelaide Fire',                   short:'Adelaide',    abbr:'ADF', primary:'#CC0000', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/f/fb/Adelaide_Fire_logo.png'},
+    {name:'Brisbane Blaze',                  short:'Brisbane',    abbr:'BRB', primary:'#F7700A', secondary:'#003087', logo:'https://upload.wikimedia.org/wikipedia/en/b/b6/Brisbane_Blaze_logo.png'},
+    {name:'Canberra Chill',                  short:'Canberra',    abbr:'CBC', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/4/4e/Canberra_Chill.png'},
+    {name:'Hockey Club Melbourne',           short:'HC Melbourne',abbr:'HCM', primary:'#003DA5', secondary:'#FFD700', logo:'https://upload.wikimedia.org/wikipedia/en/c/cb/Hockey_Club_Melbourne_Logo.png'},
+    {name:'Melbourne Cobras',                short:'Cobras',      abbr:'MCO', primary:'#004B22', secondary:'#FFD700', logo:''},
+    {name:'North West Thunder',              short:'NW Thunder',  abbr:'NWT', primary:'#CC0000', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/4/41/North_West_Thunder_Third_Logo.png'},
+    {name:'NSW Pride',                       short:'NSW Pride',   abbr:'NSW', primary:'#001F5A', secondary:'#FF6B35', logo:'https://upload.wikimedia.org/wikipedia/en/9/9e/NSW_Pride_logo.png'},
+    {name:'Perth Thundersticks',             short:'Perth',       abbr:'PTS', primary:'#FF6B35', secondary:'#003DA5', logo:'https://upload.wikimedia.org/wikipedia/en/f/f3/Perth_Thundersticks.png'},
+    {name:'Tassie Tigers',                   short:'Tassie',      abbr:'TAS', primary:'#FF6600', secondary:'#000000', logo:'https://upload.wikimedia.org/wikipedia/en/1/1f/Tassie_Tigers_logo.png'},
+    {name:'Victorian Vipers',                short:'Vipers',      abbr:'VIV', primary:'#003DA5', secondary:'#FFFFFF', logo:'https://upload.wikimedia.org/wikipedia/en/0/00/HockeyVic.png'},
   ],
 };
 
@@ -4810,7 +4949,7 @@ const SCHED_TEAMS = {
     {abbr:'SYK', name:'Sydney Kings',                alt:['KNG','KING','SKNG']},
     {abbr:'TJJ', name:'Tasmania JackJumpers',        alt:['JJP','JJMP','TAS']},
   ],
-  'Cricket (INT)':[
+  'Cricket (MINT)':[
     {abbr:'AUS', name:'Australia',                   alt:['AUST','AUS']},
     {abbr:'ENG', name:'England',                     alt:['ENGL']},
     {abbr:'IND', name:'India',                       alt:['INDI']},
@@ -4882,6 +5021,112 @@ const SCHED_TEAMS = {
     {abbr:'SPT', name:'Southport Sharks',            alt:['SPTS','SPSH']},
     {abbr:'WER', name:'Werribee',                    alt:['WERR','WERI']},
     {abbr:'WIL', name:'Williamstown',                alt:['WILL','WMSN']},
+  ],
+  NRLW:[
+    {abbr:'BRI', name:'Brisbane Broncos Women',          alt:['BRONC','BNE']},
+    {abbr:'CAN', name:'Canberra Raiders Women',          alt:['RAID','CBR']},
+    {abbr:'GCT', name:'Gold Coast Titans Women',         alt:['TITA','GC']},
+    {abbr:'MAN', name:'Manly Sea Eagles Women',          alt:['SEAG','MANL']},
+    {abbr:'NEW', name:'Newcastle Knights Women',         alt:['KNIG','NCK']},
+    {abbr:'NZW', name:'New Zealand Warriors Women',      alt:['WARR','NZ']},
+    {abbr:'NQC', name:'North Queensland Cowboys Women',  alt:['COW','NQ']},
+    {abbr:'PAR', name:'Parramatta Eels Women',           alt:['EEL','PARA']},
+    {abbr:'PEN', name:'Penrith Panthers Women',          alt:['PANT','PNTH']},
+    {abbr:'SGI', name:'St George Illawarra Dragons Women',alt:['DRAG','SGD']},
+    {abbr:'SYD', name:'Sydney Roosters Women',           alt:['ROOS','SYDR']},
+  ],
+  'A-League Women':[
+    {abbr:'ADU', name:'Adelaide United Women',           alt:['ADE','ADEL']},
+    {abbr:'AKL', name:'Auckland FC Women',               alt:['AUC','AUCK']},
+    {abbr:'BRR', name:'Brisbane Roar Women',             alt:['ROAR','BRI']},
+    {abbr:'CBU', name:'Canberra United',                 alt:['CBU','CBUN','CANU']},
+    {abbr:'CCM', name:'Central Coast Mariners Women',    alt:['CCM','MARI']},
+    {abbr:'MLC', name:'Melbourne City Women',            alt:['CITY','MCC']},
+    {abbr:'MLV', name:'Melbourne Victory Women',         alt:['VIC','MELV']},
+    {abbr:'PTG', name:'Perth Glory Women',               alt:['GLOR','PGL']},
+    {abbr:'SFC', name:'Sydney FC Women',                 alt:['SYD','SYFC']},
+    {abbr:'WLP', name:'Wellington Phoenix Women',        alt:['WEL','WELP']},
+    {abbr:'WSW', name:'Western Sydney Wanderers Women',  alt:['WAND','WSW']},
+    {abbr:'WEU', name:'Western United Women',            alt:['WUNL','WUN']},
+  ],
+  'Sheffield Shield':[
+    {abbr:'NSW', name:'New South Wales',                 alt:['BLUES','NSW']},
+    {abbr:'VIC', name:'Victoria',                        alt:['BUSH','VBUSH']},
+    {abbr:'QLD', name:'Queensland',                      alt:['BULLS','QBULL']},
+    {abbr:'WA',  name:'Western Australia',               alt:['WARR','WAWA']},
+    {abbr:'SA',  name:'South Australia',                 alt:['REDS','SARED']},
+    {abbr:'TAS', name:'Tasmania',                        alt:['TIGR','TTIG']},
+  ],
+  'Super Rugby':[
+    {abbr:'BRU', name:'Brumbies',                        alt:['BRUM','ACT']},
+    {abbr:'BLU', name:'Blues',                           alt:['AKL','AKBL']},
+    {abbr:'BUL', name:'Bulls',                           alt:['BULL','PRE']},
+    {abbr:'CHI', name:'Chiefs',                          alt:['CHIEF','HAM']},
+    {abbr:'CRU', name:'Crusaders',                       alt:['CRUS','CHC']},
+    {abbr:'DRU', name:'Fijian Drua',                     alt:['DRUA','FIJ']},
+    {abbr:'HIG', name:'Highlanders',                     alt:['HIGH','DUN']},
+    {abbr:'HUR', name:'Hurricanes',                      alt:['HURR','WEL']},
+    {abbr:'LIO', name:'Lions',                           alt:['LION','JHB']},
+    {abbr:'MPA', name:'Moana Pasifika',                  alt:['MOAN','MONA','PASI']},
+    {abbr:'RED', name:'Queensland Reds',                 alt:['REDS','BNE']},
+    {abbr:'SHK', name:'Sharks',                          alt:['SHRK','DUR']},
+    {abbr:'STO', name:'Stormers',                        alt:['STOR','CPT']},
+    {abbr:'WAR', name:'NSW Waratahs',                    alt:['WARA','NSW']},
+    {abbr:'WFO', name:'Western Force',                   alt:['FORC','PER']},
+  ],
+  'Super Rugby Women':[
+    {abbr:'BRU', name:'ACT Brumbies Women',              alt:['BRUM','ACT']},
+    {abbr:'DRU', name:'Fijian Drua Women',               alt:['DRUA','FIJ']},
+    {abbr:'WAR', name:'NSW Waratahs Women',              alt:['WARA','NSW']},
+    {abbr:'RED', name:'Queensland Reds Women',           alt:['REDS','QLD']},
+    {abbr:'WFO', name:'Western Force Women',             alt:['FORC','PER']},
+  ],
+  'Cricket (WINT)':[
+    {abbr:'AUS', name:'Australia',                       alt:['AUST']},
+    {abbr:'ENG', name:'England',                         alt:['ENGL']},
+    {abbr:'IND', name:'India',                           alt:['INDI']},
+    {abbr:'PAK', name:'Pakistan',                        alt:['PAKI']},
+    {abbr:'SLK', name:'Sri Lanka',                       alt:['SRI','SL']},
+    {abbr:'SAF', name:'South Africa',                    alt:['SA','RSA']},
+    {abbr:'WIN', name:'West Indies',                     alt:['WI','WIND']},
+    {abbr:'NZL', name:'New Zealand',                     alt:['NZ','NZC']},
+    {abbr:'BAN', name:'Bangladesh',                      alt:['BANG','BGD']},
+    {abbr:'ZIM', name:'Zimbabwe',                        alt:['ZIMB']},
+    {abbr:'AFG', name:'Afghanistan',                     alt:['AFGH']},
+    {abbr:'IRE', name:'Ireland',                         alt:['IRL']},
+  ],
+  WNBL:[
+    {abbr:'ADL', name:'Adelaide Lightning',              alt:['LGHT','ADLL']},
+    {abbr:'BND', name:'Bendigo Spirit',                  alt:['SPIR','BSPI']},
+    {abbr:'CAI', name:'Cairns Dolphins',                 alt:['DOLP','CDOL']},
+    {abbr:'CBR', name:'Canberra Capitals',               alt:['CAPS','CCAP']},
+    {abbr:'GEL', name:'Geelong Venom',                   alt:['VNOM','GVEN']},
+    {abbr:'PTL', name:'Perth Lynx',                      alt:['LYNX','PLNX']},
+    {abbr:'SYF', name:'Sydney Flames',                   alt:['FLAM','SFLA']},
+    {abbr:'TWF', name:'Townsville Fire',                 alt:['FIRE','TSVL']},
+  ],
+  AIHL:[
+    {abbr:'AAD', name:'Adelaide Adrenaline',             alt:['ADRE','ADAD']},
+    {abbr:'BRG', name:'Brisbane Goannas',                alt:['GOAN','BRGO']},
+    {abbr:'CBK', name:'Canberra Knights',                alt:['KNIG','CAKN']},
+    {abbr:'MLI', name:'Melbourne Ice',                   alt:['ICE','MICE']},
+    {abbr:'MLM', name:'Melbourne Mustangs',              alt:['MUST','MMST']},
+    {abbr:'NWN', name:'Newcastle Northstars',            alt:['NSTR','NNST']},
+    {abbr:'PTT', name:'Perth Thunder',                   alt:['THND','PTHU']},
+    {abbr:'SYB', name:'Sydney Bears',                    alt:['BEAR','SBER']},
+    {abbr:'SID', name:'Sydney Ice Dogs',                 alt:['IDOG','SICD']},
+  ],
+  'Hockey One':[
+    {abbr:'ADF', name:'Adelaide Fire',                   alt:['FIRE','ADFI']},
+    {abbr:'BRB', name:'Brisbane Blaze',                  alt:['BLAZ','BRBZ']},
+    {abbr:'CBC', name:'Canberra Chill',                  alt:['CHIL','CACL']},
+    {abbr:'HCM', name:'Hockey Club Melbourne',           alt:['HCME','MELH']},
+    {abbr:'MCO', name:'Melbourne Cobras',                alt:['COBR','MCOB']},
+    {abbr:'NWT', name:'North West Thunder',              alt:['NWTH','NWTD']},
+    {abbr:'NSW', name:'NSW Pride',                       alt:['PRDE','NPRD']},
+    {abbr:'PTS', name:'Perth Thundersticks',             alt:['THST','PTST']},
+    {abbr:'TAS', name:'Tassie Tigers',                   alt:['TIGR','TTAS']},
+    {abbr:'VIV', name:'Victorian Vipers',                alt:['VIPE','VVIP']},
   ],
 };
 
