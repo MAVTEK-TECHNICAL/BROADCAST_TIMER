@@ -1003,6 +1003,30 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .pm-clear-btn{ font-size:9px;letter-spacing:2px;padding:6px 14px;border:1px solid rgba(255,80,80,.5);background:transparent;color:var(--red);border-radius:4px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s;white-space:nowrap; }
 .pm-clear-btn:hover{ border-color:var(--red);background:rgba(255,80,80,.12); }
 .pm-clear-btn:disabled{ opacity:.4;cursor:not-allowed; }
+/* ── DEBUG CONSOLE ─────────────────────────────────────── */
+.dc-toolbar{ display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap; }
+.dc-filter-btn{ font-size:9px;letter-spacing:1.5px;padding:4px 10px;border:1px solid var(--border-bright);background:transparent;color:var(--text-dim);border-radius:3px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s; }
+.dc-filter-btn.active{ border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08); }
+.dc-filter-btn:hover:not(.active){ border-color:rgba(255,255,255,.3);color:var(--text); }
+.dc-count{ font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-left:auto;white-space:nowrap; }
+.dc-table-wrap{ flex:1;overflow-y:auto;font-family:var(--mono);font-size:11px; }
+.dc-table{ width:100%;border-collapse:collapse; }
+.dc-table th{ font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;position:sticky;top:0;background:var(--surface);z-index:1; }
+.dc-table td{ padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:top;word-break:break-word; }
+.dc-table tr:last-child td{ border-bottom:none; }
+.dc-table tr:hover td{ background:rgba(255,255,255,.025); }
+.dc-ts{ color:var(--text-dim);white-space:nowrap;width:80px; }
+.dc-lvl{ width:52px;white-space:nowrap; }
+.dc-lvl-info  { color:#7ec8e3; }
+.dc-lvl-ok    { color:#6fcf97; }
+.dc-lvl-warn  { color:#f2c94c; }
+.dc-lvl-error { color:#eb5757; }
+.dc-event{ white-space:nowrap;color:#b6c2d0;width:160px; }
+.dc-detail{ color:var(--text); }
+.dc-footer{ display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0; }
+.dc-action-btn{ font-size:9px;letter-spacing:2px;padding:5px 14px;border:1px solid var(--border-bright);background:transparent;color:var(--text-dim);border-radius:3px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s; }
+.dc-action-btn:hover{ border-color:var(--accent);color:var(--accent); }
+.dc-action-btn.red:hover{ border-color:var(--red);color:var(--red); }
 </style>
 </head>
 <body>
@@ -1068,6 +1092,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <button class="sb-import-sched admin-only" onclick="openGroupUsers()" style="display:none">👥 MANAGE USERS</button>
     <!-- Super-admin-only: parser manager -->
     <button class="sb-import-sched super-admin-only" onclick="openParserManager()" style="display:none">⚙ PARSER MANAGER</button>
+    <!-- Super-admin-only: debug console -->
+    <button class="sb-import-sched super-admin-only" onclick="openDebugConsole()" style="display:none">🔍 DEBUG LOG</button>
     <button class="sb-import-sched" id="sb-import-sched" onclick="openImportSchedule()">◈ IMPORT SCHEDULE</button>
   </div>
   <div id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -2149,6 +2175,7 @@ function showLogin(){
   _groupId=null; _userRole=null; _groupName=null;
 }
 async function showApp(user){
+  dbgLog('app:start', `session started — ${user.email}`, 'info');
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-wrapper').classList.remove('hidden');
   document.getElementById('sb-avatar').textContent = (user.email||'?')[0].toUpperCase();
@@ -2680,6 +2707,7 @@ async function resolveUserRole(user){
       const overrides = (saData.groupOverrides || []).filter(Boolean);
       _groupId = overrides.length ? overrides[0] : null;
       applyRoleToUI('super-admin');
+      dbgLog('auth:role', `super-admin — group: ${_groupId||'none'} — uid: ${user.uid}`, 'ok');
       if (_groupId) await _loadGroupAndSubscribe();
       else { toast('SUPER ADMIN — no group assigned'); setConnStatus('live'); }
       loadGroupParsers(_groupId); // null = all parsers for super-admin
@@ -2713,6 +2741,7 @@ async function resolveUserRole(user){
     _groupId  = prof.groupId || null;
     _userRole = prof.role    || 'view-operator';
     applyRoleToUI(_userRole);
+    dbgLog('auth:role', `${_userRole} — group: ${_groupId||'none'} — uid: ${user.uid}`, 'ok');
     if (prof.preferences) applyUserPreferences(prof.preferences);
     if (_groupId) await _loadGroupAndSubscribe();
     else {
@@ -2729,6 +2758,7 @@ async function resolveUserRole(user){
     console.error('resolveUserRole:', e);
     setConnStatus('error');
     toast('Error loading profile');
+    dbgLog('auth:role', `FAILED — ${e.message||e}`, 'error');
   }
 }
 
@@ -2914,6 +2944,7 @@ function applyCalendarSnapshot(docs){
   const dayDocs = docs
     .filter(d => d.data().isoDate === calendarDate)
     .sort((a,b) => ((a.data().sortOrder||0)-(b.data().sortOrder||0)) || a.id.localeCompare(b.id));
+  dbgLog('snapshot:apply', `${dayDocs.length} match${dayDocs.length!==1?'es':''} for ${calendarDate} (${docs.length} total docs)`, 'info');
 
   window._slotToMatchId = [];
   window._matchIdToSlot = {};
@@ -3000,6 +3031,7 @@ function doSaveMatch(i){
   if (!matchId){ _createMatchDoc(i); return; }
   const payload = buildMatchPayload(i);
   setPip('saving');
+  dbgLog('match:save', `slot ${i} doc ${matchId}`, 'info');
   if (!_saveQueues[i]) _saveQueues[i] = Promise.resolve();
   _saveQueues[i] = _saveQueues[i].catch(()=>{}).then(async () => {
     try {
@@ -3007,13 +3039,15 @@ function doSaveMatch(i){
       await setDoc(doc(db,'groups',_groupId,'calendar',matchId), payload, {merge:true});
       setPip('saved');
       document.getElementById('as-text').textContent = 'Live · auto-saved';
-    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; }
+      dbgLog('match:save', `slot ${i} saved`, 'ok');
+    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; dbgLog('match:save', `slot ${i} FAILED — ${e.message||e}`, 'error'); }
   });
 }
 
 async function _createMatchDoc(i){
   if (!_groupId || !window._user) return;
   _localPendingSlots.add(i); // protect this slot from snapshot clearing until confirmed
+  dbgLog('match:create', `slot ${i} — pending Firestore write`, 'info');
   try {
     const {db,collection,addDoc} = window._fb;
     const payload = buildMatchPayload(i);
@@ -3023,9 +3057,11 @@ async function _createMatchDoc(i){
     _localPendingSlots.delete(i);
     setPip('saved');
     document.getElementById('as-text').textContent = 'Live · match created';
+    dbgLog('match:create', `slot ${i} → doc ${ref.id}`, 'ok');
   } catch(e){
     _localPendingSlots.delete(i);
     console.error('_createMatchDoc:',e); toast('Error creating match');
+    dbgLog('match:create', `slot ${i} FAILED — ${e.message||e}`, 'error');
   }
 }
 
@@ -3033,12 +3069,14 @@ async function deleteMatchDoc(i){
   if (!_groupId || !window._user) return;
   const matchId = window._slotToMatchId[i];
   if (!matchId) return;
+  dbgLog('match:delete', `slot ${i} doc ${matchId}`, 'info');
   try {
     const {db,doc,deleteDoc} = window._fb;
     await deleteDoc(doc(db,'groups',_groupId,'calendar',matchId));
     delete window._matchIdToSlot[matchId];
     window._slotToMatchId[i] = undefined;
-  } catch(e){ console.error('deleteMatchDoc:',e); toast('Error deleting match'); }
+    dbgLog('match:delete', `slot ${i} deleted`, 'ok');
+  } catch(e){ console.error('deleteMatchDoc:',e); toast('Error deleting match'); dbgLog('match:delete', `slot ${i} FAILED — ${e.message||e}`, 'error'); }
 }
 
 function buildMatchPayload(i){
@@ -3113,7 +3151,8 @@ function saveUserPreferences(){
     try {
       const {db,doc,setDoc} = window._fb;
       await setDoc(doc(db,'userProfiles',window._user.uid), {preferences:prefs}, {merge:true});
-    } catch(e){ console.warn('saveUserPreferences failed:',e); }
+      dbgLog('prefs:save', `nameMode=${prefs.teamDisplayMode} logo=${prefs.logoSizeMode} view=${prefs.viewMode}`, 'ok');
+    } catch(e){ console.warn('saveUserPreferences failed:',e); dbgLog('prefs:save', `FAILED — ${e.message||e}`, 'error'); }
   });
 }
 
@@ -3124,6 +3163,8 @@ function setConnStatus(s){
   el.className='conn-status conn-'+s;
   const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR',nogroup:'NO GROUP'};
   el.textContent=labels[s]||s.toUpperCase();
+  const lvl = s==='live'?'ok' : s==='error'?'error' : s==='offline'?'warn' : 'info';
+  dbgLog('conn:status', labels[s]||s.toUpperCase(), lvl);
 }
 
 // ── SELECTS ──────────────────────────────────────────────
@@ -4690,6 +4731,7 @@ document.addEventListener('click', e=>{
 
 // ── VIEW SWITCHING ────────────────────────────────────────
 function switchView(mode){
+  dbgLog('view:switch', mode, 'info');
   viewMode=mode;
   const mg=document.getElementById('matches-grid');
   const hv=document.getElementById('hub-view');
@@ -5226,6 +5268,116 @@ const _PM_GROUPS = [
 // Local state: _pmState[groupId] = { callsheet: [...parserIds], schedule: [...parserIds] }
 let _pmState = {};
 
+// ══════════════════════════════════════════════════════════
+// ── DEBUG CONSOLE ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+const _DEBUG_MAX = 600;
+const _debugLog  = [];   // [{ts, level, event, detail}]  level: 'info'|'ok'|'warn'|'error'
+let   _dcFilter  = 'all';
+let   _dcOpen    = false;
+
+function dbgLog(event, detail='', level='info'){
+  const entry = { ts: Date.now(), level, event, detail: String(detail) };
+  _debugLog.push(entry);
+  if(_debugLog.length > _DEBUG_MAX) _debugLog.splice(0, _debugLog.length - _DEBUG_MAX);
+  if(_dcOpen) _dcAppendRow(entry);
+}
+
+function openDebugConsole(){
+  _dcOpen = true;
+  document.getElementById('modal-debug-console').classList.remove('hidden');
+  dcRender();
+}
+
+function _dcClose(){
+  _dcOpen = false;
+}
+
+function dcSetFilter(f){
+  _dcFilter = f;
+  ['all','ok','warn','error'].forEach(k=>{
+    document.getElementById('dcf-'+k)?.classList.toggle('active', k===f);
+  });
+  dcRender();
+}
+
+function _dcVisible(e){ return _dcFilter==='all' || e.level===_dcFilter; }
+
+function _dcRowHtml(e){
+  const d = new Date(e.ts);
+  const ts = d.toTimeString().slice(0,8)+'.'+String(d.getMilliseconds()).padStart(3,'0');
+  const lvlLabel = {info:'INFO',ok:'OK',warn:'WARN',error:'ERR'}[e.level]||e.level.toUpperCase();
+  const lvlCls   = 'dc-lvl dc-lvl-'+e.level;
+  return `<tr>
+    <td class="dc-ts">${ts}</td>
+    <td class="${lvlCls}">${lvlLabel}</td>
+    <td class="dc-event">${esc(e.event)}</td>
+    <td class="dc-detail">${esc(e.detail)}</td>
+  </tr>`;
+}
+
+function dcRender(){
+  const tbody = document.getElementById('dc-tbody');
+  if(!tbody) return;
+  const visible = _debugLog.filter(_dcVisible);
+  tbody.innerHTML = visible.map(_dcRowHtml).join('');
+  // Scroll to bottom
+  const wrap = document.getElementById('dc-table-wrap');
+  if(wrap) wrap.scrollTop = wrap.scrollHeight;
+  _dcUpdateCount();
+}
+
+function _dcAppendRow(e){
+  if(!_dcVisible(e)) return;
+  const tbody = document.getElementById('dc-tbody');
+  if(!tbody) return;
+  const tr = document.createElement('tbody');
+  tr.innerHTML = _dcRowHtml(e);
+  tbody.appendChild(tr.firstElementChild);
+  // Auto-scroll if already near bottom
+  const wrap = document.getElementById('dc-table-wrap');
+  if(wrap && (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight) < 80){
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+  _dcUpdateCount();
+}
+
+function _dcUpdateCount(){
+  const el = document.getElementById('dc-count');
+  if(!el) return;
+  const total   = _debugLog.length;
+  const visible = _debugLog.filter(_dcVisible).length;
+  el.textContent = _dcFilter==='all'
+    ? `${total} entr${total!==1?'ies':'y'}`
+    : `${visible} / ${total}`;
+}
+
+function dcClear(){
+  _debugLog.length = 0;
+  const tbody = document.getElementById('dc-tbody');
+  if(tbody) tbody.innerHTML='';
+  _dcUpdateCount();
+}
+
+function dcExportCsv(){
+  const header = 'Timestamp,Level,Event,Detail\n';
+  const rows = _debugLog.map(e=>{
+    const d   = new Date(e.ts);
+    const ts  = d.toISOString();
+    const esc = v => '"'+String(v).replace(/"/g,'""')+'"';
+    return [esc(ts), esc(e.level), esc(e.event), esc(e.detail)].join(',');
+  }).join('\n');
+  const blob = new Blob([header+rows], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `debug-log-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── END DEBUG CONSOLE ──────────────────────────────────────
+
 function openParserManager(){
   document.getElementById('modal-parser-manager').classList.remove('hidden');
   pmLoad();
@@ -5394,12 +5546,14 @@ async function pmClearDatabase(){
     }
 
     statusEl.textContent = `Cleared ${docs.length} match${docs.length !== 1 ? 'es' : ''} from ${groupName} ✓`;
+    dbgLog('db:clear', `cleared ${docs.length} matches from group ${groupName} (${groupId})`, 'warn');
     setTimeout(() => { statusEl.textContent = ''; }, 3500);
     // Reset group selector
     document.getElementById('pm-clear-group').value = '';
   } catch(e) {
     console.error('pmClearDatabase:', e);
     statusEl.textContent = 'Clear failed: ' + (e.message || e.code || 'unknown error');
+    dbgLog('db:clear', `FAILED for group ${groupName} — ${e.message||e}`, 'error');
   }
 }
 
@@ -5618,10 +5772,12 @@ function confirmScheduleImport(){
     // Register slots in Firestore FIRST — _createMatchDoc synchronously adds each
     // slot to _localPendingSlots before returning, so the applyCalendarSnapshot
     // triggered by _applyCalendarDate below won't clear them mid-flight.
+    dbgLog('import:schedule', `${matches.length} match${matches.length!==1?'es':''} → slots ${_importedSlots.join(',')}`, 'info');
     _importedSlots.forEach(slot => _createMatchDoc(slot));
     switchView('hub'); renderAll();
     _applyCalendarDate(true);
     toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
+    dbgLog('import:schedule', `import complete, date=${calendarDate}`, 'ok');
   }
   if(window._fringeSlots.length>0){
     openFringeTzModal(window._fringeSlots, _finishImport);
@@ -6867,6 +7023,42 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
      Super-admin only. Shows a matrix of all parsers × all groups.
      Each cell is a toggle to assign / unassign a parser for that group.
 ──────────────────────────────────────────────────────────────────────────── -->
+<!-- ═══════════ DEBUG CONSOLE (super-admin only) ═══════════ -->
+<div class="modal-overlay hidden" id="modal-debug-console">
+  <div class="modal" style="width:min(960px,97vw);max-height:90vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
+    <div class="modal-title" style="padding:14px 18px 12px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span>🔍 DEBUG LOG</span>
+      <span id="dc-live-badge" style="font-size:9px;letter-spacing:2px;color:#6fcf97;font-family:var(--mono);font-weight:400">● LIVE</span>
+    </div>
+    <!-- filter toolbar -->
+    <div class="dc-toolbar">
+      <button class="dc-filter-btn active" id="dcf-all"   onclick="dcSetFilter('all')">ALL</button>
+      <button class="dc-filter-btn"        id="dcf-ok"    onclick="dcSetFilter('ok')">OK</button>
+      <button class="dc-filter-btn"        id="dcf-warn"  onclick="dcSetFilter('warn')">WARN</button>
+      <button class="dc-filter-btn"        id="dcf-error" onclick="dcSetFilter('error')">ERROR</button>
+      <span class="dc-count" id="dc-count">0 entries</span>
+    </div>
+    <!-- log table -->
+    <div class="dc-table-wrap" id="dc-table-wrap">
+      <table class="dc-table">
+        <thead><tr>
+          <th class="dc-ts">TIME</th>
+          <th class="dc-lvl">LEVEL</th>
+          <th class="dc-event">EVENT</th>
+          <th class="dc-detail">DETAIL</th>
+        </tr></thead>
+        <tbody id="dc-tbody"></tbody>
+      </table>
+    </div>
+    <!-- footer -->
+    <div class="dc-footer">
+      <button class="dc-action-btn" onclick="dcExportCsv()">⬇ EXPORT CSV</button>
+      <button class="dc-action-btn red" onclick="dcClear()">✕ CLEAR LOG</button>
+      <button class="btn btn-cancel" style="margin-left:auto" onclick="_dcClose();closeModal('modal-debug-console')">CLOSE</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="modal-parser-manager">
   <div class="modal" style="width:min(820px,96vw);max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
     <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
