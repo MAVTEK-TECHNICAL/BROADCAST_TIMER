@@ -3096,6 +3096,15 @@ function saveUserPreferences(){
   });
 }
 
+// ── CONNECTION STATUS ─────────────────────────────────────
+function setConnStatus(s){
+  const el=document.getElementById('conn-status');
+  if(!el) return;
+  el.className='conn-status conn-'+s;
+  const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR',nogroup:'NO GROUP'};
+  el.textContent=labels[s]||s.toUpperCase();
+}
+
 // ── SELECTS ──────────────────────────────────────────────
 function populateSelects(){
   const tzSelIds = ['hub-tz', 'op-tz', ...Array.from({length:MAX_MATCHES},(_,i)=>`match-tz-${i}`), 'em-tz', 'em-hub-tz', 'add-ref-tz', 'et-ref-tz'];
