@@ -20,9 +20,10 @@ import { initializeApp }
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
          signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc,
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager,
+         collection, doc, addDoc, setDoc, getDoc, updateDoc,
          getDocs, deleteDoc, query, orderBy, serverTimestamp,
-         onSnapshot, where, writeBatch, enableIndexedDbPersistence,
+         onSnapshot, where, writeBatch,
          arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getFunctions, httpsCallable }
@@ -41,14 +42,12 @@ const firebaseConfig = {
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
-const fns  = getFunctions(app);
-
-// Enable offline persistence (single-tab; graceful degradation on failure)
-enableIndexedDbPersistence(db).catch(e => {
-  if (e.code === 'failed-precondition') console.warn('Firestore persistence unavailable: multiple tabs open');
-  else if (e.code === 'unimplemented')  console.warn('Firestore persistence not supported in this browser');
+// Use modern Firebase 10 persistence API — queues writes in IndexedDB so they
+// survive page refreshes and send on the next session open.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() })
 });
+const fns  = getFunctions(app);
 
 window._fb = { auth, db, fns, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword,
@@ -2170,6 +2169,14 @@ async function showApp(user){
   _applyCalendarDate(true);
   setConnStatus('connecting');
   await resolveUserRole(user);
+  // Flush any pending debounced saves before the page is unloaded so that
+  // timer changes are not silently lost on refresh or tab close.
+  window.addEventListener('beforeunload', () => {
+    for (const slot of _pendingSaveSlots) {
+      clearTimeout(_saveTimers[slot]);
+      doSaveMatch(slot);
+    }
+  });
 }
 async function doSignOut(){
   if (_calUnsub){ _calUnsub(); _calUnsub=null; }
@@ -2919,6 +2926,7 @@ function subscribeGroupCalendar(){
   const dTo   = new Date(now); dTo.setDate(dTo.getDate()+37);
   const isoFrom = dFrom.toISOString().slice(0,10);
   const isoTo   = dTo.toISOString().slice(0,10);
+  dbgLog('snapshot:subscribe', `groups/${_groupId}/calendar  (${isoFrom} → ${isoTo})`, 'info');
   const q = query(
     collection(db,'groups',_groupId,'calendar'),
     where('isoDate','>=',isoFrom),
@@ -2944,45 +2952,50 @@ function applyCalendarSnapshot(docs){
     const data = d.data();
     window._slotToMatchId[slot] = d.id;
     window._matchIdToSlot[d.id] = slot;
-    matchVisible[slot]  = data.visible !== false;
-    matchEnabled[slot]  = data.enabled !== false;
-    matchTzs[slot]      = data.matchTz    || 'Australia/Sydney';
-    matchHubTzs[slot]   = data.matchHubTz || hubTz || 'Australia/Sydney';
-    timerSortMode[slot] = !!data.timerSortMode;
-    const _sport = data.sport || '';
-    matchMeta[slot] = {
-      label:        data.label        || '',
-      home:         data.home         || '',
-      homeColour:   data.homeColour   || '#ffffff',
-      homeTeamRef:  _resolveTeamRef(_sport, data.home || ''),
-      away:         data.away         || '',
-      awayColour:   data.awayColour   || '#ffffff',
-      awayTeamRef:  _resolveTeamRef(_sport, data.away || ''),
-      sport:        _sport,
-      isoDate:      data.isoDate      || calendarDate,
-      location:     data.location     || '',
-      host:         data.host         || '',
-      hub:          data.hub          || '',
-      truck:        data.truck        || '',
-      main:         data.main         || '',
-      backup:       data.backup       || '',
-      arCtrl:       data.arCtrl       || '',
-      arRend:       data.arRend       || '',
-      droneCtrl:    data.droneCtrl    || '',
-      droneRend:    data.droneRend    || '',
-      tactic:       data.tactic       || '',
-      tracker:      data.tracker      || '',
-      customFields: data.customFields || [],
-      day:          data.day          || '',
-    };
-    matchTimers[slot] = Array.isArray(data.timers) ? data.timers.map(t=>({
-      id:        t.id        || uid(),
-      name:      t.name      || '',
-      core:      !!t.core,
-      timeStr:   t.timeStr   || null,
-      targetUTC: t.targetUTC || null,
-      refTz:     t.refTz     || null,
-    })) : _defTimers();
+    // If there's a pending save for this slot, the local state is newer than
+    // Firestore — skip overwriting it so the debounce can complete correctly.
+    const _hasPendingSave = _pendingSaveSlots.has(slot);
+    if (!_hasPendingSave) {
+      matchVisible[slot]  = data.visible !== false;
+      matchEnabled[slot]  = data.enabled !== false;
+      matchTzs[slot]      = data.matchTz    || 'Australia/Sydney';
+      matchHubTzs[slot]   = data.matchHubTz || hubTz || 'Australia/Sydney';
+      timerSortMode[slot] = !!data.timerSortMode;
+      const _sport = data.sport || '';
+      matchMeta[slot] = {
+        label:        data.label        || '',
+        home:         data.home         || '',
+        homeColour:   data.homeColour   || '#ffffff',
+        homeTeamRef:  _resolveTeamRef(_sport, data.home || ''),
+        away:         data.away         || '',
+        awayColour:   data.awayColour   || '#ffffff',
+        awayTeamRef:  _resolveTeamRef(_sport, data.away || ''),
+        sport:        _sport,
+        isoDate:      data.isoDate      || calendarDate,
+        location:     data.location     || '',
+        host:         data.host         || '',
+        hub:          data.hub          || '',
+        truck:        data.truck        || '',
+        main:         data.main         || '',
+        backup:       data.backup       || '',
+        arCtrl:       data.arCtrl       || '',
+        arRend:       data.arRend       || '',
+        droneCtrl:    data.droneCtrl    || '',
+        droneRend:    data.droneRend    || '',
+        tactic:       data.tactic       || '',
+        tracker:      data.tracker      || '',
+        customFields: data.customFields || [],
+        day:          data.day          || '',
+      };
+      matchTimers[slot] = Array.isArray(data.timers) ? data.timers.map(t=>({
+        id:        t.id        || uid(),
+        name:      t.name      || '',
+        core:      !!t.core,
+        timeStr:   t.timeStr   || null,
+        targetUTC: t.targetUTC || null,
+        refTz:     t.refTz     || null,
+      })) : _defTimers();
+    }
   });
 
   // Clear slots beyond today's doc count — but skip any slot currently being
@@ -3008,10 +3021,12 @@ function applyCalendarSnapshot(docs){
 const _saveTimers  = {};   // slot → debounce handle
 const _saveQueues  = {};   // slot → Promise chain (prevents write races)
 const _localPendingSlots = new Set(); // slots added locally but not yet confirmed in Firestore
+const _pendingSaveSlots  = new Set(); // slots with a debounced/in-flight save — snapshot must not overwrite their local timer state
 
 function scheduleSaveMatch(i){
   if (!_groupId || !window._user) return;
   setPip('saving');
+  _pendingSaveSlots.add(i);   // guard: snapshot must not overwrite local state until saved
   clearTimeout(_saveTimers[i]);
   _saveTimers[i] = setTimeout(() => doSaveMatch(i), 1400);
 }
@@ -3022,12 +3037,13 @@ function doSaveMatch(i){
   if (!matchId){ _createMatchDoc(i); return; }
   const payload = buildMatchPayload(i);
   setPip('saving');
-  dbgLog('match:save', `slot ${i} doc ${matchId}`, 'info');
+  dbgLog('match:save', `groups/${_groupId}/calendar/${matchId}  (slot ${i})`, 'info');
   if (!_saveQueues[i]) _saveQueues[i] = Promise.resolve();
   _saveQueues[i] = _saveQueues[i].catch(()=>{}).then(async () => {
     try {
       const {db,doc,setDoc} = window._fb;
       await setDoc(doc(db,'groups',_groupId,'calendar',matchId), payload, {merge:true});
+      _pendingSaveSlots.delete(i);  // safe to accept snapshots for this slot again
       setPip('saved');
       document.getElementById('as-text').textContent = 'Live · auto-saved';
       dbgLog('match:save', `slot ${i} saved`, 'ok');
@@ -3038,7 +3054,7 @@ function doSaveMatch(i){
 async function _createMatchDoc(i){
   if (!_groupId || !window._user) return;
   _localPendingSlots.add(i); // protect this slot from snapshot clearing until confirmed
-  dbgLog('match:create', `slot ${i} — pending Firestore write`, 'info');
+  dbgLog('match:create', `groups/${_groupId}/calendar  (slot ${i}) — pending write`, 'info');
   try {
     const {db,collection,addDoc} = window._fb;
     const payload = buildMatchPayload(i);
