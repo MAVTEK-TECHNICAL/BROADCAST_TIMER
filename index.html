@@ -22,7 +22,8 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc,
          getDocs, deleteDoc, query, orderBy, serverTimestamp,
-         onSnapshot, where, writeBatch, enableIndexedDbPersistence }
+         onSnapshot, where, writeBatch, enableIndexedDbPersistence,
+         arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getFunctions, httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
@@ -53,7 +54,7 @@ window._fb = { auth, db, fns, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword,
   collection, doc, addDoc, setDoc, getDoc, updateDoc, getDocs,
   deleteDoc, query, orderBy, serverTimestamp,
-  onSnapshot, where, writeBatch, httpsCallable };
+  onSnapshot, where, writeBatch, arrayUnion, arrayRemove, httpsCallable };
 
 // Boot once DOM is ready
 if (document.readyState === 'loading') {
@@ -984,6 +985,27 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .import-match-label{ font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:2px;color:var(--accent);text-transform:uppercase; }
 .import-match-teams{ font-family:var(--mono);font-size:11px;color:var(--text);letter-spacing:.05em;text-transform:uppercase; }
 .import-match-date{ font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase; }
+/* ── Parser Manager ── */
+.pm-section-head{ font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);padding:10px 20px 6px;border-bottom:1px solid rgba(255,255,255,.06); }
+.pm-matrix{ width:100%;border-collapse:collapse; }
+.pm-matrix th{ font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);font-weight:600;text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap; }
+.pm-matrix th.pm-parser-col{ text-align:left;min-width:160px;padding-left:16px; }
+.pm-matrix td{ text-align:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle; }
+.pm-matrix td.pm-parser-info{ text-align:left;padding:10px 8px 10px 16px; }
+.pm-matrix tr:last-child td{ border-bottom:none; }
+.pm-matrix tr:hover td{ background:rgba(255,255,255,.02); }
+.pm-parser-name{ font-family:var(--mono);font-size:11px;color:var(--text);font-weight:600;letter-spacing:.5px; }
+.pm-parser-desc{ font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:.5px;margin-top:2px; }
+.pm-toggle{ position:relative;display:inline-block;width:34px;height:18px; }
+.pm-toggle input{ opacity:0;width:0;height:0; }
+.pm-toggle-slider{ position:absolute;cursor:pointer;inset:0;background:rgba(255,255,255,.12);border-radius:18px;transition:.2s; }
+.pm-toggle-slider:before{ content:'';position:absolute;width:12px;height:12px;left:3px;bottom:3px;background:rgba(255,255,255,.5);border-radius:50%;transition:.2s; }
+.pm-toggle input:checked + .pm-toggle-slider{ background:var(--accent); }
+.pm-toggle input:checked + .pm-toggle-slider:before{ transform:translateX(16px);background:#fff; }
+.pm-toggle input:disabled + .pm-toggle-slider{ opacity:.4;cursor:not-allowed; }
+.pm-empty{ font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px;text-align:center; }
+.pm-seed-btn{ font-size:9px;letter-spacing:2px;padding:6px 14px;border:1px solid var(--border-bright);background:transparent;color:var(--text-dim);border-radius:4px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s; }
+.pm-seed-btn:hover{ border-color:var(--purple);color:var(--purple);background:rgba(155,89,182,.1); }
 </style>
 </head>
 <body>
@@ -1047,6 +1069,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     </div>
     <!-- Admin-only: manage group users -->
     <button class="sb-import-sched admin-only" onclick="openGroupUsers()" style="display:none">👥 MANAGE USERS</button>
+    <!-- Super-admin-only: parser manager -->
+    <button class="sb-import-sched super-admin-only" onclick="openParserManager()" style="display:none">⚙ PARSER MANAGER</button>
     <div class="sb-footer">
       <button class="sb-footer-btn" onclick="exportJSON()">⬇ EXPORT</button>
       <button class="sb-footer-btn" onclick="document.getElementById('import-file').click()">⬆ IMPORT</button>
@@ -2827,6 +2851,10 @@ function applyRoleToUI(role){
   // Show admin controls only for admin / super-admin
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = (role === 'admin' || role === 'super-admin') ? '' : 'none';
+  });
+  // Show super-admin-only controls
+  document.querySelectorAll('.super-admin-only').forEach(el => {
+    el.style.display = (role === 'super-admin') ? '' : 'none';
   });
 }
 
@@ -5336,6 +5364,158 @@ function schedUpdateBtn(){
   document.getElementById('sched-count-label').textContent=selected?`${selected} selected`:'';
 }
 
+// ── PARSER MANAGER MODAL (super-admin only) ───────────────────────────────
+// Shows a matrix of all parsers × all groups with toggles to assign/unassign.
+// Uses Firestore reads/writes directly — super-admin can write to any group doc.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// All known groups (static list matching Firestore group IDs)
+const _PM_GROUPS = [
+  { id: 'champion-data', name: 'Champion Data' },
+  { id: 'nep',           name: 'NEP' },
+  { id: 'apac',          name: 'APAC' },
+  { id: 'cms',           name: 'CMS' },
+  { id: 'mavtek',        name: 'MAVTEK' }
+];
+
+// Local state: _pmState[groupId] = { callsheet: [...parserIds], schedule: [...parserIds] }
+let _pmState = {};
+
+function openParserManager(){
+  document.getElementById('modal-parser-manager').classList.remove('hidden');
+  pmLoad();
+}
+
+async function pmLoad(){
+  const { db, collection, getDocs, doc, getDoc } = window._fb;
+  const statusEl = document.getElementById('pm-status');
+  statusEl.textContent = 'Loading…';
+
+  try {
+    // 1. Load all parsers from the registry
+    const parserSnap = await getDocs(collection(db, 'parsers'));
+    const allParsers = [];
+    parserSnap.forEach(d => allParsers.push({ id: d.id, ...d.data() }));
+
+    // 2. Load each group's assignedParsers
+    _pmState = {};
+    await Promise.all(_PM_GROUPS.map(async g => {
+      const gSnap = await getDoc(doc(db, 'groups', g.id));
+      const ap = gSnap.exists() ? (gSnap.data().assignedParsers || {}) : {};
+      _pmState[g.id] = {
+        callsheet: ap.callsheet || [],
+        schedule:  ap.schedule  || []
+      };
+    }));
+
+    // 3. Render
+    pmRender(allParsers);
+    statusEl.textContent = '';
+  } catch(e) {
+    console.error('pmLoad:', e);
+    statusEl.textContent = 'Error loading parsers';
+  }
+}
+
+function pmRender(allParsers){
+  const callsheetParsers = allParsers.filter(p => p.type === 'callsheet' && p.isActive !== false);
+  const scheduleParsers  = allParsers.filter(p => p.type === 'schedule'  && p.isActive !== false);
+
+  document.getElementById('pm-callsheet-wrap').innerHTML = pmBuildTable(callsheetParsers, 'callsheet');
+  document.getElementById('pm-schedule-wrap').innerHTML  = pmBuildTable(scheduleParsers,  'schedule');
+}
+
+function pmBuildTable(parsers, type){
+  if (!parsers.length) return '<div class="pm-empty">No ' + type + ' parsers registered yet.</div>';
+
+  const groupCols = _PM_GROUPS.map(g =>
+    `<th>${g.name}</th>`
+  ).join('');
+
+  const rows = parsers.map(p => {
+    const cells = _PM_GROUPS.map(g => {
+      const assigned = (_pmState[g.id]?.[type] || []).includes(p.id);
+      return `<td>
+        <label class="pm-toggle" title="${assigned ? 'Assigned — click to remove' : 'Not assigned — click to add'}">
+          <input type="checkbox" ${assigned ? 'checked' : ''}
+                 onchange="pmToggle('${g.id}','${p.id}','${type}',this.checked,this)">
+          <span class="pm-toggle-slider"></span>
+        </label>
+      </td>`;
+    }).join('');
+    return `<tr>
+      <td class="pm-parser-info">
+        <div class="pm-parser-name">${p.name || p.id}</div>
+        <div class="pm-parser-desc">${p.description || p.formatKey || ''}</div>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  return `<table class="pm-matrix">
+    <thead>
+      <tr>
+        <th class="pm-parser-col">PARSER</th>
+        ${groupCols}
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function pmToggle(groupId, parserId, type, checked, inputEl){
+  const { db, doc, updateDoc, arrayUnion, arrayRemove } = window._fb;
+  const statusEl = document.getElementById('pm-status');
+
+  // Optimistic local state update
+  const arr = _pmState[groupId]?.[type] || [];
+  if (checked) {
+    if (!arr.includes(parserId)) arr.push(parserId);
+  } else {
+    const idx = arr.indexOf(parserId);
+    if (idx !== -1) arr.splice(idx, 1);
+  }
+  if (_pmState[groupId]) _pmState[groupId][type] = arr;
+
+  // Disable toggle while saving
+  if (inputEl) inputEl.disabled = true;
+  statusEl.textContent = 'Saving…';
+
+  try {
+    const update = {};
+    update[`assignedParsers.${type}`] = checked
+      ? arrayUnion(parserId)
+      : arrayRemove(parserId);
+    await updateDoc(doc(db, 'groups', groupId), update);
+    statusEl.textContent = 'Saved ✓';
+    setTimeout(() => { statusEl.textContent = ''; }, 1800);
+  } catch(e) {
+    console.error('pmToggle:', e);
+    statusEl.textContent = 'Save failed';
+    // Revert checkbox
+    if (inputEl) inputEl.checked = !checked;
+  } finally {
+    if (inputEl) inputEl.disabled = false;
+  }
+}
+
+async function pmSeedDefaults(){
+  if (!confirm('Reset all parser assignments to factory defaults?\n\nThis will overwrite current assignments for all groups.')) return;
+  const { fns, httpsCallable } = window._fb;
+  const statusEl = document.getElementById('pm-status');
+  statusEl.textContent = 'Seeding…';
+  try {
+    const fn = httpsCallable(fns, 'seedParsers');
+    const result = await fn({});
+    statusEl.textContent = result.data?.message || 'Seeded ✓';
+    // Reload to reflect new state
+    await pmLoad();
+  } catch(e) {
+    console.error('pmSeedDefaults:', e);
+    statusEl.textContent = 'Seed failed: ' + (e.message || e.code || 'unknown error');
+  }
+}
+
 // ── GROUP PARSER ASSIGNMENTS (loaded from Firestore at login) ─────────────
 // Populated by loadGroupParsers(). Each entry is a full parser metadata object
 // from the parsers/ collection merged with the formatKey → handler mapping below.
@@ -6790,6 +6970,41 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
     </div>
     <div style="padding:12px 22px 18px;display:flex;justify-content:flex-end">
       <button class="btn btn-primary" id="sp-submit-btn" onclick="spSubmit()" disabled>SET PASSWORD</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PARSER MANAGER MODAL ───────────────────────────────────────────────
+     Super-admin only. Shows a matrix of all parsers × all groups.
+     Each cell is a toggle to assign / unassign a parser for that group.
+──────────────────────────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-parser-manager">
+  <div class="modal" style="width:min(820px,96vw);max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
+    <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span>⚙ PARSER MANAGER</span>
+      <span id="pm-status" style="font-size:10px;color:var(--text-dim);font-family:var(--mono);font-weight:400;letter-spacing:1px"></span>
+    </div>
+
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;min-height:0">
+
+      <!-- CALLSHEET PARSERS -->
+      <div class="pm-section-head">CALLSHEET PARSERS</div>
+      <div id="pm-callsheet-wrap" style="padding:8px 16px 12px;overflow-x:auto">
+        <div class="pm-empty">Loading…</div>
+      </div>
+
+      <!-- SCHEDULE PARSERS -->
+      <div class="pm-section-head" style="margin-top:4px">SCHEDULE PARSERS</div>
+      <div id="pm-schedule-wrap" style="padding:8px 16px 12px;overflow-x:auto">
+        <div class="pm-empty">Loading…</div>
+      </div>
+
+    </div>
+
+    <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);gap:8px">
+      <button class="pm-seed-btn" onclick="pmSeedDefaults()" title="Reset all parser assignments to factory defaults">↺ SEED DEFAULTS</button>
+      <button class="btn btn-cancel" onclick="closeModal('modal-parser-manager')">CLOSE</button>
     </div>
   </div>
 </div>
