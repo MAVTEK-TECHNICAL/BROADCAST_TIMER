@@ -1091,8 +1091,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <button class="sb-import-sched admin-only" onclick="openGroupUsers()" style="display:none">👥 MANAGE USERS</button>
     <!-- Super-admin-only: parser manager -->
     <button class="sb-import-sched super-admin-only" onclick="openParserManager()" style="display:none">⚙ PARSER MANAGER</button>
-    <!-- Admin + super-admin: debug console -->
-    <button class="sb-import-sched admin-only" onclick="openDebugConsole()" style="display:none">🔍 DEBUG LOG</button>
+    <!-- All users: debug console -->
+    <button class="sb-import-sched" onclick="openDebugConsole()">🔍 DEBUG LOG</button>
     <button class="sb-import-sched" id="sb-import-sched" onclick="openImportSchedule()">◈ IMPORT SCHEDULE</button>
   </div>
   <div id="sidebar-overlay" onclick="closeSidebar()"></div>
