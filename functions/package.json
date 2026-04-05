@@ -1,0 +1,19 @@
+{
+  "name": "broadcast-timer-functions",
+  "description": "Firebase Cloud Functions for Broadcast Timer",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  },
+  "devDependencies": {},
+  "private": true
+}

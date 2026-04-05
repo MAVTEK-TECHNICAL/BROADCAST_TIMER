@@ -1,3 +1,19 @@
 text_options_proof2.png
 team-color-preview.html
 shadow-compare.html
+
+# Dependencies
+functions/node_modules/
+scripts/node_modules/
+
+# Firebase local files
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Environment / secrets (never commit these)
+.env
+.env.*
+service-account*.json
+*-credentials.json

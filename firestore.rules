@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function authed() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return authed() &&
+        exists(/databases/$(database)/documents/superAdmins/$(uid()));
+    }
+
+    function memberDoc(groupId) {
+      return get(/databases/$(database)/documents/groups/$(groupId)/members/$(uid())).data;
+    }
+
+    function isMember(groupId) {
+      return authed() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(uid()));
+    }
+
+    function isAdmin(groupId) {
+      return authed() && (
+        (isMember(groupId) && memberDoc(groupId).role == 'admin') ||
+        isSuperAdmin()
+      );
+    }
+
+    // ── Group config (settings, name) ────────────────────────────────────────
+    match /groups/{groupId} {
+      allow read:  if isMember(groupId) || isSuperAdmin();
+      allow write: if isAdmin(groupId);
+    }
+
+    // ── Group members ─────────────────────────────────────────────────────────
+    match /groups/{groupId}/members/{memberId} {
+      allow read:   if isMember(groupId) || isSuperAdmin();
+      allow create: if isAdmin(groupId);
+      allow update: if isAdmin(groupId);
+      allow delete: if isAdmin(groupId);
+    }
+
+    // ── Group calendar (individual match documents) ───────────────────────────
+    match /groups/{groupId}/calendar/{matchId} {
+      allow read:   if isMember(groupId) || isSuperAdmin();
+      allow create: if isAdmin(groupId);
+      allow update: if isAdmin(groupId);
+      allow delete: if isAdmin(groupId);
+    }
+
+    // ── Match callsheets (subcollection of calendar matches) ──────────────────
+    match /groups/{groupId}/calendar/{matchId}/callsheets/{jobId} {
+      allow read:   if isMember(groupId) || isSuperAdmin();
+      allow write:  if isAdmin(groupId);
+    }
+
+    // ── User profiles + personal preferences ─────────────────────────────────
+    match /userProfiles/{targetUid} {
+      // Users read their own profile; super admins read all
+      allow read: if uid() == targetUid || isSuperAdmin();
+
+      // Admins can read profiles of users in their own group (for user management panel).
+      // We check groupId field on the profile document against the admin's own group.
+      allow read: if authed() &&
+                     resource.data.groupId != null &&
+                     isMember(resource.data.groupId) &&
+                     memberDoc(resource.data.groupId).role == 'admin';
+
+      // Users can update ONLY their own preferences field — not role, email, groupId.
+      allow update: if uid() == targetUid &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['preferences']);
+
+      // Full create/delete only via Cloud Function (super admin context)
+      allow create: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Parser registry ───────────────────────────────────────────────────────
+    match /parsers/{parserId} {
+      allow read:  if authed();       // any member can read parser metadata
+      allow write: if isSuperAdmin(); // only super admins register or modify parsers
+    }
+
+    // ── Super admin registry ──────────────────────────────────────────────────
+    match /superAdmins/{targetUid} {
+      allow read, write: if isSuperAdmin();
+    }
+
+  }
+}

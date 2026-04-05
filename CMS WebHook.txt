@@ -1,0 +1,1 @@
+Function URL (receiveApiWebhook(us-central1)): https://receiveapiwebhook-bfx3qamu2q-uc.a.run.app

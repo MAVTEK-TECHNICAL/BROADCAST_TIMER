@@ -7,17 +7,6 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Broadcast Timer</title>
-<script>
-// Unregister any old service workers and clear their caches
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(reg => reg.unregister());
-  });
-  caches.keys().then(keys => {
-    keys.forEach(key => caches.delete(key));
-  });
-}
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -29,11 +18,14 @@ if ('serviceWorker' in navigator) {
 import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-         signOut, onAuthStateChanged }
+         signOut, onAuthStateChanged, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, setDoc, getDoc,
-         getDocs, deleteDoc, query, orderBy, serverTimestamp }
+         getDocs, deleteDoc, query, orderBy, serverTimestamp,
+         onSnapshot, where, writeBatch, enableIndexedDbPersistence }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFunctions, httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAlW32mcIfHccAIjNkb45G8TKEfHTnS8r4",
@@ -49,11 +41,19 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const fns  = getFunctions(app);
 
-window._fb = { auth, db, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged,
+// Enable offline persistence (single-tab; graceful degradation on failure)
+enableIndexedDbPersistence(db).catch(e => {
+  if (e.code === 'failed-precondition') console.warn('Firestore persistence unavailable: multiple tabs open');
+  else if (e.code === 'unimplemented')  console.warn('Firestore persistence not supported in this browser');
+});
+
+window._fb = { auth, db, fns, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
   collection, doc, addDoc, setDoc, getDoc, getDocs,
-  deleteDoc, query, orderBy, serverTimestamp };
+  deleteDoc, query, orderBy, serverTimestamp,
+  onSnapshot, where, writeBatch, httpsCallable };
 
 // Boot once DOM is ready
 if (document.readyState === 'loading') {
@@ -387,6 +387,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   border-radius:50%;background:var(--green);border:1px solid var(--bg);transition:background .3s;
 }
 .as-pip.saving{ background:var(--yellow);animation:blink-dot .6s infinite; }
+.conn-status{ display:inline-block;transition:color .3s; }
+.conn-live       { color:var(--green); }
+.conn-connecting { color:var(--yellow);animation:blink-dot .9s infinite; }
+.conn-offline    { color:var(--text-dim); }
+.conn-error      { color:var(--red); }
 
 /* Matches grid */
 #matches-grid{ display:flex;gap:8px;flex:1;min-height:0; }
@@ -1001,7 +1006,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   <!-- SIDEBAR -->
   <div id="sidebar">
     <div class="sb-head">
-      <div class="sb-title">📁 Showfiles</div>
+      <div class="sb-title">⚙ ACCOUNT</div>
       <button class="sb-close" onclick="closeSidebar()">✕</button>
     </div>
     <div class="sb-user">
@@ -1011,11 +1016,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     </div>
     <div class="sb-autosave">
       <div class="as-dot" id="as-dot"></div>
-      <div class="as-text" id="as-text">No showfile loaded</div>
+      <div class="as-text" id="as-text">Connecting…</div>
     </div>
-    <button class="sb-new" onclick="promptNewShowfile()">＋ NEW SHOWFILE</button>
-    <div class="sb-list-head">YOUR SHOWFILES</div>
-    <div class="sb-list" id="sb-list"><div style="padding:20px;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:11px;">Loading…</div></div>
+    <div class="sb-list-head">GROUP</div>
+    <div style="padding:8px 16px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)" id="sb-group-name">—</div>
     <div class="sb-footer">
       <button class="sb-footer-btn" onclick="exportJSON()">⬇ EXPORT</button>
       <button class="sb-footer-btn" onclick="document.getElementById('import-file').click()">⬆ IMPORT</button>
@@ -1140,10 +1144,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       </div>
       <div class="nav-sf-btn" onclick="openSidebar()">
         <div class="as-pip" id="nav-pip"></div>
-        <div class="nav-sf-icon">📁</div>
-        <div class="nav-sf-label">SHOWFILE</div>
-        <div class="nav-sf-name" id="nav-sf-name">—</div>
+        <div class="nav-sf-icon">🌐</div>
+        <div class="nav-sf-label">GROUP</div>
+        <div class="nav-sf-name" id="nav-group-name">—</div>
       </div>
+      <div class="conn-status conn-connecting" id="conn-status" style="font-family:var(--mono);font-size:9px;letter-spacing:1.5px;padding:2px 7px;border-radius:3px;border:1px solid currentColor;margin-left:6px;align-self:center">CONNECTING…</div>
     </div>
 
     <!-- Calendar popup (fixed-position, shown/hidden via JS) -->
@@ -1495,21 +1500,6 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <div class="modal-buttons">
       <button class="btn btn-cancel"  onclick="closeModal('modal-edit-match')">CANCEL</button>
       <button class="btn btn-confirm" onclick="confirmEditMatch()">SAVE</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Name Showfile -->
-<div class="modal-overlay hidden" id="modal-sf-name">
-  <div class="modal">
-    <div class="modal-title">NAME SHOWFILE</div>
-    <div class="modal-field">
-      <label>Showfile Name</label>
-      <input class="modal-input" id="sf-name-input" type="text" placeholder="e.g. ESL FINALS 2026" style="font-family:var(--ui);font-size:15px;letter-spacing:2px;text-transform:uppercase;" />
-    </div>
-    <div class="modal-buttons">
-      <button class="btn btn-cancel"  onclick="closeModal('modal-sf-name')">CANCEL</button>
-      <button class="btn btn-confirm" onclick="confirmNewShowfile()">CREATE</button>
     </div>
   </div>
 </div>
@@ -2033,11 +2023,12 @@ function _defTimers(){ return [{id:uid(),name:'ON AIR',core:true,timeStr:null,ta
 let matchTimers = Array.from({length:MAX_MATCHES}, ()=>_defTimers());
 let ctx = {}; // modal context
 
-// ── Showfile state ────────────────────────────────────────
-let sfId     = null;
-let sfName   = null;
-let sfList   = [];
-let asTimer  = null;
+// ── Group / role state ────────────────────────────────────
+let _groupId    = null;
+let _userRole   = null;   // 'view-operator' | 'view-hub' | 'admin' | 'super-admin'
+let _groupName  = null;
+let _calUnsub   = null;   // Firestore onSnapshot unsubscribe handle
+let _prefTimer  = null;   // debounce handle for preference saves
 
 function uid() { return Math.random().toString(36).slice(2,9); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -2094,15 +2085,14 @@ document.addEventListener('keydown', e=>{
     else if (!document.getElementById('modal-set-time').classList.contains('hidden'))  confirmSetTime();
     else if (!document.getElementById('modal-add-timer').classList.contains('hidden')) confirmAddTimer();
     else if (!document.getElementById('modal-edit-match').classList.contains('hidden'))confirmEditMatch();
-    else if (!document.getElementById('modal-sf-name').classList.contains('hidden'))   confirmNewShowfile();
   }
   if (e.key==='Escape'){
-    ['modal-edit-timer','modal-set-time','modal-add-timer','modal-edit-match','modal-sf-name','modal-sched-import','modal-import-hub','modal-callsheet'].forEach(closeModal);
+    ['modal-edit-timer','modal-set-time','modal-add-timer','modal-edit-match','modal-sched-import','modal-import-hub','modal-callsheet'].forEach(closeModal);
     closeSidebar();
   }
   if ((e.metaKey||e.ctrlKey) && e.key==='s'){
     e.preventDefault();
-    sfId ? doSave() : promptNewShowfile();
+    // Auto-save is always live; Cmd/Ctrl+S is a no-op in group mode
   }
 });
 
@@ -2111,6 +2101,9 @@ function showLogin(){
   document.getElementById('app-wrapper').classList.add('hidden');
   document.getElementById('l-btn').disabled=false;
   document.getElementById('l-btn').textContent='SIGN IN';
+  // Tear down any live subscription
+  if (_calUnsub){ _calUnsub(); _calUnsub=null; }
+  _groupId=null; _userRole=null; _groupName=null;
 }
 async function showApp(user){
   document.getElementById('login-screen').classList.add('hidden');
@@ -2119,141 +2112,338 @@ async function showApp(user){
   document.getElementById('sb-email').textContent  = user.email||'';
   populateSelects();
   startClock();
-  _applyCalendarDate(true); // seed calendar label to today on first load
-  await refreshSfList();
-  if (sfList.length){
-    // Try to restore the last showfile the user had open
-    const lastId = localStorage.getItem('lastSfId_' + user.uid);
-    const lastExists = lastId && sfList.find(s=>s.id===lastId);
-    await loadSf(lastExists ? lastId : sfList[0].id);
-  }
+  _applyCalendarDate(true);
+  setConnStatus('connecting');
+  await resolveUserRole(user);
 }
 async function doSignOut(){
-  clearTimeout(asTimer);
+  if (_calUnsub){ _calUnsub(); _calUnsub=null; }
   await window._fb.signOut(window._fb.auth);
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────
-function openSidebar(){ refreshSfList(); document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('visible'); }
+function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('visible'); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('visible'); }
 
-// ── FIRESTORE ─────────────────────────────────────────────
-function sfColRef(){
-  const {db,collection}=window._fb;
-  return collection(db,'users',window._user.uid,'showfiles');
-}
-function sfDocRef(id){
-  const {db,doc}=window._fb;
-  return doc(db,'users',window._user.uid,'showfiles',id);
-}
-async function refreshSfList(){
+// ── ROLE RESOLUTION ────────────────────────────────────────
+async function resolveUserRole(user){
+  const {db, doc, getDoc} = window._fb;
   try {
-    const {getDocs,query,orderBy}=window._fb;
-    let snap;
+    // 1. Check superAdmins collection first
+    const saSnap = await getDoc(doc(db, 'superAdmins', user.uid));
+    if (saSnap.exists()){
+      _userRole = 'super-admin';
+      const saData = saSnap.data();
+      const overrides = (saData.groupOverrides || []).filter(Boolean);
+      _groupId = overrides.length ? overrides[0] : null;
+      applyRoleToUI('super-admin');
+      if (_groupId) await _loadGroupAndSubscribe();
+      else { toast('SUPER ADMIN — no group assigned'); setConnStatus('live'); }
+      return;
+    }
+    // 2. Normal user — read userProfile
+    const profSnap = await getDoc(doc(db, 'userProfiles', user.uid));
+    if (!profSnap.exists()){
+      toast('Profile not found — contact your admin');
+      setConnStatus('error');
+      return;
+    }
+    const prof = profSnap.data();
+    _groupId  = prof.groupId || null;
+    _userRole = prof.role    || 'view-operator';
+    applyRoleToUI(_userRole);
+    if (prof.preferences) applyUserPreferences(prof.preferences);
+    if (_groupId) await _loadGroupAndSubscribe();
+    else { toast('No group assigned — contact your admin'); setConnStatus('error'); }
+  } catch(e){
+    console.error('resolveUserRole:', e);
+    setConnStatus('error');
+    toast('Error loading profile');
+  }
+}
+
+async function _loadGroupAndSubscribe(){
+  const {db, doc, getDoc} = window._fb;
+  try {
+    const gSnap = await getDoc(doc(db, 'groups', _groupId));
+    if (gSnap.exists()){
+      _groupName = gSnap.data().name || _groupId;
+      const el = document.getElementById('nav-group-name');
+      if (el) el.textContent = _groupName;
+      const sbEl = document.getElementById('sb-group-name');
+      if (sbEl) sbEl.textContent = _groupName;
+    }
+  } catch(e){ console.warn('Could not load group doc:', e); }
+  subscribeGroupCalendar();
+}
+
+function applyRoleToUI(role){
+  document.body.setAttribute('data-role', role);
+  // view-operator: hide HUB tab
+  const hubTab = document.getElementById('vtb-hub');
+  if (hubTab) hubTab.style.display = (role === 'view-operator') ? 'none' : '';
+  // Show admin controls only for admin / super-admin
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = (role === 'admin' || role === 'super-admin') ? '' : 'none';
+  });
+}
+
+function applyUserPreferences(prefs){
+  if (!prefs) return;
+  if (prefs.hubTz){
+    hubTz = prefs.hubTz;
+    ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; });
+  }
+  if (prefs.brandColor)          setBrandColor(prefs.brandColor, true);
+  if (typeof prefs.showClockSeconds==='boolean'){
+    showClockSeconds=prefs.showClockSeconds;
+    document.getElementById('sec-on')?.classList.toggle('active',showClockSeconds);
+    document.getElementById('sec-off')?.classList.toggle('active',!showClockSeconds);
+  }
+  if (typeof prefs.opTimerDivider==='boolean'){
+    opTimerDivider=prefs.opTimerDivider;
+    document.getElementById('optd-on')?.classList.toggle('active',opTimerDivider);
+    document.getElementById('optd-off')?.classList.toggle('active',!opTimerDivider);
+  }
+  if (typeof prefs.hubTimerDivider==='boolean'){
+    hubTimerDivider=prefs.hubTimerDivider;
+    document.getElementById('hubtd-on')?.classList.toggle('active',hubTimerDivider);
+    document.getElementById('hubtd-off')?.classList.toggle('active',!hubTimerDivider);
+  }
+  if (prefs.teamDisplayMode)    setNameMode(prefs.teamDisplayMode, true);
+  if (prefs.hubTeamDisplayMode) setHubNameMode(prefs.hubTeamDisplayMode, true);
+  if (prefs.logoSizeMode){ logoSizeMode=prefs.logoSizeMode; setLogoSize(logoSizeMode,true); }
+  if (prefs.hubLogoSize) { hubLogoSize=prefs.hubLogoSize;  setHubLogoSize(hubLogoSize,true); }
+  if (prefs.logoBgMode!==undefined) setLogoBg(prefs.logoBgMode,true);
+  if (prefs.hubCols)     { hubCols=prefs.hubCols; setHubCols(hubCols,true); }
+  if (prefs.viewMode)    switchView(prefs.viewMode);
+}
+
+// ── GROUP CALENDAR SUBSCRIPTION ────────────────────────────
+// slot → matchId and reverse
+window._slotToMatchId = [];
+window._matchIdToSlot = {};
+let _lastCalDocs = null; // cached snapshot docs for date-change re-apply
+
+function subscribeGroupCalendar(){
+  if (!_groupId) return;
+  if (_calUnsub){ _calUnsub(); _calUnsub=null; }
+  setConnStatus('connecting');
+  const {db, collection, query, where, onSnapshot} = window._fb;
+  // 67-day rolling window (30 days back, 37 days forward)
+  const now = new Date();
+  const dFrom = new Date(now); dFrom.setDate(dFrom.getDate()-30);
+  const dTo   = new Date(now); dTo.setDate(dTo.getDate()+37);
+  const isoFrom = dFrom.toISOString().slice(0,10);
+  const isoTo   = dTo.toISOString().slice(0,10);
+  const q = query(
+    collection(db,'groups',_groupId,'calendar'),
+    where('isoDate','>=',isoFrom),
+    where('isoDate','<=',isoTo)
+  );
+  _calUnsub = onSnapshot(q,
+    snap => { setConnStatus('live'); _lastCalDocs=snap.docs; applyCalendarSnapshot(snap.docs); },
+    err  => { console.error('Calendar snapshot error:',err); setConnStatus('error'); }
+  );
+}
+
+function applyCalendarSnapshot(docs){
+  // Filter to the currently displayed date and sort by sortOrder then id
+  const dayDocs = docs
+    .filter(d => d.data().isoDate === calendarDate)
+    .sort((a,b) => ((a.data().sortOrder||0)-(b.data().sortOrder||0)) || a.id.localeCompare(b.id));
+
+  window._slotToMatchId = [];
+  window._matchIdToSlot = {};
+
+  dayDocs.forEach((d, slot) => {
+    const data = d.data();
+    window._slotToMatchId[slot] = d.id;
+    window._matchIdToSlot[d.id] = slot;
+    matchVisible[slot]  = data.visible !== false;
+    matchEnabled[slot]  = data.enabled !== false;
+    matchTzs[slot]      = data.matchTz    || 'Australia/Sydney';
+    matchHubTzs[slot]   = data.matchHubTz || hubTz || 'Australia/Sydney';
+    timerSortMode[slot] = !!data.timerSortMode;
+    matchMeta[slot] = {
+      label:        data.label        || '',
+      home:         data.home         || '',
+      homeColour:   data.homeColour   || '#ffffff',
+      away:         data.away         || '',
+      awayColour:   data.awayColour   || '#ffffff',
+      sport:        data.sport        || '',
+      isoDate:      data.isoDate      || calendarDate,
+      location:     data.location     || '',
+      host:         data.host         || '',
+      hub:          data.hub          || '',
+      truck:        data.truck        || '',
+      main:         data.main         || '',
+      backup:       data.backup       || '',
+      arCtrl:       data.arCtrl       || '',
+      arRend:       data.arRend       || '',
+      droneCtrl:    data.droneCtrl    || '',
+      droneRend:    data.droneRend    || '',
+      tactic:       data.tactic       || '',
+      tracker:      data.tracker      || '',
+      customFields: data.customFields || [],
+      day:          data.day          || '',
+    };
+    matchTimers[slot] = Array.isArray(data.timers) ? data.timers.map(t=>({
+      id:        t.id        || uid(),
+      name:      t.name      || '',
+      core:      !!t.core,
+      timeStr:   t.timeStr   || null,
+      targetUTC: t.targetUTC || null,
+      refTz:     t.refTz     || null,
+    })) : _defTimers();
+  });
+
+  // Clear slots beyond today's doc count
+  for (let i=dayDocs.length; i<MAX_MATCHES; i++){
+    matchVisible[i] = false;
+    matchEnabled[i] = false;
+    matchTimers[i]  = _defTimers();
+    matchMeta[i]    = _defMeta(i);
+  }
+
+  _rebuildOpSlotMap();
+  renderAll();
+  updateAddMatchBtn();
+  setPip('saved');
+  document.getElementById('as-text').textContent = 'Live · synced';
+}
+
+// ── PER-MATCH SAVE ─────────────────────────────────────────
+const _saveTimers  = {};   // slot → debounce handle
+const _saveQueues  = {};   // slot → Promise chain (prevents write races)
+
+function scheduleSaveMatch(i){
+  if (!_groupId || !window._user) return;
+  setPip('saving');
+  clearTimeout(_saveTimers[i]);
+  _saveTimers[i] = setTimeout(() => doSaveMatch(i), 1400);
+}
+
+function doSaveMatch(i){
+  if (!_groupId || !window._user) return;
+  const matchId = window._slotToMatchId[i];
+  if (!matchId){ _createMatchDoc(i); return; }
+  const payload = buildMatchPayload(i);
+  setPip('saving');
+  if (!_saveQueues[i]) _saveQueues[i] = Promise.resolve();
+  _saveQueues[i] = _saveQueues[i].catch(()=>{}).then(async () => {
     try {
-      snap = await getDocs(query(sfColRef(), orderBy('updatedAt','desc')));
-    } catch(e){
-      // orderBy can fail if index not ready — fall back to unordered
-      snap = await getDocs(sfColRef());
-    }
-    sfList = snap.docs.map(d=>({id:d.id,...d.data()}));
-    // Sort client-side — use updatedAtMs (plain number) as reliable fallback
-    sfList.sort((a,b)=>{
-      const ta = a.updatedAtMs || (a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0);
-      const tb = b.updatedAtMs || (b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0);
-      return tb - ta;
-    });
-    renderSfList();
-  } catch(e){ console.error('refreshSfList error:',e); }
-}
-function renderSfList(){
-  const el = document.getElementById('sb-list');
-  if (!sfList.length){
-    el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:11px;">No showfiles yet.<br>Create one to begin.</div>';
-    return;
-  }
-  el.innerHTML = sfList.map(sf=>{
-    const active = sf.id===sfId;
-    const d = sf.updatedAt?.toDate ? sf.updatedAt.toDate() : new Date(sf.updatedAt||0);
-    const ds = d.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'})
-             + ' ' + d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
-    return `<div class="sf-item${active?' active':''}" onclick="loadSf('${sf.id}')">
-      <div class="sf-icon">${active?'▶':'📄'}</div>
-      <div class="sf-body">
-        <div class="sf-name">${esc(sf.name||'Untitled')}</div>
-        <div class="sf-meta">${ds}</div>
-      </div>
-      <div class="sf-actions" onclick="event.stopPropagation()">
-        <button class="sf-btn" onclick="renameSf('${sf.id}','${esc(sf.name||'')}')">✎</button>
-        <button class="sf-btn del" onclick="deleteSf('${sf.id}','${esc(sf.name||'')}')">✕</button>
-      </div>
-    </div>`;
-  }).join('');
+      const {db,doc,setDoc} = window._fb;
+      await setDoc(doc(db,'groups',_groupId,'calendar',matchId), payload, {merge:true});
+      setPip('saved');
+      document.getElementById('as-text').textContent = 'Live · auto-saved';
+    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; }
+  });
 }
 
-async function loadSf(id){
+async function _createMatchDoc(i){
+  if (!_groupId || !window._user) return;
   try {
-    const {getDoc}=window._fb;
-    const snap = await getDoc(sfDocRef(id));
-    if (!snap.exists()){ toast('Showfile not found'); return; }
-    const data = snap.data();
-    applyState(data.state||data);
-    sfId   = id;
-    sfName = data.name||'Untitled';
-    // Remember this showfile for next session
-    if (window._user) localStorage.setItem('lastSfId_' + window._user.uid, id);
-    updateSfUI();
-    renderSfList();
-    closeSidebar();
-    toast('LOADED: ' + sfName);
-  } catch(e){ console.error(e); toast('Error loading showfile'); }
+    const {db,collection,addDoc} = window._fb;
+    const payload = buildMatchPayload(i);
+    const ref = await addDoc(collection(db,'groups',_groupId,'calendar'), payload);
+    window._slotToMatchId[i] = ref.id;
+    window._matchIdToSlot[ref.id] = i;
+    setPip('saved');
+    document.getElementById('as-text').textContent = 'Live · match created';
+  } catch(e){ console.error('_createMatchDoc:',e); toast('Error creating match'); }
 }
 
-function buildPayload(name){
-  // Only serialize up to the highest active match slot (sparse — avoids huge arrays)
-  const maxActive = matchVisible.reduce((hi,v,i)=>v?i:hi, -1);
-  const serLen = Math.max(maxActive+1, 3); // at least 3 for backward compat
-  // Only include timers for active slots
-  const timerKeys = {};
-  for(let i=0;i<serLen;i++){
-    if(matchVisible[i]){
-      timerKeys[`timers${i}`] = matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null,refTz:t.refTz||null}));
-    }
-  }
-  // Build timerSortMode without sparse holes — Firestore rejects undefined (hole) values
-  const _tsm=[]; for(let i=0;i<serLen;i++) _tsm.push(!!timerSortMode[i]);
-  timerKeys.timerSortMode = _tsm;
-  timerKeys.opDismissedSlots = [...opDismissedSlots]; // persist operator-view dismissals
+async function deleteMatchDoc(i){
+  if (!_groupId || !window._user) return;
+  const matchId = window._slotToMatchId[i];
+  if (!matchId) return;
+  try {
+    const {db,doc,deleteDoc} = window._fb;
+    await deleteDoc(doc(db,'groups',_groupId,'calendar',matchId));
+    delete window._matchIdToSlot[matchId];
+    window._slotToMatchId[i] = undefined;
+  } catch(e){ console.error('deleteMatchDoc:',e); toast('Error deleting match'); }
+}
+
+function buildMatchPayload(i){
+  const m = matchMeta[i] || _defMeta(i);
+  const timers = (matchTimers[i]||_defTimers()).map(t=>({
+    id:        t.id        || uid(),
+    name:      t.name      || '',
+    core:      !!t.core,
+    timeStr:   t.timeStr   || null,
+    targetUTC: t.targetUTC || null,
+    refTz:     t.refTz     || null,
+  }));
   return {
-    name: name||sfName||'Untitled',
-    updatedAt: window._fb.serverTimestamp(),
-    updatedAtMs: Date.now(),
-    state:{
-      brandColor,
-      hubTz,
-      showClockSeconds,
-      opTimerDivider,
-      hubTimerDivider,
-      matchHubTzs:matchHubTzs.slice(0,serLen),
-      teamDisplayMode:opTeamDisplayMode,
-      hubTeamDisplayMode,
-      logoSizeMode,
-      hubLogoSize,
-      logoBgMode,
-      hubCols,
-      calendarDate,
-      hubRangeStart,
-      hubRangeEnd,
-      hubTodayMode,
-      matchTzs:    matchTzs.slice(0,serLen),
-      matchVisible:matchVisible.slice(0,serLen),
-      matchEnabled:matchEnabled.slice(0,serLen),
-      matchMeta:   matchMeta.slice(0,serLen).map(m=>({...m})),
-      ...timerKeys
-    }
+    isoDate:      m.isoDate      || calendarDate,
+    label:        m.label        || '',
+    home:         m.home         || '',
+    homeColour:   m.homeColour   || '#ffffff',
+    away:         m.away         || '',
+    awayColour:   m.awayColour   || '#ffffff',
+    sport:        m.sport        || '',
+    location:     m.location     || '',
+    host:         m.host         || '',
+    hub:          m.hub          || '',
+    truck:        m.truck        || '',
+    main:         m.main         || '',
+    backup:       m.backup       || '',
+    arCtrl:       m.arCtrl       || '',
+    arRend:       m.arRend       || '',
+    droneCtrl:    m.droneCtrl    || '',
+    droneRend:    m.droneRend    || '',
+    tactic:       m.tactic       || '',
+    tracker:      m.tracker      || '',
+    customFields: m.customFields || [],
+    day:          m.day          || '',
+    matchTz:      matchTzs[i]    || 'Australia/Sydney',
+    matchHubTz:   matchHubTzs[i] || hubTz || 'Australia/Sydney',
+    timers,
+    timerSortMode: !!timerSortMode[i],
+    visible:      !!matchVisible[i],
+    enabled:      !!matchEnabled[i],
+    sortOrder:    i,
+    updatedAt:    window._fb.serverTimestamp(),
+    updatedBy:    window._user?.uid || null,
   };
 }
 
+// scheduleSave() — called from preference-change handlers (brandColor, divider, etc.)
+// Saves user preferences to userProfiles/{uid}.preferences
+function scheduleSave(){
+  clearTimeout(_prefTimer);
+  _prefTimer = setTimeout(saveUserPreferences, 1400);
+}
+
+let _prefQueue = Promise.resolve();
+function saveUserPreferences(){
+  if (!window._user) return;
+  const prefs = {
+    hubTz,
+    brandColor,
+    showClockSeconds,
+    opTimerDivider,
+    hubTimerDivider,
+    teamDisplayMode:    opTeamDisplayMode,
+    hubTeamDisplayMode,
+    logoSizeMode,
+    hubLogoSize,
+    logoBgMode,
+    hubCols,
+    viewMode,
+  };
+  _prefQueue = _prefQueue.catch(()=>{}).then(async () => {
+    try {
+      const {db,doc,setDoc} = window._fb;
+      await setDoc(doc(db,'userProfiles',window._user.uid), {preferences:prefs}, {merge:true});
+    } catch(e){ console.warn('saveUserPreferences failed:',e); }
+  });
+}
+
+// applyState — used by importJSON to apply a legacy showfile's state locally
+// (does NOT write to Firestore; import UI triggers per-match saves separately)
 function applyState(s){
   if(s.brandColor)     { setBrandColor(s.brandColor, true); }
   if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
@@ -2271,14 +2461,11 @@ function applyState(s){
   hubRangeStart = s.hubRangeStart||null;
   hubRangeEnd   = s.hubRangeEnd  ||null;
   hubTodayMode  = !!s.hubTodayMode;
-  // Legacy: if old save had hubShowAllDays=false treat as no range
   _updateHubRangeUI();
   _updateHubQuickBtns();
-  // Expand saved arrays to MAX_MATCHES (backward compat with 3-match saves)
   if(s.matchTzs){
     matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
     s.matchTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES) matchTzs[i]=tz; });
-    // Sync both TZ selectors to matchTzs[0] as the representative value
     ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=matchTzs[0]; });
     hubTz=matchTzs[0];
   }
@@ -2292,167 +2479,86 @@ function applyState(s){
   }
   if(s.matchMeta){
     matchMeta = Array.from({length:MAX_MATCHES}, (_,i)=>s.matchMeta[i] ? {...s.matchMeta[i]} : _defMeta(i));
-    // Re-resolve teamRefs — handles matches saved before a sport was added, or saved without a sport set
     const _validRef=ref=>ref&&SPORTS_DATA[ref.sport]?.[ref.idx];
     const _findAcrossAllSports=name=>{
-      // 1. Exact full-name match
       for(const sp of Object.keys(SPORTS_DATA)){
-        const ref=findTeamRef(sp,name);
-        if(ref) return ref;
+        const ref=findTeamRef(sp,name); if(ref) return ref;
       }
-      // 2. Fuzzy match across all sports (handles abbrs/short names like "AUS WPGA CHAMP")
       const fuzzy=fuzzyMatchTeam(name,'');
-      if(fuzzy){
-        for(const sp of Object.keys(SPORTS_DATA)){
-          const ref=findTeamRef(sp,fuzzy.name.toUpperCase());
-          if(ref) return ref;
-        }
-      }
+      if(fuzzy){ for(const sp of Object.keys(SPORTS_DATA)){ const ref=findTeamRef(sp,fuzzy.name.toUpperCase()); if(ref) return ref; } }
       return null;
     };
     matchMeta.forEach(m=>{
       if(m.home && !_validRef(m.homeTeamRef)){
-        m.homeTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.home) : null)
-                     || _findAcrossAllSports(m.home);
+        m.homeTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.home) : null) || _findAcrossAllSports(m.home);
         if(m.homeTeamRef && !m.sport) m.sport=m.homeTeamRef.sport;
       }
       if(m.away && !_validRef(m.awayTeamRef)){
-        m.awayTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.away) : null)
-                     || _findAcrossAllSports(m.away);
+        m.awayTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.away) : null) || _findAcrossAllSports(m.away);
       }
     });
   }
-  // Load timers — support new per-key format, old flat format, and legacy nested array
   if(s.timers0 !== undefined){
-    // New format: timers0…timers15
     for(let i=0;i<MAX_MATCHES;i++){
-      const key=`timers${i}`;
-      if(s[key]){
-        matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
-      }
+      const key=`timers${i}`; if(s[key]) matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
     }
   } else if(s.matchTimers){
-    // Legacy nested array format
-    s.matchTimers.forEach((mt,i)=>{
-      if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
-    });
+    s.matchTimers.forEach((mt,i)=>{ if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null})); });
   }
-  if(Array.isArray(s.opDismissedSlots)){
-    opDismissedSlots = new Set(s.opDismissedSlots);
-  }
+  if(Array.isArray(s.opDismissedSlots)) opDismissedSlots = new Set(s.opDismissedSlots);
   if(s.timerSortMode){
     s.timerSortMode.forEach((v,i)=>{ if(i<MAX_MATCHES) timerSortMode[i]=!!v; });
-    // Re-sort in-place with fresh now so order is correct regardless of when save happened
     const _now=Date.now();
     timerSortMode.forEach((sorted,i)=>{
-      if(sorted && matchTimers[i] && matchTimers[i].length>1){
+      if(sorted && matchTimers[i]?.length>1){
         matchTimers[i].sort((a,b)=>{
-          if(!a.targetUTC && !b.targetUTC) return 0;
-          if(!a.targetUTC) return 1;
-          if(!b.targetUTC) return -1;
-          const da=a.targetUTC-_now, db=b.targetUTC-_now;
-          const futureA=da>=0, futureB=db>=0;
-          if(futureA && !futureB) return -1;
-          if(!futureA && futureB) return 1;
-          if(futureA) return da-db;
-          return db-da;
+          if(!a.targetUTC && !b.targetUTC) return 0; if(!a.targetUTC) return 1; if(!b.targetUTC) return -1;
+          const da=a.targetUTC-_now, db=b.targetUTC-_now, futA=da>=0, futB=db>=0;
+          if(futA && !futB) return -1; if(!futA && futB) return 1;
+          return futA ? da-db : db-da;
         });
       }
     });
   }
-  // Sync hidden TZ selects for all 16 slots
-  for(let i=0;i<MAX_MATCHES;i++){
-    const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i];
-  }
-  // _applyCalendarDate rebuilds opSlotMap, show/hides op columns, and calls renderAll()
+  for(let i=0;i<MAX_MATCHES;i++){ const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i]; }
   _applyCalendarDate(true);
 }
 
-// Auto-save
-function scheduleSave(){
-  if (!sfId) return;
-  setPip('saving');
-  clearTimeout(asTimer);
-  asTimer = setTimeout(doSave, 1600);
-}
-let _saveQueue = Promise.resolve(); // serialises Firebase writes — prevents race conditions
-function doSave(){
-  if (!sfId||!window._user) return;
-  const payload = buildPayload(); // capture state NOW, synchronously, before any async delay
-  setPip('saving');
-  _saveQueue = _saveQueue.catch(()=>{}).then(async ()=>{
-    try {
-      await window._fb.setDoc(sfDocRef(sfId), payload, {merge:true});
-      setPip('saved');
-      document.getElementById('as-text').textContent = `Auto-saved · ${sfName}`;
-    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; }
-  });
-}
 function setPip(s){
   const dot=document.getElementById('as-dot'); const pip=document.getElementById('nav-pip');
   dot.className='as-dot'+(s==='saving'?' saving':s==='error'?' error':'');
   if(pip) pip.className='as-pip'+(s==='saving'?' saving':'');
 }
-function updateSfUI(){
-  document.getElementById('nav-sf-name').textContent = sfName||'—';
-  document.getElementById('as-text').textContent = `Auto-saved · ${sfName}`;
-  setPip('saved');
-}
 
-// New showfile
-function promptNewShowfile(){
-  document.getElementById('sf-name-input').value='';
-  document.getElementById('modal-sf-name').classList.remove('hidden');
-  setTimeout(()=>document.getElementById('sf-name-input').focus(),50);
-}
-async function confirmNewShowfile(){
-  const name = (document.getElementById('sf-name-input').value.trim().toUpperCase())||'UNTITLED';
-  closeModal('modal-sf-name');
-  try {
-    const {addDoc}=window._fb;
-    const ref = await addDoc(sfColRef(), buildPayload(name));
-    sfId=ref.id; sfName=name;
-    updateSfUI();
-    await refreshSfList();
-    toast(`CREATED: ${name}`);
-    closeSidebar();
-  } catch(e){
-    console.error('Create showfile error:', e);
-    console.error('Code:', e.code, 'Message:', e.message);
-    toast('Error: ' + (e.code || e.message || String(e)));
-  }
-}
-
-// Rename
-async function renameSf(id, current){
-  const n = prompt('Rename showfile:', current);
-  if (!n||n.trim()===current) return;
-  const name = n.trim().toUpperCase();
-  try {
-    await window._fb.setDoc(sfDocRef(id),{name, updatedAt:window._fb.serverTimestamp()},{merge:true});
-    if (id===sfId){ sfName=name; updateSfUI(); }
-    await refreshSfList();
-    toast('RENAMED');
-  } catch(e){ toast('Error renaming'); }
-}
-
-// Delete
-async function deleteSf(id, name){
-  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-  try {
-    await window._fb.deleteDoc(sfDocRef(id));
-    if (id===sfId){ sfId=null; sfName=null; document.getElementById('nav-sf-name').textContent='—'; document.getElementById('as-text').textContent='No showfile loaded'; setPip(''); }
-    await refreshSfList();
-    toast('DELETED');
-  } catch(e){ toast('Error deleting'); }
+function setConnStatus(s){ // s: 'live' | 'connecting' | 'offline' | 'error'
+  const el=document.getElementById('conn-status');
+  if(!el) return;
+  el.className='conn-status conn-'+s;
+  const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR'};
+  el.textContent=labels[s]||s.toUpperCase();
 }
 
 // Export / Import
 function exportJSON(){
-  const payload = {exportedAt:new Date().toISOString(), name:sfName||'showfile', state:buildPayload().state};
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-  a.download = `${(sfName||'showfile').replace(/\s+/g,'-').toLowerCase()}.json`;
+  // Build a legacy-compatible export snapshot from current in-memory state
+  const maxActive = matchVisible.reduce((hi,v,i)=>v?i:hi,-1);
+  const serLen = Math.max(maxActive+1,3);
+  const timerKeys={};
+  for(let i=0;i<serLen;i++){
+    if(matchVisible[i]) timerKeys[`timers${i}`]=matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null,refTz:t.refTz||null}));
+  }
+  const _tsm=[]; for(let i=0;i<serLen;i++) _tsm.push(!!timerSortMode[i]);
+  timerKeys.timerSortMode=_tsm;
+  timerKeys.opDismissedSlots=[...opDismissedSlots];
+  const state={brandColor,hubTz,showClockSeconds,opTimerDivider,hubTimerDivider,
+    matchHubTzs:matchHubTzs.slice(0,serLen),teamDisplayMode:opTeamDisplayMode,hubTeamDisplayMode,
+    logoSizeMode,hubLogoSize,logoBgMode,hubCols,calendarDate,hubRangeStart,hubRangeEnd,hubTodayMode,
+    matchTzs:matchTzs.slice(0,serLen),matchVisible:matchVisible.slice(0,serLen),
+    matchEnabled:matchEnabled.slice(0,serLen),matchMeta:matchMeta.slice(0,serLen).map(m=>({...m})),...timerKeys};
+  const payload={exportedAt:new Date().toISOString(),name:_groupName||'group-export',state};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download=`${(_groupName||'group').replace(/\s+/g,'-').toLowerCase()}-${calendarDate}.json`;
   a.click(); toast('EXPORTED');
 }
 async function importJSON(e){
@@ -2491,18 +2597,15 @@ async function importJSON(e){
       if(!firstNewDate && matchMeta[dst].isoDate) firstNewDate=matchMeta[dst].isoDate;
     }
     if(firstNewDate) calendarDate=firstNewDate;
-    // Save as a new showfile entry so it appears in the list
-    const name=(data.name||file.name.replace('.json','')).toUpperCase();
-    const {addDoc}=window._fb;
-    const ref=await addDoc(sfColRef(),{name, updatedAt:window._fb.serverTimestamp(), state:buildPayload().state});
-    sfId=ref.id; sfName=name;
-    updateSfUI();
-    await refreshSfList();
     updateAddMatchBtn();
     switchView('hub'); renderAll();
     _applyCalendarDate(true);
-    scheduleSave();
-    toast(`IMPORTED: ${toWrite} MATCH${toWrite!==1?'ES':''} FROM ${name}`);
+    // Push each imported slot to Firestore
+    for(let ii=0;ii<toWrite;ii++){
+      const dst=freeSlots[ii];
+      await _createMatchDoc(dst);
+    }
+    toast(`IMPORTED: ${toWrite} MATCH${toWrite!==1?'ES':''}`);
     closeSidebar();
   } catch(err){ console.error(err); toast('Import failed — invalid file'); }
   e.target.value='';
@@ -2555,7 +2658,7 @@ function onOpTzChange(){  _applyBroadcastTz(document.getElementById('op-tz').val
 function onMatchTzChange(i){
   matchTzs[i]=document.getElementById(`match-tz-${i}`).value;
   matchTimers[i].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
-  scheduleSave();
+  scheduleSaveMatch(i);
 }
 
 // ── TIME HELPERS ─────────────────────────────────────────
@@ -2768,7 +2871,7 @@ function timerDrop(mi,toIdx,e){
   const [moved]=arr.splice(_dragFromIdx,1);
   arr.splice(toIdx,0,moved);
   timerSortMode[mi]=false; // manual reorder exits sort mode (no spacer)
-  scheduleSave();
+  scheduleSaveMatch(mi);
   timerDragEnd(e);
 }
 
@@ -2953,7 +3056,7 @@ function addMatch(){
         grid.insertBefore(div, addCol);
         window._colResizeObserver?.observe(div);
       }
-      renderAll(); scheduleSave(); return;
+      renderAll(); scheduleSaveMatch(i); return;
     }
   }
   toast('SCHEDULE FULL');
@@ -2965,14 +3068,13 @@ function addHubMatch(){
       matchVisible[i]=matchEnabled[i]=true;
       matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
       matchTimers[i] = _defTimers();
-      scheduleSave(); renderHubGrid(); return;
+      scheduleSaveMatch(i); renderHubGrid(); return;
     }
   }
   toast('SCHEDULE FULL');
 }
 function removeMatch(col){
-  // Operator view only: removes this column from the current view without deleting match data.
-  // Dismissal is saved so it survives refresh; it's date-specific ("slotIdx:isoDate").
+  // Operator view only: removes this column from the current view (does NOT delete match from Firestore)
   if(col>=0 && col<opSlotMap.length){
     const si = opSlotMap[col];
     const date = (matchMeta[si]&&matchMeta[si].isoDate) ? matchMeta[si].isoDate : calendarDate;
@@ -2981,7 +3083,6 @@ function removeMatch(col){
   }
   renderOpColumns();
   renderAll();
-  scheduleSave(); // persist the dismissed state
 }
 // Operator column wrappers — translate display column (0/1/2) → real match slot via opSlotMap
 function opEditMatch(col)  { openEditMatch(opSlotMap[col]); }
@@ -2995,10 +3096,11 @@ function opSortTimers(col) {
 }
 
 function removeHubMatch(i){
-  // Called from HUB card × buttons — permanently removes the match
+  // Called from HUB card × buttons — permanently removes the match from Firestore
   matchVisible[i]=matchEnabled[i]=false;
-  _rebuildOpSlotMap(); // in case this slot was in the op view
-  scheduleSave(); renderHubGrid();
+  _rebuildOpSlotMap();
+  deleteMatchDoc(i); // delete from Firestore; onSnapshot will update other sessions
+  renderHubGrid();
 }
 function updateAddMatchBtn(){ document.getElementById('add-match-col')?.classList.remove('hidden'); }
 
@@ -3106,13 +3208,13 @@ function confirmSetTime(){
   if(!ts){ toast('INVALID TIME — use HH:MM or HHMM'); return; }
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi]);
-  closeModal('modal-set-time'); scheduleSave();
+  closeModal('modal-set-time'); scheduleSaveMatch(ctx.mi);
   if(viewMode==='hub') renderHubGrid();
 }
 function clearTime(){
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   t.timeStr=null; t.targetUTC=null;
-  closeModal('modal-set-time'); scheduleSave();
+  closeModal('modal-set-time'); scheduleSaveMatch(ctx.mi);
   if(viewMode==='hub') renderHubGrid();
 }
 
@@ -3149,16 +3251,14 @@ function confirmEditTimer(){
   const _etRefTz=(_etRef==='other')?(document.getElementById('et-ref-tz')?.value||'Australia/Sydney'):_etRef;
   t.refTz=_etRefTz;
   t.targetUTC=ts?localToUTC(ts,getTimerRefTz(t,ctx.mi)):null;
-  closeModal('modal-edit-timer'); renderAll(); scheduleSave();
-  // Refresh em panel if Edit Match modal is open
+  closeModal('modal-edit-timer'); renderAll(); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
 function clearEditTimerTime(){
   const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
   if(!t) return;
   t.timeStr=null; t.targetUTC=null;
-  closeModal('modal-edit-timer'); renderAll(); scheduleSave();
-  // Refresh em panel if Edit Match modal is open
+  closeModal('modal-edit-timer'); renderAll(); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
 
@@ -3179,11 +3279,10 @@ function confirmAddTimer(){
   const _aRefTz=(_aRef==='other')?(document.getElementById('add-ref-tz')?.value||'Australia/Sydney'):_aRef;
   const _aEffTz=getTimerRefTz({refTz:_aRefTz},ctx.mi);
   matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,_aEffTz):null,refTz:_aRefTz});
-  closeModal('modal-add-timer'); scheduleSave();
-  // Refresh em panel if Edit Match modal is open
+  closeModal('modal-add-timer'); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
-function removeTimer(mi,tid){ matchTimers[mi]=matchTimers[mi].filter(t=>t.id!==tid); scheduleSave(); }
+function removeTimer(mi,tid){ matchTimers[mi]=matchTimers[mi].filter(t=>t.id!==tid); scheduleSaveMatch(mi); }
 
 function sortTimers(mi){
   const arr=matchTimers[mi];
@@ -3205,7 +3304,7 @@ function sortTimers(mi){
   });
   timerSortMode[mi]=true; // enable spacer between future/past groups
   renderTimers();
-  clearTimeout(asTimer); doSave(); // save immediately so sort state persists on refresh
+  scheduleSaveMatch(mi); // persist sort state immediately
 }
 
 function openEditMatch(i){
@@ -3306,7 +3405,7 @@ function confirmEditMatch(){
     isoDate:  _prevMeta.isoDate || '', // PRESERVE — not in edit form, must not be lost
     day:      _prevMeta.day     || '', // PRESERVE — original raw day string from PDF import
   };
-  closeModal('modal-edit-match'); renderAll(); scheduleSave();
+  closeModal('modal-edit-match'); renderAll(); scheduleSaveMatch(mi);
 }
 
 // ── EDIT MATCH — inline timers panel ─────────────────────
@@ -3357,7 +3456,7 @@ function emRenderTimers(mi){
       const arr=matchTimers[_emMatchIdx];
       const [moved]=arr.splice(_emDragIdx,1);
       arr.splice(toIdx,0,moved);
-      scheduleSave();
+      scheduleSaveMatch(_emMatchIdx);
       emRenderTimers();
     });
     row.addEventListener('dragend', ()=>{
@@ -3419,7 +3518,7 @@ function emEditTimer(tid){
 
 function emDeleteTimer(tid){
   matchTimers[_emMatchIdx]=matchTimers[_emMatchIdx].filter(t=>t.id!==tid);
-  scheduleSave();
+  scheduleSaveMatch(_emMatchIdx);
   emRenderTimers();
 }
 
@@ -3866,10 +3965,16 @@ function renderOpColumns(){
   });
 }
 
-// Apply calendarDate: refresh label, date lines, visibility, hub grid
+/// Apply calendarDate: refresh label, date lines, visibility, hub grid
 function _applyCalendarDate(silent){
   document.getElementById('cal-date-label').textContent=_isoDisplay(calendarDate);
-  _rebuildOpSlotMap(); // recalculates opSlotMap + calls renderOpColumns (rebuilds DOM)
+  // When navigating dates, re-apply the cached group calendar snapshot for the new day.
+  // (The snapshot already covers ±30–37 days, so no re-subscribe needed.)
+  if(_calUnsub && _lastCalDocs){
+    applyCalendarSnapshot(_lastCalDocs);
+  } else {
+    _rebuildOpSlotMap(); // recalculates opSlotMap + calls renderOpColumns (rebuilds DOM)
+  }
   // Update date lines for all active columns (after renderOpColumns creates them)
   opSlotMap.forEach((si,i)=>{
     const el=document.getElementById(`match-date-${i}`);
@@ -4781,10 +4886,12 @@ function confirmScheduleImport(){
   closeModal('modal-sched-import');
   // Deduplicate fringe slot indices
   window._fringeSlots=[...new Set(window._fringeSlots||[])];
+  const _importedSlots = freeSlots.slice(0, matches.length);
   function _finishImport(){
     switchView('hub'); renderAll();
     _applyCalendarDate(true);
-    scheduleSave();
+    // Push each imported slot to Firestore
+    _importedSlots.forEach(slot => scheduleSaveMatch(slot));
     toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
   }
   if(window._fringeSlots.length>0){
@@ -5794,17 +5901,19 @@ function confirmCallsheetImport(){
     count++;
   });
   closeModal('modal-callsheet');
-  renderAll(); scheduleSave();
+  renderAll(); scheduleSaveMatch(_csMi);
   toast(`IMPORTED ${count} TIMER${count!==1?'S':''}`);
 }
 
 async function _csSaveToDb(parsed){
-  if(!window._user||!window._fb) return;
+  if(!window._user||!window._fb||!_groupId) return;
+  const matchId = window._slotToMatchId[_csMi];
+  if(!matchId){ console.warn('_csSaveToDb: no matchId for slot',_csMi); return; }
   try{
     const {db,doc,setDoc,serverTimestamp}=window._fb;
     const key=(parsed.jobId||'unknown').replace(/[^a-zA-Z0-9_-]/g,'_');
-    const ref=doc(db,'users',window._user.uid,'callsheets',key);
-    await setDoc(ref,{...parsed,importedAt:serverTimestamp(),showfileId:sfId||null},{merge:false});
+    const ref=doc(db,'groups',_groupId,'calendar',matchId,'callsheets',key);
+    await setDoc(ref,{...parsed,importedAt:serverTimestamp(),matchId,importedBy:window._user.uid},{merge:false});
   } catch(e){ console.warn('Callsheet DB save failed:',e); }
 }
 
