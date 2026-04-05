@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
-const { onUserCreated }      = require('firebase-functions/v2/auth');
+const functionsV1            = require('firebase-functions');   // v1 auth triggers
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -37,9 +37,8 @@ async function assertGroupAdmin(callerUid, groupId) {
 // already writes the profile via batch.commit() immediately after createUser().
 // The .create() call here will throw ALREADY_EXISTS and silently no-op.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.onNewUserSetup = onUserCreated(async (event) => {
-  const user = event.data;
-  if (!user?.uid || !user?.email) return; // skip anonymous / incomplete
+exports.onNewUserSetup = functionsV1.auth.user().onCreate(async (user) => {
+  if (!user.email) return; // skip anonymous users (no email)
 
   const now = admin.firestore.FieldValue.serverTimestamp();
   try {
