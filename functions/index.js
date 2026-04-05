@@ -250,20 +250,13 @@ exports.createGroupUser = onCall(async (request) => {
 
   await batch.commit();
 
-  // Generate a password-reset link server-side and return it directly to the calling
-  // admin. This avoids the email-delivery approach entirely — corporate email security
-  // scanners often follow every link in an email to scan for phishing, which consumes
-  // Firebase's one-time OOB code before the user can click it, causing an instant
-  // "link expired" error. Returning the link to the admin lets them share it via a
-  // channel of their choice (Slack, Teams, etc.) without any scanner interference.
-  let resetLink = null;
-  try {
-    resetLink = await admin.auth().generatePasswordResetLink(email);
-  } catch (linkErr) {
-    console.warn('createGroupUser: generatePasswordResetLink failed, admin must send manually:', linkErr.message);
-  }
+  // Do NOT generate a password reset link here. Generating it during creation risks
+  // the link being invalidated if the callable is retried on a slow network (each call
+  // to generatePasswordResetLink invalidates all prior codes for that email).
+  // Admins use the dedicated getPasswordResetLink function to generate a fresh link
+  // on demand, right before sharing it with the user.
 
-  return { uid: newUser.uid, email, resetLink };
+  return { uid: newUser.uid, email };
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -309,6 +302,53 @@ exports.removeGroupMember = onCall(async (request) => {
   await batch.commit();
   console.log(`removeGroupMember: ${targetUid} removed from ${groupId} by ${callerUid}`);
   return { ok: true };
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getPasswordResetLink
+//
+// Generates a fresh Firebase password-reset link for a group member on demand.
+// The caller must be an admin of the group. Generates exactly one link per call.
+//
+// Separating link generation from user creation prevents the common failure mode
+// where the httpsCallable retries on a slow network, causing a second
+// generatePasswordResetLink call that invalidates the first link.
+//
+// Input:  { targetUid: string, groupId: string }
+// Output: { resetLink: string }
+// ─────────────────────────────────────────────────────────────────────────────
+exports.getPasswordResetLink = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const { targetUid, groupId } = request.data || {};
+  if (!targetUid || !groupId) {
+    throw new HttpsError('invalid-argument', 'targetUid and groupId are required.');
+  }
+
+  await assertGroupAdmin(callerUid, groupId);
+
+  // Verify the target user is actually a member of this group
+  const memberSnap = await db.doc(`groups/${groupId}/members/${targetUid}`).get();
+  if (!memberSnap.exists) {
+    throw new HttpsError('not-found', 'User is not a member of this group.');
+  }
+
+  // Look up their email from Firebase Auth
+  let userRecord;
+  try {
+    userRecord = await admin.auth().getUser(targetUid);
+  } catch (e) {
+    throw new HttpsError('not-found', `Auth account not found: ${e.message}`);
+  }
+
+  if (!userRecord.email) {
+    throw new HttpsError('failed-precondition', 'User has no email address in Firebase Auth.');
+  }
+
+  const resetLink = await admin.auth().generatePasswordResetLink(userRecord.email);
+  console.log(`getPasswordResetLink: generated link for ${userRecord.email} by ${callerUid}`);
+  return { resetLink };
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
