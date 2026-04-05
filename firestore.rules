@@ -103,8 +103,13 @@ service cloud.firestore {
     }
 
     // ── Super admin registry ──────────────────────────────────────────────────
+    // Any authenticated user may READ their own superAdmins doc to check their
+    // own status (resolveUserRole does getDoc on this path for every sign-in).
+    // A non-super-admin's doc simply won't exist, so snap.exists() returns false.
+    // Writes remain super-admin only.
     match /superAdmins/{targetUid} {
-      allow read, write: if isSuperAdmin();
+      allow read:  if authed();
+      allow write: if isSuperAdmin();
     }
 
   }
