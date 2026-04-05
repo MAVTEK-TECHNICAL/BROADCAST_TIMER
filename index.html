@@ -20,7 +20,7 @@ import { initializeApp }
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
          signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager,
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          collection, doc, addDoc, setDoc, getDoc, updateDoc,
          getDocs, deleteDoc, query, orderBy, serverTimestamp,
          onSnapshot, where, writeBatch,
@@ -45,7 +45,7 @@ const auth = getAuth(app);
 // Use modern Firebase 10 persistence API — queues writes in IndexedDB so they
 // survive page refreshes and send on the next session open.
 const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() })
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 const fns  = getFunctions(app);
 
@@ -2169,12 +2169,12 @@ async function showApp(user){
   _applyCalendarDate(true);
   setConnStatus('connecting');
   await resolveUserRole(user);
-  // Flush any pending debounced saves before the page is unloaded so that
-  // timer changes are not silently lost on refresh or tab close.
+  // Flush pending saves synchronously on page unload. _flushSave calls setDoc
+  // directly (no Promise queue) so Firebase's persistent cache can write to
+  // IndexedDB before the page closes, even if the network request doesn't complete.
   window.addEventListener('beforeunload', () => {
-    for (const slot of _pendingSaveSlots) {
-      clearTimeout(_saveTimers[slot]);
-      doSaveMatch(slot);
+    for (const slot of [..._pendingSaveSlots]) {
+      _flushSave(slot);
     }
   });
 }
@@ -3028,7 +3028,24 @@ function scheduleSaveMatch(i){
   setPip('saving');
   _pendingSaveSlots.add(i);   // guard: snapshot must not overwrite local state until saved
   clearTimeout(_saveTimers[i]);
+  dbgLog('match:schedule', `slot ${i} — ${matchTimers[i]?.length ?? 0} timers — debounce 1.4s`, 'info');
   _saveTimers[i] = setTimeout(() => doSaveMatch(i), 1400);
+}
+
+// _flushSave — calls setDoc directly, bypassing the async Promise queue.
+// Used in beforeunload so the Firebase client receives the write synchronously
+// before the page closes (persistent cache then queues it to IndexedDB).
+function _flushSave(i){
+  if (!_groupId || !window._user) return;
+  const matchId = window._slotToMatchId[i];
+  if (!matchId) return;
+  clearTimeout(_saveTimers[i]);
+  const payload = buildMatchPayload(i);
+  const {db, doc, setDoc} = window._fb;
+  dbgLog('match:flush', `groups/${_groupId}/calendar/${matchId}  (slot ${i})`, 'info');
+  // Fire-and-forget: persistent cache writes to IndexedDB immediately even if
+  // the page closes before the server ack arrives.
+  setDoc(doc(db,'groups',_groupId,'calendar',matchId), payload, {merge:true});
 }
 
 function doSaveMatch(i){
@@ -3047,7 +3064,12 @@ function doSaveMatch(i){
       setPip('saved');
       document.getElementById('as-text').textContent = 'Live · auto-saved';
       dbgLog('match:save', `slot ${i} saved`, 'ok');
-    } catch(e){ setPip('error'); document.getElementById('as-text').textContent = 'Save failed'; dbgLog('match:save', `slot ${i} FAILED — ${e.message||e}`, 'error'); }
+    } catch(e){
+      _pendingSaveSlots.delete(i);  // clear guard on failure too — don't block snapshots forever
+      setPip('error');
+      document.getElementById('as-text').textContent = 'Save failed';
+      dbgLog('match:save', `slot ${i} FAILED — ${e.message||e}`, 'error');
+    }
   });
 }
 
