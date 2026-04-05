@@ -66,6 +66,17 @@ function boot() {
     user ? showApp(user) : showLogin();
   });
 }
+
+// Catch any uncaught JS errors or unhandled promise rejections and write them
+// to the debug log so they show up in the console even when DevTools is closed.
+window.addEventListener('error', ev => {
+  if(typeof dbgLog === 'function')
+    dbgLog('js:error', `${ev.message} @ ${ev.filename?.split('/').pop()}:${ev.lineno}`, 'error');
+});
+window.addEventListener('unhandledrejection', ev => {
+  if(typeof dbgLog === 'function')
+    dbgLog('js:error', `Unhandled promise: ${ev.reason?.message || ev.reason}`, 'error');
+});
 </script>
 
 <style>
@@ -3801,15 +3812,21 @@ function parseTimeInput(v){
   return pad(h) + ':' + pad(m);
 }
 function confirmSetTime(){
+  dbgLog('timer:setTime', `slot ${ctx?.mi} tid ${ctx?.tid}`, 'info');
   const ts = parseTimeInput(document.getElementById('set-typed').value);
   if(!ts){ toast('INVALID TIME — use HH:MM or HHMM'); return; }
-  const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
+  const t=matchTimers[ctx.mi]?.find(x=>x.id===ctx.tid);
+  if(!t){
+    dbgLog('timer:setTime', `ERROR — timer ${ctx?.tid} not found in slot ${ctx?.mi} (${matchTimers[ctx?.mi]?.length ?? 'null'} timers)`, 'error');
+    toast('ERROR — timer not found, please close and reopen'); return;
+  }
   t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi]);
   closeModal('modal-set-time'); scheduleSaveMatch(ctx.mi);
   if(viewMode==='hub') renderHubGrid();
 }
 function clearTime(){
-  const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
+  const t=matchTimers[ctx.mi]?.find(x=>x.id===ctx.tid);
+  if(!t){ dbgLog('timer:clearTime','ERROR — timer not found','error'); toast('ERROR — timer not found, please close and reopen'); return; }
   t.timeStr=null; t.targetUTC=null;
   closeModal('modal-set-time'); scheduleSaveMatch(ctx.mi);
   if(viewMode==='hub') renderHubGrid();
@@ -3835,8 +3852,9 @@ function openEditTimer(mi, tid){
   setTimeout(()=>document.getElementById('et-name').focus(),50);
 }
 function confirmEditTimer(){
-  const t=matchTimers[ctx.mi].find(x=>x.id===ctx.tid);
-  if(!t) return;
+  dbgLog('timer:edit', `slot ${ctx?.mi} tid ${ctx?.tid}`, 'info');
+  const t=matchTimers[ctx.mi]?.find(x=>x.id===ctx.tid);
+  if(!t){ dbgLog('timer:edit','ERROR — timer not found','error'); toast('ERROR — timer not found, please close and reopen'); return; }
   const newName=document.getElementById('et-name').value.trim().toUpperCase();
   if(!newName){ toast('TIMER NAME CANNOT BE EMPTY'); return; }
   const tsRaw=document.getElementById('et-typed').value;
@@ -3869,6 +3887,7 @@ function openAddTimer(mi){
   setTimeout(()=>document.getElementById('add-name').focus(),50);
 }
 function confirmAddTimer(){
+  dbgLog('timer:add', `slot ${ctx?.mi} — groupId:${_groupId||'null'} user:${window._user?.uid||'null'}`, 'info');
   const name=(document.getElementById('add-name').value.trim().toUpperCase())||'CUSTOM';
   const v=document.getElementById('add-typed').value.trim();
   const ts = v ? parseTimeInput(v) : null;
