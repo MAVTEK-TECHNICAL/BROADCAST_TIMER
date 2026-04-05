@@ -2418,12 +2418,33 @@ async function _loadGroupMembers(){
             ).join('')}
           </select>
           <span class="gu-role-badge" style="font-size:9px;letter-spacing:1.5px;padding:2px 8px;border-radius:3px;background:var(--surface2);color:${roleCol};font-family:var(--display)">${roleLbl}</span>
+          <button class="gu-remove-btn" title="Remove from group" onclick="guRemoveMember('${esc(m.uid)}', '${esc(m.displayName || m.email || m.uid)}', this)"
+                  style="background:none;border:1px solid rgba(255,60,60,.35);border-radius:3px;color:var(--red);font-size:11px;padding:2px 7px;cursor:pointer;letter-spacing:.5px;font-family:var(--display);transition:background .15s"
+                  onmouseover="this.style.background='rgba(255,60,60,.12)'" onmouseout="this.style.background='none'">✕</button>
         </div>
       </div>`;
     }).join('');
   } catch(e){
     list.innerHTML = `<div style="color:var(--red);font-size:11px;padding:12px 8px;font-family:var(--mono)">Error: ${esc(e.message)}</div>`;
     console.error('_loadGroupMembers:', e);
+  }
+}
+
+async function guRemoveMember(uid, label, btn){
+  if (!_groupId) return;
+  const confirmed = window.confirm(`Remove "${label}" from this group?\n\nThey will lose access immediately. Their account is not deleted.`);
+  if (!confirmed) return;
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const {fns, httpsCallable} = window._fb;
+    const removeGroupMember = httpsCallable(fns, 'removeGroupMember');
+    await removeGroupMember({ targetUid: uid, groupId: _groupId });
+    toast('Member removed.');
+    await _loadGroupMembers();
+  } catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = '✕'; }
+    toast('Remove failed: ' + (e?.message || e));
+    console.error('guRemoveMember:', e);
   }
 }
 

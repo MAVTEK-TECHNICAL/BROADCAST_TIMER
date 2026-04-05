@@ -260,6 +260,51 @@ exports.createGroupUser = onCall(async (request) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// removeGroupMember
+//
+// Removes a user from a group. Deletes their group membership doc and clears
+// their groupId in userProfiles so they land in the unassigned state.
+// Works even if the Firebase Auth account has been deleted (orphan cleanup).
+//
+// Input:  { targetUid: string, groupId: string }
+// Output: { ok: true }
+// ─────────────────────────────────────────────────────────────────────────────
+exports.removeGroupMember = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const { targetUid, groupId } = request.data || {};
+  if (!targetUid || !groupId) {
+    throw new HttpsError('invalid-argument', 'targetUid and groupId are required.');
+  }
+
+  await assertGroupAdmin(callerUid, groupId);
+
+  // Prevent removing yourself
+  if (targetUid === callerUid) {
+    throw new HttpsError('failed-precondition', 'You cannot remove yourself from the group.');
+  }
+
+  const batch = db.batch();
+
+  // Delete group membership
+  batch.delete(db.doc(`groups/${groupId}/members/${targetUid}`));
+
+  // Clear groupId on userProfile if it exists (won't fail if doc is missing)
+  const profSnap = await db.doc(`userProfiles/${targetUid}`).get();
+  if (profSnap.exists && profSnap.data().groupId === groupId) {
+    batch.update(db.doc(`userProfiles/${targetUid}`), {
+      groupId: null,
+      role:    'admin'
+    });
+  }
+
+  await batch.commit();
+  console.log(`removeGroupMember: ${targetUid} removed from ${groupId} by ${callerUid}`);
+  return { ok: true };
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // updateUserRole
 //
 // Called by an admin to change a group member's role.
