@@ -568,7 +568,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 }
 /* Mini badge with logo (AFL) */
 .team-badge-mini.badge-logo{
-  width:44px;height:26px;background-size:contain;background-position:center;background-repeat:no-repeat;
+  width:36px;height:26px;background-size:contain;background-position:center;background-repeat:no-repeat;
 }
 
 .team-badge{
@@ -591,16 +591,16 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 }
 /* Logo banner version of mini badge */
 .team-badge-mini.has-logo{
-  width:44px;height:26px;
+  width:36px;height:26px;
   background-size:contain;background-position:center;background-repeat:no-repeat;
-  border-radius:3px;
+  border-radius:0;
 }
 
 /* ── Logo size variants ──────────────────────────────────── */
 /* Medium */
 .team-badge-mini.logo-md{ width:36px;height:36px; }
-.team-badge-mini.logo-md.badge-logo{ width:60px;height:36px; }
-.team-badge-mini.logo-md.has-logo{ width:60px;height:36px; }
+.team-badge-mini.logo-md.badge-logo{ width:48px;height:36px; }
+.team-badge-mini.logo-md.has-logo{ width:48px;height:36px; }
 /* Large */
 .team-badge-mini.logo-lg{ width:50px;height:50px; }
 .team-badge-mini.logo-lg.badge-logo{ width:84px;height:50px; }
@@ -1154,13 +1154,6 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             </div>
           </div>
           <div class="opts-row opts-view-hub hidden-view">
-            <span class="opts-label">LOGO BG</span>
-            <div class="name-mode-btns">
-              <button class="nmb active" id="lbg-hub-on"  onclick="setLogoBg(true)">ON</button>
-              <button class="nmb"        id="lbg-hub-off" onclick="setLogoBg(false)">OFF</button>
-            </div>
-          </div>
-          <div class="opts-row opts-view-hub hidden-view">
             <span class="opts-label">SECONDS</span>
             <div class="name-mode-btns">
               <button class="nmb active" id="sec-on"  onclick="setShowSeconds(true)">ON</button>
@@ -1193,13 +1186,6 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
               <button class="nmb"        id="nlb-medium" onclick="setLogoSize('medium')">M</button>
               <button class="nmb"        id="nlb-large"  onclick="setLogoSize('large')">L</button>
               <button class="nmb"        id="nlb-xl"     onclick="setLogoSize('xl')">XL</button>
-            </div>
-          </div>
-          <div class="opts-row opts-view-op">
-            <span class="opts-label">LOGO BG</span>
-            <div class="name-mode-btns">
-              <button class="nmb active" id="lbg-op-on"  onclick="setLogoBg(true)">ON</button>
-              <button class="nmb"        id="lbg-op-off" onclick="setLogoBg(false)">OFF</button>
             </div>
           </div>
           <div class="opts-row opts-view-op">
@@ -1705,7 +1691,6 @@ let opTeamDisplayMode  = 'short';  // 'long' | 'short' | 'tri'  — operator vie
 let hubTeamDisplayMode = 'short';  // 'long' | 'short' | 'tri'  — hub view
 let logoSizeMode    = 'medium';    // 'small' | 'medium' | 'large'
 let hubLogoSize     = 'medium';    // 'off' | 'small' | 'medium' | 'large'
-let logoBgMode      = false;       // true = coloured tile bg | false = logo only, no bg
 let brandColor      = '#ff6b35'; // global default colour for borders, labels, dividers
 let viewMode    = 'operator'; // 'operator' | 'hub'
 let hubCols     = 4;
@@ -2913,7 +2898,6 @@ function applyUserPreferences(prefs){
   if (prefs.hubTeamDisplayMode) setHubNameMode(prefs.hubTeamDisplayMode, true);
   if (prefs.logoSizeMode){ logoSizeMode=prefs.logoSizeMode; setLogoSize(logoSizeMode,true); }
   if (prefs.hubLogoSize) { hubLogoSize=prefs.hubLogoSize;  setHubLogoSize(hubLogoSize,true); }
-  if (prefs.logoBgMode!==undefined) setLogoBg(prefs.logoBgMode,true);
   if (prefs.hubCols)     { hubCols=prefs.hubCols; setHubCols(hubCols,true); }
   if (prefs.viewMode)    switchView(prefs.viewMode);
 }
@@ -3150,7 +3134,6 @@ function saveUserPreferences(){
     hubTeamDisplayMode,
     logoSizeMode,
     hubLogoSize,
-    logoBgMode,
     hubCols,
     viewMode,
   };
@@ -4139,17 +4122,6 @@ function setHubLogoSize(mode, silent){
 }
 
 // ── LOGO BACKGROUND MODE ─────────────────────────────────
-function setLogoBg(val, silent){
-  logoBgMode=val;
-  // Sync both operator and hub cog buttons
-  ['op','hub'].forEach(v=>{
-    document.getElementById(`lbg-${v}-on`)?.classList.toggle('active',  val===true);
-    document.getElementById(`lbg-${v}-off`)?.classList.toggle('active', val===false);
-  });
-  renderHeaders();
-  if(viewMode==='hub') renderHubGrid();
-  if(!silent) scheduleSave();
-}
 
 function setBrandColor(hex, silent){
   brandColor=hex;
@@ -4250,17 +4222,11 @@ function getTeamBadgeMiniHTML(teamRef, sizeOverride){
   const szCls=sz==='medium'?' logo-md':sz==='large'?' logo-lg':sz==='xl'?' logo-xl':'';
   if(t.logo){
     if(t.logo.includes('wikimedia.org')){
-      // AFL: transparent badge PNG — with or without coloured tile bg
-      if(logoBgMode){
-        return `<span class="team-badge-mini badge-logo${szCls}" style="background-color:${t.primary};background-image:url('${t.logo}');border:1.5px solid ${t.secondary}"></span>`;
-      } else {
-        return `<span class="team-badge-mini badge-logo${szCls}" style="background-image:url('${t.logo}')"></span>`;
-      }
+      // AFL: transparent badge PNG — no background tile, logo only
+      return `<span class="team-badge-mini badge-logo${szCls}" style="background-image:url('${t.logo}')"></span>`;
     }
-    // Netball: full-bleed banner — just strip the border when bg is off
-    // Full-bleed banner (Netball, Golf, etc.) — use contain so rectangular logos show fully
-    const bg=logoBgMode?`background-color:#0d0f15;border:1.5px solid ${t.primary};`:'';
-    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}');${bg}"></span>`;
+    // Full-bleed banner (Netball, Golf, etc.) — logo only, no dark tile or border
+    return `<span class="team-badge-mini has-logo${szCls}" style="background-image:url('${t.logo}')"></span>`;
   }
   // Abbr tile: always needs the bg to stay readable
   const tc=_badgeTextColor(t);
@@ -4290,7 +4256,7 @@ function _fitHubTeamsRows(){
       // Reset any previous overrides
       el.style.letterSpacing='';
       el.style.gap='';
-      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>s.style.fontSize='');
+      el.querySelectorAll('span:not(.team-badge-mini):not(.team-vs)').forEach(s=>s.style.fontSize='');
 
       // Available width = hub-card-head clientWidth (overflow:hidden clips here)
       const avail=el.parentElement.clientWidth;
@@ -4306,8 +4272,8 @@ function _fitHubTeamsRows(){
       el.style.gap='0';
       if(measure()<=avail) return;
 
-      // 3. Shrink text spans only (not badges) down to 7px minimum
-      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini)')];
+      // 3. Shrink team name spans only — keep .team-vs at its natural small size
+      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini):not(.team-vs)')];
       let fs=parseFloat(getComputedStyle(el).fontSize);
       while(fs>7){
         fs=Math.max(7, fs-0.5);
@@ -4355,10 +4321,10 @@ function _fitOpTeamsRows(){
       const el=document.getElementById(`match-teams-${i}`);
       if(!el) return;
 
-      // Reset overrides
+      // Reset overrides — keep .team-vs excluded so its 11px CSS size is never overridden
       el.style.letterSpacing='';
       el.style.gap='';
-      el.querySelectorAll('span:not(.team-badge-mini)').forEach(s=>s.style.fontSize='');
+      el.querySelectorAll('span:not(.team-badge-mini):not(.team-vs)').forEach(s=>s.style.fontSize='');
 
       if(el.scrollWidth<=el.offsetWidth) return;
 
@@ -4372,8 +4338,10 @@ function _fitOpTeamsRows(){
       el.style.gap='0';
       if(el.scrollWidth<=el.offsetWidth) return;
 
-      // 3. Shrink text spans only (not badges), minimum 10px
-      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini)')];
+      // 3. Shrink team name spans only — exclude badges AND the VS label so it stays at
+      //    its natural 11px. If VS were included it would be set to the same px value as
+      //    the team names, making it look disproportionately large on narrow columns.
+      const textSpans=[...el.querySelectorAll('span:not(.team-badge-mini):not(.team-vs)')];
       let fs=parseFloat(getComputedStyle(el).fontSize);
       while(fs>10){
         fs=Math.max(10, fs-0.5);
