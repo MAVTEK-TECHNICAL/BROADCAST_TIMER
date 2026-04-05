@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
-const { beforeUserCreated }  = require('firebase-functions/v2/identity');
+const { onUserCreated }      = require('firebase-functions/v2/auth');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -24,23 +24,26 @@ async function assertGroupAdmin(callerUid, groupId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// onNewUserSetup  (blocking auth trigger)
+// onNewUserSetup  (non-blocking auth trigger)
 //
-// Fires via Identity Platform BEFORE a new user is created through the client
-// SDK (self-registration). Admin SDK creates (e.g. createGroupUser) do NOT
-// trigger this, so admin-provisioned users keep the profile written by
-// createGroupUser. Self-registered users land here and get:
-//   role: 'admin', groupId: null, selfRegistered: true
-// This lets them explore the UI immediately; a super-admin then assigns them
-// to a group via the ALL USERS panel.
+// Fires AFTER a new user is created — works with standard Firebase Auth
+// (no GCIP / Identity Platform upgrade required).
+//
+// For self-registered users (client SDK sign-up), this creates a Firestore
+// profile with role: 'admin' and groupId: null so they can explore the UI
+// immediately. A super-admin then assigns them to a group via MANAGE USERS.
+//
+// For admin-provisioned users (createGroupUser via Admin SDK), that function
+// already writes the profile via batch.commit() immediately after createUser().
+// The .create() call here will throw ALREADY_EXISTS and silently no-op.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.onNewUserSetup = beforeUserCreated(async (event) => {
+exports.onNewUserSetup = onUserCreated(async (event) => {
   const user = event.data;
   if (!user?.uid || !user?.email) return; // skip anonymous / incomplete
 
   const now = admin.firestore.FieldValue.serverTimestamp();
   try {
-    // .create() throws ALREADY_EXISTS if the doc is already there (admin-provisioned)
+    // .create() throws ALREADY_EXISTS if createGroupUser already wrote this doc
     await db.doc(`userProfiles/${user.uid}`).create({
       email:          user.email,
       displayName:    user.displayName || '',
@@ -53,10 +56,8 @@ exports.onNewUserSetup = beforeUserCreated(async (event) => {
   } catch (e) {
     // gRPC code 6 = ALREADY_EXISTS — admin-provisioned user, silently skip
     if (e.code === 6 || (e.message || '').includes('ALREADY_EXISTS')) return;
-    // Log but don't throw — we never want to block user creation over a profile write
     console.error('onNewUserSetup: Firestore write failed —', e.message);
   }
-  // Returning nothing = allow user creation with no modifications
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
