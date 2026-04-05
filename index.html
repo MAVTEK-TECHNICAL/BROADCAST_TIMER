@@ -995,6 +995,14 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .pm-empty{ font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px;text-align:center; }
 .pm-seed-btn{ font-size:9px;letter-spacing:2px;padding:6px 14px;border:1px solid var(--border-bright);background:transparent;color:var(--text-dim);border-radius:4px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s; }
 .pm-seed-btn:hover{ border-color:var(--purple);color:var(--purple);background:rgba(155,89,182,.1); }
+.pm-danger-zone{ border-top:1px solid rgba(255,80,80,.2);margin-top:6px;padding:14px 20px 10px; }
+.pm-danger-head{ font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:10px; }
+.pm-danger-row{ display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+.pm-danger-select{ background:var(--surface2);border:1px solid var(--border-bright);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px; }
+.pm-danger-select:focus{ border-color:var(--red); }
+.pm-clear-btn{ font-size:9px;letter-spacing:2px;padding:6px 14px;border:1px solid rgba(255,80,80,.5);background:transparent;color:var(--red);border-radius:4px;cursor:pointer;font-family:var(--display);text-transform:uppercase;transition:all .15s;white-space:nowrap; }
+.pm-clear-btn:hover{ border-color:var(--red);background:rgba(255,80,80,.12); }
+.pm-clear-btn:disabled{ opacity:.4;cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -2952,8 +2960,12 @@ function applyCalendarSnapshot(docs){
     })) : _defTimers();
   });
 
-  // Clear slots beyond today's doc count
+  // Clear slots beyond today's doc count — but skip any slot currently being
+  // written to Firestore (_localPendingSlots). Without this guard, a snapshot
+  // arriving before the addDoc resolves would wipe the local match state,
+  // causing the save to write visible:false and the match to vanish.
   for (let i=dayDocs.length; i<MAX_MATCHES; i++){
+    if(_localPendingSlots.has(i)) continue;
     matchVisible[i] = false;
     matchEnabled[i] = false;
     matchTimers[i]  = _defTimers();
@@ -2970,6 +2982,7 @@ function applyCalendarSnapshot(docs){
 // ── PER-MATCH SAVE ─────────────────────────────────────────
 const _saveTimers  = {};   // slot → debounce handle
 const _saveQueues  = {};   // slot → Promise chain (prevents write races)
+const _localPendingSlots = new Set(); // slots added locally but not yet confirmed in Firestore
 
 function scheduleSaveMatch(i){
   if (!_groupId || !window._user) return;
@@ -2997,15 +3010,20 @@ function doSaveMatch(i){
 
 async function _createMatchDoc(i){
   if (!_groupId || !window._user) return;
+  _localPendingSlots.add(i); // protect this slot from snapshot clearing until confirmed
   try {
     const {db,collection,addDoc} = window._fb;
     const payload = buildMatchPayload(i);
     const ref = await addDoc(collection(db,'groups',_groupId,'calendar'), payload);
     window._slotToMatchId[i] = ref.id;
     window._matchIdToSlot[ref.id] = i;
+    _localPendingSlots.delete(i);
     setPip('saved');
     document.getElementById('as-text').textContent = 'Live · match created';
-  } catch(e){ console.error('_createMatchDoc:',e); toast('Error creating match'); }
+  } catch(e){
+    _localPendingSlots.delete(i);
+    console.error('_createMatchDoc:',e); toast('Error creating match');
+  }
 }
 
 async function deleteMatchDoc(i){
@@ -3550,7 +3568,7 @@ function addMatch(){
         grid.insertBefore(div, addCol);
         window._colResizeObserver?.observe(div);
       }
-      renderAll(); scheduleSaveMatch(i); return;
+      renderAll(); _createMatchDoc(i); return;
     }
   }
   toast('SCHEDULE FULL');
@@ -3562,7 +3580,7 @@ function addHubMatch(){
       matchVisible[i]=matchEnabled[i]=true;
       matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
       matchTimers[i] = _defTimers();
-      scheduleSaveMatch(i); renderHubGrid(); return;
+      _createMatchDoc(i); renderHubGrid(); return;
     }
   }
   toast('SCHEDULE FULL');
@@ -5340,6 +5358,48 @@ async function pmSeedDefaults(){
   }
 }
 
+async function pmClearDatabase(){
+  const groupId = document.getElementById('pm-clear-group').value;
+  if (!groupId) { alert('Please select a group first.'); return; }
+  const groupName = _PM_GROUPS.find(g => g.id === groupId)?.name || groupId;
+  if (!confirm(
+    `CLEAR MATCH DATABASE — ${groupName.toUpperCase()}\n\n` +
+    `This will permanently delete ALL calendar matches for ${groupName}.\n\n` +
+    `This action cannot be undone. Are you sure?`
+  )) return;
+
+  const statusEl = document.getElementById('pm-status');
+  statusEl.textContent = 'Reading…';
+  const { db, collection, getDocs, writeBatch } = window._fb;
+
+  try {
+    const calSnap = await getDocs(collection(db, 'groups', groupId, 'calendar'));
+    if (calSnap.empty) {
+      statusEl.textContent = `${groupName} — no matches to clear`;
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+      return;
+    }
+
+    const docs = calSnap.docs;
+    statusEl.textContent = `Deleting ${docs.length} match${docs.length !== 1 ? 'es' : ''}…`;
+
+    // Firestore batch limit is 500 — chunk into groups of 450 for safety
+    for (let i = 0; i < docs.length; i += 450) {
+      const batch = writeBatch(db);
+      docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    statusEl.textContent = `Cleared ${docs.length} match${docs.length !== 1 ? 'es' : ''} from ${groupName} ✓`;
+    setTimeout(() => { statusEl.textContent = ''; }, 3500);
+    // Reset group selector
+    document.getElementById('pm-clear-group').value = '';
+  } catch(e) {
+    console.error('pmClearDatabase:', e);
+    statusEl.textContent = 'Clear failed: ' + (e.message || e.code || 'unknown error');
+  }
+}
+
 // ── GROUP PARSER ASSIGNMENTS (loaded from Firestore at login) ─────────────
 // Populated by loadGroupParsers(). Each entry is a full parser metadata object
 // from the parsers/ collection merged with the formatKey → handler mapping below.
@@ -5554,8 +5614,9 @@ function confirmScheduleImport(){
   function _finishImport(){
     switchView('hub'); renderAll();
     _applyCalendarDate(true);
-    // Push each imported slot to Firestore
-    _importedSlots.forEach(slot => scheduleSaveMatch(slot));
+    // Push each imported slot to Firestore immediately (no debounce — avoids
+    // snapshot race where applyCalendarSnapshot wipes local state before save)
+    _importedSlots.forEach(slot => _createMatchDoc(slot));
     toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
   }
   if(window._fringeSlots.length>0){
@@ -6822,6 +6883,25 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
       <div class="pm-section-head" style="margin-top:4px">SCHEDULE PARSERS</div>
       <div id="pm-schedule-wrap" style="padding:8px 16px 12px;overflow-x:auto">
         <div class="pm-empty">Loading…</div>
+      </div>
+
+      <!-- DANGER ZONE: Clear match database -->
+      <div class="pm-danger-zone">
+        <div class="pm-danger-head">⚠ DATABASE</div>
+        <div class="pm-danger-row">
+          <select class="pm-danger-select" id="pm-clear-group">
+            <option value="">— Select group —</option>
+            <option value="champion-data">Champion Data</option>
+            <option value="nep">NEP</option>
+            <option value="apac">APAC</option>
+            <option value="cms">CMS</option>
+            <option value="mavtek">MAVTEK</option>
+          </select>
+          <button class="pm-clear-btn" onclick="pmClearDatabase()">🗑 CLEAR MATCH DATABASE</button>
+        </div>
+        <div style="font-size:9px;color:var(--text-dim);font-family:var(--mono);margin-top:6px;letter-spacing:.5px">
+          Permanently deletes all calendar matches for the selected group. Cannot be undone.
+        </div>
       </div>
 
     </div>
