@@ -36,7 +36,7 @@ exports.createGroupUser = onCall(async (request) => {
   const callerUid = request.auth?.uid;
   if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
 
-  const { email, groupId } = request.data || {};
+  const { email, groupId, displayName } = request.data || {};
   if (!email || !groupId) {
     throw new HttpsError('invalid-argument', 'email and groupId are required.');
   }
@@ -61,11 +61,13 @@ exports.createGroupUser = onCall(async (request) => {
   const tempPassword = crypto.randomBytes(24).toString('base64url');
 
   // Create the Firebase Auth user
-  const newUser = await admin.auth().createUser({
+  const createParams = {
     email,
-    password: tempPassword,
+    password:      tempPassword,
     emailVerified: false
-  });
+  };
+  if (displayName) createParams.displayName = displayName;
+  const newUser = await admin.auth().createUser(createParams);
 
   const now          = admin.firestore.FieldValue.serverTimestamp();
   const callerEmail  = request.auth.token?.email || '';
@@ -89,31 +91,32 @@ exports.createGroupUser = onCall(async (request) => {
 
   batch.set(db.doc(`groups/${groupId}/members/${newUser.uid}`), {
     email,
-    role:     'view-operator',   // default — admin can promote after creation
-    addedAt:  now,
-    addedBy:  callerUid,
+    displayName:  displayName || '',
+    role:         'view-operator',   // default — admin can promote after creation
+    addedAt:      now,
+    addedBy:      callerUid,
     addedByEmail: callerEmail
   });
 
   batch.set(db.doc(`userProfiles/${newUser.uid}`), {
     email,
+    displayName:  displayName || '',
     groupId,
-    role:        'view-operator',
-    createdAt:   now,
-    createdBy:   callerUid,
-    preferences: defaultPreferences
+    role:         'view-operator',
+    createdAt:    now,
+    createdBy:    callerUid,
+    preferences:  defaultPreferences
   });
 
   await batch.commit();
 
-  // Send password-reset email — this is the user's "Welcome, set your password" email.
-  // Customise the template in Firebase Console → Authentication → Templates → Password reset.
-  await admin.auth().generatePasswordResetLink(email);
-  // The actual send is triggered client-side via sendPasswordResetEmail() after this returns,
-  // because the Admin SDK's generatePasswordResetLink() only returns the link — it doesn't
-  // send the email. The client call uses the Firebase Auth REST endpoint which does send it.
+  // Signal the client to send a password-reset email via sendPasswordResetEmail().
+  // The Admin SDK's generatePasswordResetLink() only returns the link without sending;
+  // the Firebase Auth client SDK's sendPasswordResetEmail() uses the REST endpoint and
+  // actually delivers the email using the template configured in Firebase Console →
+  // Authentication → Templates → Password reset.
 
-  return { uid: newUser.uid, email };
+  return { uid: newUser.uid, email, sendResetEmail: true };
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
