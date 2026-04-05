@@ -2848,6 +2848,12 @@ function applyGroupParsers(){
       if (inp) inp.accept = parser.fileAccept || '.pdf';
     }
   }
+
+  // Re-render match cards so callsheet button visibility (which reads _groupParsers.callsheet.length)
+  // reflects the now-loaded parser assignments. Without this, a fast initial snapshot can render
+  // the cards before loadGroupParsers() resolves, leaving the callsheet button permanently hidden
+  // until the next render trigger (e.g. switching groups).
+  if (typeof renderAll === 'function') renderAll();
 }
 
 async function _loadGroupAndSubscribe(){
