@@ -166,10 +166,13 @@ exports.createGroupUser = onCall(async (request) => {
   const callerUid = request.auth?.uid;
   if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
 
-  const { email, groupId, displayName } = request.data || {};
+  const { email, groupId, displayName, role: requestedRole } = request.data || {};
   if (!email || !groupId) {
     throw new HttpsError('invalid-argument', 'email and groupId are required.');
   }
+
+  const validRoles = ['view-operator', 'view-hub', 'admin'];
+  const role = validRoles.includes(requestedRole) ? requestedRole : 'view-operator';
 
   // Validate email format
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -222,7 +225,7 @@ exports.createGroupUser = onCall(async (request) => {
   batch.set(db.doc(`groups/${groupId}/members/${newUser.uid}`), {
     email,
     displayName:  displayName || '',
-    role:         'view-operator',   // default — admin can promote after creation
+    role,
     addedAt:      now,
     addedBy:      callerUid,
     addedByEmail: callerEmail
@@ -232,10 +235,10 @@ exports.createGroupUser = onCall(async (request) => {
     email,
     displayName:  displayName || '',
     groupId,
-    role:         'view-operator',
-    createdAt:    now,
-    createdBy:    callerUid,
-    preferences:  defaultPreferences
+    role,
+    createdAt:   now,
+    createdBy:   callerUid,
+    preferences: defaultPreferences
   });
 
   await batch.commit();

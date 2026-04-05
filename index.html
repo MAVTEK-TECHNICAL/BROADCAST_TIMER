@@ -2451,28 +2451,18 @@ async function guAddUser(){
   try {
     const {fns, httpsCallable, auth, sendPasswordResetEmail} = window._fb;
     const createGroupUser = httpsCallable(fns, 'createGroupUser');
-    const result = await createGroupUser({ email, displayName, groupId: _groupId });
+    // Pass role directly — Cloud Function sets it in one atomic batch write
+    const result = await createGroupUser({ email, displayName, groupId: _groupId, role });
 
-    // Cloud Function returns { uid, email, sendResetEmail: true } — send welcome/reset email
-    if (result.data?.sendResetEmail){
-      try {
-        await sendPasswordResetEmail(auth, email);
-        status.style.color = 'var(--green)';
-        status.textContent = `✓ ${email} created — password setup email sent.`;
-      } catch(emailErr){
-        status.style.color = 'var(--accent)';
-        status.textContent = `✓ ${email} created. (Email send failed — user can request reset manually.)`;
-        console.warn('sendPasswordResetEmail:', emailErr);
-      }
-    } else {
+    // Send welcome / password-setup email
+    try {
+      await sendPasswordResetEmail(auth, email);
       status.style.color = 'var(--green)';
-      status.textContent = `✓ ${email} created.`;
-    }
-
-    // Optionally promote role if not default
-    if (role !== 'view-operator' && result.data?.uid){
-      const updateUserRole = httpsCallable(fns, 'updateUserRole');
-      await updateUserRole({ targetUid: result.data.uid, groupId: _groupId, newRole: role });
+      status.textContent = `✓ ${email} created as ${role.toUpperCase().replace('-',' ')} — password setup email sent.`;
+    } catch(emailErr){
+      status.style.color = 'var(--green)';
+      status.textContent = `✓ ${email} created. (Welcome email failed — user can request a password reset manually.)`;
+      console.warn('sendPasswordResetEmail:', emailErr);
     }
 
     // Clear form & reload list
