@@ -76,38 +76,45 @@ exports.listAllUsers = onCall(async (request) => {
   const superSnap = await db.doc(`superAdmins/${callerUid}`).get();
   if (!superSnap.exists) throw new HttpsError('permission-denied', 'Super admin required.');
 
-  // Fetch all auth users + all profiles + all group names in parallel
-  const [listResult, profilesSnap, groupsSnap] = await Promise.all([
+  // Fetch all auth users + all profiles + all group names + super-admins in parallel
+  const [listResult, profilesSnap, groupsSnap, superAdminsSnap] = await Promise.all([
     admin.auth().listUsers(1000),
     db.collection('userProfiles').get(),
-    db.collection('groups').get()
+    db.collection('groups').get(),
+    db.collection('superAdmins').get()
   ]);
 
-  // Build profile map and groups list
-  const profileMap = {};
-  profilesSnap.docs.forEach(d => { profileMap[d.id] = d.data(); });
+  // Build lookup maps
+  const profileMap    = {};
+  const superAdminMap = {};
+  profilesSnap.docs.forEach(d    => { profileMap[d.id]    = d.data(); });
+  superAdminsSnap.docs.forEach(d => { superAdminMap[d.id] = true; });
 
   const groups = groupsSnap.docs
     .map(d => ({ id: d.id, name: d.data().name || d.id }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const users = listResult.users.map(authUser => {
-    const profile = profileMap[authUser.uid] || null;
+    const profile    = profileMap[authUser.uid] || null;
+    const isSuperAdm = superAdminMap[authUser.uid] || false;
     return {
       uid:            authUser.uid,
       email:          authUser.email || '',
       displayName:    authUser.displayName || profile?.displayName || '',
-      groupId:        profile?.groupId   || null,
-      role:           profile?.role      || null,
+      groupId:        isSuperAdm ? null : (profile?.groupId || null),
+      role:           isSuperAdm ? 'super-admin' : (profile?.role || null),
       selfRegistered: profile?.selfRegistered || false,
       hasProfile:     !!profile,
-      createdAt:      authUser.metadata.creationTime  || null,
+      isSuperAdmin:   isSuperAdm,
+      createdAt:      authUser.metadata.creationTime   || null,
       lastSignIn:     authUser.metadata.lastSignInTime || null
     };
   });
 
-  // Sort: unassigned first, then alphabetical by email
+  // Sort: super-admins first, then unassigned, then alphabetical by email
   users.sort((a, b) => {
+    if (a.isSuperAdmin && !b.isSuperAdmin) return -1;
+    if (!a.isSuperAdmin && b.isSuperAdmin) return  1;
     if (!a.groupId && b.groupId)  return -1;
     if (a.groupId  && !b.groupId) return  1;
     return (a.email || '').localeCompare(b.email || '');

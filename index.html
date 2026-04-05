@@ -2305,7 +2305,22 @@ function _guRenderAllUsers(users){
     const email   = esc(u.email||u.uid);
     const hasGrp  = !!u.groupId;
     const grpName = hasGrp ? esc((_guAllGroups.find(g=>g.id===u.groupId)?.name||u.groupId).toUpperCase()) : '—';
-    const roleStr = u.role ? (u.role==='admin'?'ADMIN':u.role==='view-hub'?'VIEW HUB':'VIEW OP') : '—';
+    const roleStr = u.role ? (u.role==='admin'?'ADMIN':u.role==='view-hub'?'VIEW HUB':u.role==='super-admin'?'SUPER ADMIN':'VIEW OP') : '—';
+
+    // Super-admins: show badge only, no assign controls
+    if (u.isSuperAdmin){
+      return `<div class="gu-au-row" data-uid="${esc(u.uid)}">
+        <div style="min-width:0">
+          ${name ? `<div class="gu-member-name">${name}</div>` : ''}
+          <div class="gu-member-email">${email}</div>
+        </div>
+        <div style="grid-column:2/5;display:flex;align-items:center;gap:8px">
+          <span style="font-size:9px;letter-spacing:1.5px;padding:3px 10px;background:var(--accent);color:#000;border-radius:3px;font-family:var(--display);font-weight:700">SUPER ADMIN</span>
+          <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Managed via Firebase Console</span>
+        </div>
+      </div>`;
+    }
+
     const unassignedBadge = !hasGrp
       ? `<span style="font-size:8px;letter-spacing:1px;padding:2px 5px;background:var(--accent);color:#000;border-radius:2px;font-family:var(--display);font-weight:700">NEW</span>`
       : '';
