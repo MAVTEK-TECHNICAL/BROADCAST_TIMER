@@ -2926,7 +2926,7 @@ function subscribeGroupCalendar(){
   );
   _calUnsub = onSnapshot(q,
     snap => { setConnStatus('live'); _lastCalDocs=snap.docs; applyCalendarSnapshot(snap.docs); },
-    err  => { console.error('Calendar snapshot error:',err); setConnStatus('error'); }
+    err  => { console.error('Calendar snapshot error:',err); setConnStatus('error'); dbgLog('snapshot:error', err.code ? `${err.code} — ${err.message}` : String(err), 'error'); }
   );
 }
 
@@ -3715,10 +3715,22 @@ function openImportModal(){
   document.getElementById('modal-import-hub').classList.remove('hidden');
 }
 function importMatchToOp(slotIdx){
-  opSlotMap.push(slotIdx);
   closeModal('modal-import-hub');
-  renderOpColumns();
-  renderAll();
+  const matchDate = matchMeta[slotIdx]?.isoDate;
+  // Clear any prior dismissal so this slot isn't immediately re-excluded by _rebuildOpSlotMap
+  opDismissedSlots.delete(`${slotIdx}:${matchDate || calendarDate}`);
+  if(matchDate){
+    // Navigate the operator view to the match's date. This lets _rebuildOpSlotMap naturally
+    // include it (and all sibling matches for that day) on every future snapshot, so the
+    // column stays visible permanently — not just until the next snapshot wipes it.
+    calendarDate = matchDate;
+    _applyCalendarDate(true);
+  } else {
+    // Dateless match — just add it directly
+    if(!opSlotMap.includes(slotIdx)) opSlotMap.push(slotIdx);
+    renderOpColumns();
+    renderAll();
+  }
 }
 
 // ── MODALS ───────────────────────────────────────────────
