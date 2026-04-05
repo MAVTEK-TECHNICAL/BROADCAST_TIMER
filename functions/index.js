@@ -250,13 +250,20 @@ exports.createGroupUser = onCall(async (request) => {
 
   await batch.commit();
 
-  // Signal the client to send a password-reset email via sendPasswordResetEmail().
-  // The Admin SDK's generatePasswordResetLink() only returns the link without sending;
-  // the Firebase Auth client SDK's sendPasswordResetEmail() uses the REST endpoint and
-  // actually delivers the email using the template configured in Firebase Console →
-  // Authentication → Templates → Password reset.
+  // Generate a password-reset link server-side and return it directly to the calling
+  // admin. This avoids the email-delivery approach entirely — corporate email security
+  // scanners often follow every link in an email to scan for phishing, which consumes
+  // Firebase's one-time OOB code before the user can click it, causing an instant
+  // "link expired" error. Returning the link to the admin lets them share it via a
+  // channel of their choice (Slack, Teams, etc.) without any scanner interference.
+  let resetLink = null;
+  try {
+    resetLink = await admin.auth().generatePasswordResetLink(email);
+  } catch (linkErr) {
+    console.warn('createGroupUser: generatePasswordResetLink failed, admin must send manually:', linkErr.message);
+  }
 
-  return { uid: newUser.uid, email, sendResetEmail: true };
+  return { uid: newUser.uid, email, resetLink };
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
