@@ -2526,11 +2526,20 @@ async function resolveUserRole(user){
       return;
     }
     // 2. Normal user — read userProfile
-    const profSnap = await getDoc(doc(db, 'userProfiles', user.uid));
+    let profSnap = await getDoc(doc(db, 'userProfiles', user.uid));
     if (!profSnap.exists()){
-      toast('Profile not found — contact your admin');
-      setConnStatus('error');
-      return;
+      // Self-registered user — bootstrap a basic admin profile so they can use the app.
+      // A super-admin can then assign them to a group via MANAGE USERS → ALL USERS.
+      const {setDoc, serverTimestamp} = window._fb;
+      await setDoc(doc(db, 'userProfiles', user.uid), {
+        email:          user.email || '',
+        displayName:    user.displayName || '',
+        groupId:        null,
+        role:           'admin',
+        selfRegistered: true,
+        createdAt:      serverTimestamp()
+      });
+      profSnap = await getDoc(doc(db, 'userProfiles', user.uid));
     }
     const prof = profSnap.data();
     _groupId  = prof.groupId || null;

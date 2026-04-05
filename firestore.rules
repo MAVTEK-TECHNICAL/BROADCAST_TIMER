@@ -80,6 +80,12 @@ service cloud.firestore {
 
       // Full create/delete only via Cloud Function (super admin context)
       allow create: if isSuperAdmin();
+
+      // Self-registration silo: a user may bootstrap their own profile if none exists yet.
+      // Role is locked to 'admin' and groupId must be null — prevents self-promotion.
+      allow create: if uid() == targetUid &&
+                       request.resource.data.role == 'admin' &&
+                       request.resource.data.groupId == null;
       allow delete: if isSuperAdmin();
     }
 

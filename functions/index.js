@@ -1,6 +1,5 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
-const functionsV1            = require('firebase-functions');   // v1 auth triggers
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -23,41 +22,6 @@ async function assertGroupAdmin(callerUid, groupId) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// onNewUserSetup  (non-blocking auth trigger)
-//
-// Fires AFTER a new user is created — works with standard Firebase Auth
-// (no GCIP / Identity Platform upgrade required).
-//
-// For self-registered users (client SDK sign-up), this creates a Firestore
-// profile with role: 'admin' and groupId: null so they can explore the UI
-// immediately. A super-admin then assigns them to a group via MANAGE USERS.
-//
-// For admin-provisioned users (createGroupUser via Admin SDK), that function
-// already writes the profile via batch.commit() immediately after createUser().
-// The .create() call here will throw ALREADY_EXISTS and silently no-op.
-// ─────────────────────────────────────────────────────────────────────────────
-exports.onNewUserSetup = functionsV1.auth.user().onCreate(async (user) => {
-  if (!user.email) return; // skip anonymous users (no email)
-
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  try {
-    // .create() throws ALREADY_EXISTS if createGroupUser already wrote this doc
-    await db.doc(`userProfiles/${user.uid}`).create({
-      email:          user.email,
-      displayName:    user.displayName || '',
-      groupId:        null,
-      role:           'admin',
-      selfRegistered: true,
-      createdAt:      now
-    });
-    console.log(`onNewUserSetup: created admin profile for ${user.email}`);
-  } catch (e) {
-    // gRPC code 6 = ALREADY_EXISTS — admin-provisioned user, silently skip
-    if (e.code === 6 || (e.message || '').includes('ALREADY_EXISTS')) return;
-    console.error('onNewUserSetup: Firestore write failed —', e.message);
-  }
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // listAllUsers  (super-admin only)
