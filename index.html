@@ -240,17 +240,6 @@ html,body{ width:100%;height:100%;overflow:hidden;background:var(--bg);
 .sf-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .sf-btn.del:hover{ border-color:var(--red);color:var(--red); }
 
-.sb-footer{
-  padding:10px 14px 14px;border-top:1px solid var(--border);
-  display:flex;gap:8px;flex-shrink:0;
-}
-.sb-footer-btn{
-  flex:1;padding:8px;background:transparent;border:1px solid var(--border-bright);
-  border-radius:4px;color:var(--text-dim);font-family:var(--display);
-  font-size:10px;letter-spacing:2px;text-transform:uppercase;
-  cursor:pointer;transition:all .15s;text-align:center;
-}
-.sb-footer-btn:hover{ border-color:var(--accent2);color:var(--accent2); }
 
 /* ─── MAIN APP ───────────────────────────────────────── */
 #app{ display:flex;flex-direction:column;height:100vh;width:100%;padding:8px;gap:8px; }
@@ -1071,11 +1060,6 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
     <button class="sb-import-sched admin-only" onclick="openGroupUsers()" style="display:none">👥 MANAGE USERS</button>
     <!-- Super-admin-only: parser manager -->
     <button class="sb-import-sched super-admin-only" onclick="openParserManager()" style="display:none">⚙ PARSER MANAGER</button>
-    <div class="sb-footer">
-      <button class="sb-footer-btn" onclick="exportJSON()">⬇ EXPORT</button>
-      <button class="sb-footer-btn" onclick="document.getElementById('import-file').click()">⬆ IMPORT</button>
-      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)" />
-    </div>
     <button class="sb-import-sched" id="sb-import-sched" onclick="openImportSchedule()">◈ IMPORT SCHEDULE</button>
   </div>
   <div id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -3110,175 +3094,6 @@ function saveUserPreferences(){
       await setDoc(doc(db,'userProfiles',window._user.uid), {preferences:prefs}, {merge:true});
     } catch(e){ console.warn('saveUserPreferences failed:',e); }
   });
-}
-
-// applyState — used by importJSON to apply a legacy showfile's state locally
-// (does NOT write to Firestore; import UI triggers per-match saves separately)
-function applyState(s){
-  if(s.brandColor)     { setBrandColor(s.brandColor, true); }
-  if(s.hubTz){ hubTz=s.hubTz; ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=hubTz; }); }
-  if(s.matchHubTzs){ matchHubTzs=Array(MAX_MATCHES).fill('Australia/Sydney'); s.matchHubTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES&&tz) matchHubTzs[i]=tz; }); }
-  if(typeof s.showClockSeconds==='boolean'){ showClockSeconds=s.showClockSeconds; document.getElementById('sec-on')?.classList.toggle('active',showClockSeconds); document.getElementById('sec-off')?.classList.toggle('active',!showClockSeconds); }
-  if(typeof s.opTimerDivider==='boolean'){  opTimerDivider =s.opTimerDivider;  document.getElementById('optd-on')?.classList.toggle('active', opTimerDivider);  document.getElementById('optd-off')?.classList.toggle('active',!opTimerDivider);  }
-  if(typeof s.hubTimerDivider==='boolean'){ hubTimerDivider=s.hubTimerDivider; document.getElementById('hubtd-on')?.classList.toggle('active', hubTimerDivider); document.getElementById('hubtd-off')?.classList.toggle('active',!hubTimerDivider); }
-  if(s.teamDisplayMode)    { setNameMode(s.teamDisplayMode, true); }
-  if(s.hubTeamDisplayMode) { setHubNameMode(s.hubTeamDisplayMode, true); }
-  if(s.logoSizeMode)   { logoSizeMode=s.logoSizeMode;       setLogoSize(logoSizeMode,true); }
-  if(s.hubLogoSize)    { hubLogoSize=s.hubLogoSize;         setHubLogoSize(hubLogoSize,true); }
-  if(s.logoBgMode!==undefined){ setLogoBg(s.logoBgMode, true); }
-  if(s.hubCols)        { hubCols=s.hubCols; setHubCols(hubCols,true); }
-  if(s.calendarDate)   { calendarDate=s.calendarDate; }
-  hubRangeStart = s.hubRangeStart||null;
-  hubRangeEnd   = s.hubRangeEnd  ||null;
-  hubTodayMode  = !!s.hubTodayMode;
-  _updateHubRangeUI();
-  _updateHubQuickBtns();
-  if(s.matchTzs){
-    matchTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
-    s.matchTzs.forEach((tz,i)=>{ if(i<MAX_MATCHES) matchTzs[i]=tz; });
-    ['hub-tz','op-tz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=matchTzs[0]; });
-    hubTz=matchTzs[0];
-  }
-  if(s.matchVisible){
-    matchVisible = Array(MAX_MATCHES).fill(false);
-    s.matchVisible.forEach((v,i)=>{ if(i<MAX_MATCHES) matchVisible[i]=v; });
-  }
-  if(s.matchEnabled){
-    matchEnabled = Array(MAX_MATCHES).fill(false);
-    s.matchEnabled.forEach((v,i)=>{ if(i<MAX_MATCHES) matchEnabled[i]=v; });
-  }
-  if(s.matchMeta){
-    matchMeta = Array.from({length:MAX_MATCHES}, (_,i)=>s.matchMeta[i] ? {...s.matchMeta[i]} : _defMeta(i));
-    const _validRef=ref=>ref&&SPORTS_DATA[ref.sport]?.[ref.idx];
-    const _findAcrossAllSports=name=>{
-      for(const sp of Object.keys(SPORTS_DATA)){
-        const ref=findTeamRef(sp,name); if(ref) return ref;
-      }
-      const fuzzy=fuzzyMatchTeam(name,'');
-      if(fuzzy){ for(const sp of Object.keys(SPORTS_DATA)){ const ref=findTeamRef(sp,fuzzy.name.toUpperCase()); if(ref) return ref; } }
-      return null;
-    };
-    matchMeta.forEach(m=>{
-      if(m.home && !_validRef(m.homeTeamRef)){
-        m.homeTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.home) : null) || _findAcrossAllSports(m.home);
-        if(m.homeTeamRef && !m.sport) m.sport=m.homeTeamRef.sport;
-      }
-      if(m.away && !_validRef(m.awayTeamRef)){
-        m.awayTeamRef = (m.sport ? _resolveTeamRef(m.sport,m.away) : null) || _findAcrossAllSports(m.away);
-      }
-    });
-  }
-  if(s.timers0 !== undefined){
-    for(let i=0;i<MAX_MATCHES;i++){
-      const key=`timers${i}`; if(s[key]) matchTimers[i]=s[key].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null}));
-    }
-  } else if(s.matchTimers){
-    s.matchTimers.forEach((mt,i)=>{ if(i<MAX_MATCHES) matchTimers[i]=mt.map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},i)):null})); });
-  }
-  if(Array.isArray(s.opDismissedSlots)) opDismissedSlots = new Set(s.opDismissedSlots);
-  if(s.timerSortMode){
-    s.timerSortMode.forEach((v,i)=>{ if(i<MAX_MATCHES) timerSortMode[i]=!!v; });
-    const _now=Date.now();
-    timerSortMode.forEach((sorted,i)=>{
-      if(sorted && matchTimers[i]?.length>1){
-        matchTimers[i].sort((a,b)=>{
-          if(!a.targetUTC && !b.targetUTC) return 0; if(!a.targetUTC) return 1; if(!b.targetUTC) return -1;
-          const da=a.targetUTC-_now, db=b.targetUTC-_now, futA=da>=0, futB=db>=0;
-          if(futA && !futB) return -1; if(!futA && futB) return 1;
-          return futA ? da-db : db-da;
-        });
-      }
-    });
-  }
-  for(let i=0;i<MAX_MATCHES;i++){ const sel=document.getElementById(`match-tz-${i}`); if(sel) sel.value=matchTzs[i]; }
-  _applyCalendarDate(true);
-}
-
-function setPip(s){
-  const dot=document.getElementById('as-dot'); const pip=document.getElementById('nav-pip');
-  dot.className='as-dot'+(s==='saving'?' saving':s==='error'?' error':'');
-  if(pip) pip.className='as-pip'+(s==='saving'?' saving':'');
-}
-
-function setConnStatus(s){ // s: 'live' | 'connecting' | 'offline' | 'error' | 'nogroup'
-  const el=document.getElementById('conn-status');
-  if(!el) return;
-  el.className='conn-status conn-'+s;
-  const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR',nogroup:'NO GROUP'};
-  el.textContent=labels[s]||s.toUpperCase();
-}
-
-// Export / Import
-function exportJSON(){
-  // Build a legacy-compatible export snapshot from current in-memory state
-  const maxActive = matchVisible.reduce((hi,v,i)=>v?i:hi,-1);
-  const serLen = Math.max(maxActive+1,3);
-  const timerKeys={};
-  for(let i=0;i<serLen;i++){
-    if(matchVisible[i]) timerKeys[`timers${i}`]=matchTimers[i].map(t=>({id:t.id,name:t.name,core:!!t.core,timeStr:t.timeStr||null,targetUTC:t.targetUTC||null,refTz:t.refTz||null}));
-  }
-  const _tsm=[]; for(let i=0;i<serLen;i++) _tsm.push(!!timerSortMode[i]);
-  timerKeys.timerSortMode=_tsm;
-  timerKeys.opDismissedSlots=[...opDismissedSlots];
-  const state={brandColor,hubTz,showClockSeconds,opTimerDivider,hubTimerDivider,
-    matchHubTzs:matchHubTzs.slice(0,serLen),teamDisplayMode:opTeamDisplayMode,hubTeamDisplayMode,
-    logoSizeMode,hubLogoSize,logoBgMode,hubCols,calendarDate,hubRangeStart,hubRangeEnd,hubTodayMode,
-    matchTzs:matchTzs.slice(0,serLen),matchVisible:matchVisible.slice(0,serLen),
-    matchEnabled:matchEnabled.slice(0,serLen),matchMeta:matchMeta.slice(0,serLen).map(m=>({...m})),...timerKeys};
-  const payload={exportedAt:new Date().toISOString(),name:_groupName||'group-export',state};
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-  a.download=`${(_groupName||'group').replace(/\s+/g,'-').toLowerCase()}-${calendarDate}.json`;
-  a.click(); toast('EXPORTED');
-}
-async function importJSON(e){
-  const file=e.target.files[0]; if(!file) return;
-  try {
-    const data=JSON.parse(await file.text());
-    const state=data.state||data;
-    // Extract only the match slots that carry real data from the imported file
-    const srcMeta    = state.matchMeta    || [];
-    const srcTimers  = state.matchTimers  || [];
-    const srcVisible = state.matchVisible || [];
-    const srcEnabled = state.matchEnabled || [];
-    const srcTzs     = state.matchTzs     || [];
-    // Collect populated source slots
-    const srcSlots=[];
-    for(let i=0;i<srcMeta.length;i++){
-      const m=srcMeta[i];
-      if(srcVisible[i]||m.home||m.away||m.isoDate||m.location) srcSlots.push(i);
-    }
-    if(!srcSlots.length){ toast('No match data found in file'); e.target.value=''; return; }
-    // Find free destination slots
-    const freeSlots=_findFreeSlots(srcSlots.length);
-    const toWrite=Math.min(srcSlots.length,freeSlots.length);
-    if(freeSlots.length<srcSlots.length){
-      toast(`${freeSlots.length} of ${srcSlots.length} matches imported — not enough free slots`);
-    }
-    let firstNewDate=null;
-    for(let ii=0;ii<toWrite;ii++){
-      const src=srcSlots[ii];
-      const dst=freeSlots[ii];
-      matchMeta[dst]   = srcMeta[src]    ? {..._defMeta(dst), ...srcMeta[src], label:srcMeta[src].label||`MATCH ${dst+1}`} : _defMeta(dst);
-      matchTimers[dst] = (srcTimers[src] && srcTimers[src].length) ? srcTimers[src].map(t=>({...t,targetUTC:t.timeStr?localToUTC(t.timeStr,getTimerRefTz({refTz:t.refTz},dst)):null})) : _defTimers();
-      matchTzs[dst]    = srcTzs[src]    || 'Australia/Sydney';
-      matchVisible[dst]= srcVisible[src] || false;
-      matchEnabled[dst]= srcEnabled[src] || false;
-      if(!firstNewDate && matchMeta[dst].isoDate) firstNewDate=matchMeta[dst].isoDate;
-    }
-    if(firstNewDate) calendarDate=firstNewDate;
-    updateAddMatchBtn();
-    switchView('hub'); renderAll();
-    _applyCalendarDate(true);
-    // Push each imported slot to Firestore
-    for(let ii=0;ii<toWrite;ii++){
-      const dst=freeSlots[ii];
-      await _createMatchDoc(dst);
-    }
-    toast(`IMPORTED: ${toWrite} MATCH${toWrite!==1?'ES':''}`);
-    closeSidebar();
-  } catch(err){ console.error(err); toast('Import failed — invalid file'); }
-  e.target.value='';
 }
 
 // ── SELECTS ──────────────────────────────────────────────
@@ -6776,7 +6591,7 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
   </div>
 </div>
 
-<!-- Hidden match TZ selects — kept for populateSelects / applyState compatibility -->
+<!-- Hidden match TZ selects — used by populateSelects() -->
 <div style="display:none" aria-hidden="true">
   <select id="match-tz-0"  onchange="onMatchTzChange(0)"></select>
   <select id="match-tz-1"  onchange="onMatchTzChange(1)"></select>
