@@ -2159,6 +2159,7 @@ function showLogin(){
   _groupId=null; _userRole=null; _groupName=null;
 }
 async function showApp(user){
+  dbgLog('─────────────', `PAGE LOAD — ${new Date().toISOString()}`, 'info');
   dbgLog('app:start', `session started — ${user.email}`, 'info');
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-wrapper').classList.remove('hidden');
@@ -5296,8 +5297,18 @@ let _pmState = {};
 // ══════════════════════════════════════════════════════════
 // ── DEBUG CONSOLE ─────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
-const _DEBUG_MAX = 600;
-const _debugLog  = [];   // [{ts, level, event, detail}]  level: 'info'|'ok'|'warn'|'error'
+const _DEBUG_MAX     = 600;  // max entries kept in memory
+const _DEBUG_LS_KEY  = 'bcast_debug_log';
+const _DEBUG_LS_MAX  = 400;  // max entries persisted to localStorage (keep it lean)
+
+// Boot: seed in-memory log from localStorage so previous-session entries survive refresh.
+const _debugLog = (()=>{
+  try {
+    const raw = localStorage.getItem(_DEBUG_LS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+})();
+
 let   _dcFilter  = 'all';
 let   _dcOpen    = false;
 
@@ -5305,6 +5316,11 @@ function dbgLog(event, detail='', level='info'){
   const entry = { ts: Date.now(), level, event, detail: String(detail) };
   _debugLog.push(entry);
   if(_debugLog.length > _DEBUG_MAX) _debugLog.splice(0, _debugLog.length - _DEBUG_MAX);
+  // Persist to localStorage (fire-and-forget, trim to _DEBUG_LS_MAX)
+  try {
+    const toStore = _debugLog.slice(-_DEBUG_LS_MAX);
+    localStorage.setItem(_DEBUG_LS_KEY, JSON.stringify(toStore));
+  } catch(e){ /* storage full — ignore */ }
   if(_dcOpen) _dcAppendRow(entry);
 }
 
@@ -5379,6 +5395,7 @@ function _dcUpdateCount(){
 
 function dcClear(){
   _debugLog.length = 0;
+  try { localStorage.removeItem(_DEBUG_LS_KEY); } catch(e){}
   const tbody = document.getElementById('dc-tbody');
   if(tbody) tbody.innerHTML='';
   _dcUpdateCount();
