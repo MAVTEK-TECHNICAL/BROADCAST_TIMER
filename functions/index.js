@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule }         = require('firebase-functions/v2/scheduler');
+const { beforeUserCreated }  = require('firebase-functions/v2/identity');
 const admin                  = require('firebase-admin');
 const crypto                 = require('crypto');
 
@@ -21,6 +22,164 @@ async function assertGroupAdmin(callerUid, groupId) {
     throw new HttpsError('permission-denied', 'Admin access required for this group.');
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onNewUserSetup  (blocking auth trigger)
+//
+// Fires via Identity Platform BEFORE a new user is created through the client
+// SDK (self-registration). Admin SDK creates (e.g. createGroupUser) do NOT
+// trigger this, so admin-provisioned users keep the profile written by
+// createGroupUser. Self-registered users land here and get:
+//   role: 'admin', groupId: null, selfRegistered: true
+// This lets them explore the UI immediately; a super-admin then assigns them
+// to a group via the ALL USERS panel.
+// ─────────────────────────────────────────────────────────────────────────────
+exports.onNewUserSetup = beforeUserCreated(async (event) => {
+  const user = event.data;
+  if (!user?.uid || !user?.email) return; // skip anonymous / incomplete
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  try {
+    // .create() throws ALREADY_EXISTS if the doc is already there (admin-provisioned)
+    await db.doc(`userProfiles/${user.uid}`).create({
+      email:          user.email,
+      displayName:    user.displayName || '',
+      groupId:        null,
+      role:           'admin',
+      selfRegistered: true,
+      createdAt:      now
+    });
+    console.log(`onNewUserSetup: created admin profile for ${user.email}`);
+  } catch (e) {
+    // gRPC code 6 = ALREADY_EXISTS — admin-provisioned user, silently skip
+    if (e.code === 6 || (e.message || '').includes('ALREADY_EXISTS')) return;
+    // Log but don't throw — we never want to block user creation over a profile write
+    console.error('onNewUserSetup: Firestore write failed —', e.message);
+  }
+  // Returning nothing = allow user creation with no modifications
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// listAllUsers  (super-admin only)
+//
+// Returns all Firebase Auth accounts joined with their Firestore profile data.
+// Used to populate the ALL USERS tab in the admin panel so super-admins can
+// spot and assign unattached accounts.
+//
+// Input:  (none)
+// Output: { users: [...], groups: [...] }
+// ─────────────────────────────────────────────────────────────────────────────
+exports.listAllUsers = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const superSnap = await db.doc(`superAdmins/${callerUid}`).get();
+  if (!superSnap.exists) throw new HttpsError('permission-denied', 'Super admin required.');
+
+  // Fetch all auth users + all profiles + all group names in parallel
+  const [listResult, profilesSnap, groupsSnap] = await Promise.all([
+    admin.auth().listUsers(1000),
+    db.collection('userProfiles').get(),
+    db.collection('groups').get()
+  ]);
+
+  // Build profile map and groups list
+  const profileMap = {};
+  profilesSnap.docs.forEach(d => { profileMap[d.id] = d.data(); });
+
+  const groups = groupsSnap.docs
+    .map(d => ({ id: d.id, name: d.data().name || d.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const users = listResult.users.map(authUser => {
+    const profile = profileMap[authUser.uid] || null;
+    return {
+      uid:            authUser.uid,
+      email:          authUser.email || '',
+      displayName:    authUser.displayName || profile?.displayName || '',
+      groupId:        profile?.groupId   || null,
+      role:           profile?.role      || null,
+      selfRegistered: profile?.selfRegistered || false,
+      hasProfile:     !!profile,
+      createdAt:      authUser.metadata.creationTime  || null,
+      lastSignIn:     authUser.metadata.lastSignInTime || null
+    };
+  });
+
+  // Sort: unassigned first, then alphabetical by email
+  users.sort((a, b) => {
+    if (!a.groupId && b.groupId)  return -1;
+    if (a.groupId  && !b.groupId) return  1;
+    return (a.email || '').localeCompare(b.email || '');
+  });
+
+  return { users, groups };
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// assignUserToGroup  (super-admin only)
+//
+// Assigns any existing Firebase Auth user to a group with a given role.
+// Removes them from their previous group's members subcollection if different.
+// Creates or overwrites their userProfiles doc.
+//
+// Input:  { targetUid: string, groupId: string, role: string }
+// Output: { ok: true }
+// ─────────────────────────────────────────────────────────────────────────────
+exports.assignUserToGroup = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const superSnap = await db.doc(`superAdmins/${callerUid}`).get();
+  if (!superSnap.exists) throw new HttpsError('permission-denied', 'Super admin required.');
+
+  const { targetUid, groupId, role } = request.data || {};
+  const validRoles = ['view-operator', 'view-hub', 'admin'];
+  if (!targetUid || !groupId || !validRoles.includes(role)) {
+    throw new HttpsError('invalid-argument', 'targetUid, groupId, and a valid role are required.');
+  }
+
+  // Fetch auth user + current profile in parallel
+  const [authUser, profSnap] = await Promise.all([
+    admin.auth().getUser(targetUid),
+    db.doc(`userProfiles/${targetUid}`).get()
+  ]);
+
+  const email       = authUser.email || '';
+  const displayName = authUser.displayName || profSnap.data()?.displayName || '';
+  const oldGroupId  = profSnap.exists ? profSnap.data().groupId : null;
+  const now         = admin.firestore.FieldValue.serverTimestamp();
+  const batch       = db.batch();
+
+  // Remove from old group members if switching groups
+  if (oldGroupId && oldGroupId !== groupId) {
+    batch.delete(db.doc(`groups/${oldGroupId}/members/${targetUid}`));
+  }
+
+  // Add/update new group membership
+  batch.set(db.doc(`groups/${groupId}/members/${targetUid}`), {
+    email,
+    displayName,
+    role,
+    addedAt:      now,
+    addedBy:      callerUid,
+    addedByEmail: request.auth.token?.email || ''
+  });
+
+  // Create/update userProfile
+  batch.set(db.doc(`userProfiles/${targetUid}`), {
+    email,
+    displayName,
+    groupId,
+    role,
+    assignedAt: now,
+    assignedBy: callerUid
+  }, { merge: true });
+
+  await batch.commit();
+  console.log(`assignUserToGroup: ${email} → ${groupId} as ${role} (by ${callerUid})`);
+  return { ok: true };
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // createGroupUser

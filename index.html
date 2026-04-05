@@ -392,6 +392,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .conn-connecting { color:var(--yellow);animation:blink-dot .9s infinite; }
 .conn-offline    { color:var(--text-dim); }
 .conn-error      { color:var(--red); }
+.conn-nogroup    { color:var(--accent); }
 
 /* Matches grid */
 #matches-grid{ display:flex;gap:8px;flex:1;min-height:0; }
@@ -760,6 +761,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .cs-person{ font-size:13px;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .cs-time{ font-family:var(--mono);font-size:16px;color:var(--accent);text-align:right;white-space:nowrap;font-weight:600; }
 /* Group Users modal */
+.gu-tab-btn{ background:none;border:none;border-bottom:2px solid transparent;color:var(--text-dim);font-family:var(--display);font-size:10px;letter-spacing:1.5px;padding:10px 18px;cursor:pointer;transition:color .15s,border-color .15s; }
+.gu-tab-btn:hover{ color:var(--text); }
+.gu-tab-active{ color:var(--accent)!important;border-bottom-color:var(--accent)!important; }
 .gu-member-row{ display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap; }
 .gu-member-row:hover{ background:var(--surface2); }
 .gu-member-info{ display:flex;flex-direction:column;gap:2px;min-width:0;flex:1; }
@@ -767,6 +771,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .gu-member-email{ font-size:11px;color:var(--text-dim);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .gu-member-controls{ display:flex;align-items:center;gap:8px;flex-shrink:0; }
 .gu-role-badge{ display:inline-block; }
+.gu-au-row{ display:grid;grid-template-columns:1fr 160px 130px 110px;gap:6px;align-items:center;padding:8px 8px;border-bottom:1px solid rgba(255,255,255,.05); }
+.gu-au-row:hover{ background:var(--surface2); }
+.gu-au-assign-btn{ font-family:var(--display);font-size:9px;letter-spacing:1px;padding:4px 8px;background:var(--accent);color:#000;border:none;border-radius:3px;cursor:pointer;font-weight:700;white-space:nowrap; }
+.gu-au-assign-btn:hover{ opacity:.85; }
+.gu-au-assign-btn:disabled{ opacity:.4;cursor:not-allowed; }
 .hub-clock-row{ display:flex;align-items:baseline;justify-content:space-between;width:100%; }
 .hub-clock-label{ font-family:var(--display);font-size:calc(7px * var(--hub-fs,1));font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;padding-right:4px; }
 .hub-clock-val{ font-family:var(--mono);font-size:calc(11px * var(--hub-fs,1));font-weight:700;color:#fff;letter-spacing:.06em;line-height:1.2;text-align:right;white-space:nowrap;flex:1; }
@@ -2223,12 +2232,142 @@ function openGroupUsers(){
   // Label
   const lbl = document.getElementById('gu-group-label');
   if (lbl) lbl.textContent = (_groupName || _groupId || '').toUpperCase();
+  // Show tab bar only for super-admin
+  const tabBar = document.getElementById('gu-tab-bar');
+  if (tabBar) tabBar.style.display = (_userRole === 'super-admin') ? 'block' : 'none';
   // Clear add form
   ['gu-new-name','gu-new-email'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   const sel = document.getElementById('gu-new-role'); if(sel) sel.value='view-operator';
   const st  = document.getElementById('gu-add-status'); if(st) st.textContent='';
-  // Load members
-  _loadGroupMembers();
+  // Always start on GROUP MEMBERS tab
+  guShowTab('members');
+}
+
+function guShowTab(tab){
+  const isMembersTab = (tab === 'members');
+  // Panes
+  const paneM = document.getElementById('gu-pane-members');
+  const paneA = document.getElementById('gu-pane-allusers');
+  if (paneM) paneM.style.display = isMembersTab ? 'flex' : 'none';
+  if (paneA) paneA.style.display = isMembersTab ? 'none' : 'flex';
+  // Tab button active state
+  document.getElementById('gu-tab-btn-members')?.classList.toggle('gu-tab-active', isMembersTab);
+  document.getElementById('gu-tab-btn-allusers')?.classList.toggle('gu-tab-active', !isMembersTab);
+  // Load data for the tab
+  if (isMembersTab) _loadGroupMembers();
+  else              guLoadAllUsers();
+}
+
+// ── ALL USERS tab ──────────────────────────────────────────
+let _guAllUsers  = [];   // cached full list from last listAllUsers call
+let _guAllGroups = [];   // cached group list
+
+async function guLoadAllUsers(){
+  const list = document.getElementById('gu-au-list');
+  if (!list) return;
+  list.innerHTML = '<div style="color:var(--text-dim);font-size:11px;padding:16px 8px;font-family:var(--mono)">Loading all users…</div>';
+  const searchEl = document.getElementById('gu-au-search');
+  if (searchEl) searchEl.value = '';
+  try {
+    const {fns, httpsCallable} = window._fb;
+    const listAllUsers = httpsCallable(fns, 'listAllUsers');
+    const result = await listAllUsers({});
+    _guAllUsers  = result.data.users  || [];
+    _guAllGroups = result.data.groups || [];
+    _guRenderAllUsers(_guAllUsers);
+  } catch(e){
+    list.innerHTML = `<div style="color:var(--red);font-size:11px;padding:16px 8px;font-family:var(--mono)">Error: ${esc(e.message||'Unknown error')}</div>`;
+    console.error('guLoadAllUsers:', e);
+  }
+}
+
+function _guFilterAllUsers(query){
+  if (!query.trim()){ _guRenderAllUsers(_guAllUsers); return; }
+  const q = query.toLowerCase();
+  _guRenderAllUsers(_guAllUsers.filter(u =>
+    (u.email||'').toLowerCase().includes(q) ||
+    (u.displayName||'').toLowerCase().includes(q) ||
+    (u.groupId||'').toLowerCase().includes(q)
+  ));
+}
+
+function _guRenderAllUsers(users){
+  const list = document.getElementById('gu-au-list');
+  if (!list) return;
+  if (!users.length){ list.innerHTML='<div style="color:var(--text-dim);font-size:11px;padding:16px 8px;font-family:var(--mono)">No users found.</div>'; return; }
+
+  const groupOpts = _guAllGroups.map(g =>
+    `<option value="${esc(g.id)}"${g.id===_groupId?' selected':''}>${esc(g.name.toUpperCase())}</option>`
+  ).join('');
+
+  list.innerHTML = users.map(u => {
+    const name    = esc(u.displayName||'');
+    const email   = esc(u.email||u.uid);
+    const hasGrp  = !!u.groupId;
+    const grpName = hasGrp ? esc((_guAllGroups.find(g=>g.id===u.groupId)?.name||u.groupId).toUpperCase()) : '—';
+    const roleStr = u.role ? (u.role==='admin'?'ADMIN':u.role==='view-hub'?'VIEW HUB':'VIEW OP') : '—';
+    const unassignedBadge = !hasGrp
+      ? `<span style="font-size:8px;letter-spacing:1px;padding:2px 5px;background:var(--accent);color:#000;border-radius:2px;font-family:var(--display);font-weight:700">NEW</span>`
+      : '';
+    const selfBadge = u.selfRegistered && !hasGrp
+      ? `<span style="font-size:8px;letter-spacing:1px;padding:2px 5px;background:var(--surface2);color:var(--text-dim);border-radius:2px;font-family:var(--mono);margin-left:3px">SELF</span>`
+      : '';
+
+    return `<div class="gu-au-row" data-uid="${esc(u.uid)}">
+      <div style="min-width:0">
+        ${name ? `<div class="gu-member-name">${name} ${unassignedBadge}${selfBadge}</div>` : `<div class="gu-member-email">${email}&nbsp;${unassignedBadge}${selfBadge}</div>`}
+        ${name ? `<div class="gu-member-email">${email}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:11px;color:${hasGrp?'var(--text-mid)':'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${grpName}</div>
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:1px">${roleStr}</div>
+      </div>
+      <select class="modal-input gu-au-group-sel" data-uid="${esc(u.uid)}" style="font-size:10px;padding:3px 4px;margin:0;cursor:pointer">
+        ${groupOpts}
+      </select>
+      <div style="display:flex;gap:4px;align-items:center">
+        <select class="modal-input gu-au-role-sel" data-uid="${esc(u.uid)}" style="font-size:10px;padding:3px 4px;margin:0;cursor:pointer;width:80px">
+          <option value="view-operator"${u.role==='view-operator'?' selected':''}>VIEW OP</option>
+          <option value="view-hub"${u.role==='view-hub'?' selected':''}>VIEW HUB</option>
+          <option value="admin"${u.role==='admin'?' selected':''}>ADMIN</option>
+        </select>
+        <button class="gu-au-assign-btn" id="gu-assign-${esc(u.uid)}"
+                onclick="guAssignUser('${esc(u.uid)}')">ASSIGN</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function guAssignUser(uid){
+  const btn      = document.getElementById(`gu-assign-${uid}`);
+  const row      = btn?.closest('.gu-au-row');
+  const groupSel = row?.querySelector('.gu-au-group-sel');
+  const roleSel  = row?.querySelector('.gu-au-role-sel');
+  if (!groupSel || !roleSel) return;
+
+  const groupId = groupSel.value;
+  const role    = roleSel.value;
+  if (!groupId){ toast('Select a group first.'); return; }
+
+  if (btn){ btn.disabled=true; btn.textContent='…'; }
+  try {
+    const {fns, httpsCallable} = window._fb;
+    const assignUserToGroup = httpsCallable(fns, 'assignUserToGroup');
+    await assignUserToGroup({ targetUid: uid, groupId, role });
+
+    // Update cached data so the row reflects the new state immediately
+    const u = _guAllUsers.find(x => x.uid === uid);
+    if (u){ u.groupId = groupId; u.role = role; u.hasProfile = true; }
+
+    toast('User assigned ✓');
+    // Re-render (keeps scroll position, just updates rows)
+    const searchVal = document.getElementById('gu-au-search')?.value || '';
+    _guFilterAllUsers(searchVal);
+  } catch(e){
+    toast('Assign failed: ' + (e?.message||e));
+    console.error('guAssignUser:', e);
+    if (btn){ btn.disabled=false; btn.textContent='ASSIGN'; }
+  }
 }
 
 async function _loadGroupMembers(){
@@ -2384,7 +2523,15 @@ async function resolveUserRole(user){
     applyRoleToUI(_userRole);
     if (prof.preferences) applyUserPreferences(prof.preferences);
     if (_groupId) await _loadGroupAndSubscribe();
-    else { toast('No group assigned — contact your admin'); setConnStatus('error'); }
+    else {
+      // No group yet — show app with role applied but no live data.
+      // Admin users can explore the UI; super-admin can assign them via MANAGE USERS → ALL USERS.
+      setConnStatus('nogroup');
+      const isAdminish = (_userRole === 'admin' || _userRole === 'super-admin');
+      toast(isAdminish
+        ? 'ADMIN — no group assigned yet. Ask a super-admin to assign you via Manage Users.'
+        : 'No group assigned — contact your admin.');
+    }
   } catch(e){
     console.error('resolveUserRole:', e);
     setConnStatus('error');
@@ -2760,11 +2907,11 @@ function setPip(s){
   if(pip) pip.className='as-pip'+(s==='saving'?' saving':'');
 }
 
-function setConnStatus(s){ // s: 'live' | 'connecting' | 'offline' | 'error'
+function setConnStatus(s){ // s: 'live' | 'connecting' | 'offline' | 'error' | 'nogroup'
   const el=document.getElementById('conn-status');
   if(!el) return;
   el.className='conn-status conn-'+s;
-  const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR'};
+  const labels={live:'LIVE',connecting:'CONNECTING…',offline:'OFFLINE',error:'ERROR',nogroup:'NO GROUP'};
   el.textContent=labels[s]||s.toUpperCase();
 }
 
@@ -6256,42 +6403,73 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
 </div>
 <!-- ── GROUP USERS MODAL ─────────────────────────────────────────── -->
 <div class="modal-overlay hidden" id="modal-group-users">
-  <div class="modal" style="width:680px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
+  <div class="modal" style="width:740px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
     <div class="modal-title" style="padding:16px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
-      <span>👥 GROUP USERS</span>
+      <span>👥 MANAGE USERS</span>
       <span id="gu-group-label" style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:1px;margin-left:4px"></span>
     </div>
 
-    <!-- ADD USER form -->
-    <div style="flex-shrink:0;padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">ADD NEW USER</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
-          <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">NAME</label>
-          <input id="gu-new-name" type="text" class="modal-input" placeholder="Full name (optional)" style="margin:0">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px">
-          <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">EMAIL</label>
-          <input id="gu-new-email" type="email" class="modal-input" placeholder="user@example.com" style="margin:0">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;min-width:140px">
-          <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">ROLE</label>
-          <select id="gu-new-role" class="modal-input" style="margin:0;cursor:pointer">
-            <option value="view-operator">VIEW OPERATOR</option>
-            <option value="view-hub">VIEW HUB</option>
-            <option value="admin">ADMIN</option>
-          </select>
-        </div>
-        <button class="btn btn-confirm" id="gu-add-btn" onclick="guAddUser()" style="flex-shrink:0;align-self:flex-end">+ ADD</button>
+    <!-- Tab bar — shown only for super-admin via openGroupUsers() -->
+    <div id="gu-tab-bar" style="display:none;flex-shrink:0;display:none;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:0">
+        <button id="gu-tab-btn-members" class="gu-tab-btn gu-tab-active" onclick="guShowTab('members')">GROUP MEMBERS</button>
+        <button id="gu-tab-btn-allusers" class="gu-tab-btn" onclick="guShowTab('allusers')">ALL USERS ★</button>
       </div>
-      <div id="gu-add-status" style="font-size:11px;color:var(--text-dim);min-height:16px;font-family:var(--mono)"></div>
     </div>
 
-    <!-- Members list -->
-    <div style="flex:1;overflow-y:auto;padding:0">
-      <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;padding:10px 20px 6px">CURRENT MEMBERS</div>
-      <div id="gu-members-list" style="padding:0 12px 12px">
-        <div style="color:var(--text-dim);font-size:11px;padding:12px 8px;font-family:var(--mono)">Loading…</div>
+    <!-- ── TAB: GROUP MEMBERS ── -->
+    <div id="gu-pane-members" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+      <!-- ADD USER form -->
+      <div style="flex-shrink:0;padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">ADD NEW USER TO GROUP</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:150px">
+            <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">NAME</label>
+            <input id="gu-new-name" type="text" class="modal-input" placeholder="Full name (optional)" style="margin:0">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:170px">
+            <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">EMAIL</label>
+            <input id="gu-new-email" type="email" class="modal-input" placeholder="user@example.com" style="margin:0">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:130px">
+            <label style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase">ROLE</label>
+            <select id="gu-new-role" class="modal-input" style="margin:0;cursor:pointer">
+              <option value="view-operator">VIEW OPERATOR</option>
+              <option value="view-hub">VIEW HUB</option>
+              <option value="admin">ADMIN</option>
+            </select>
+          </div>
+          <button class="btn btn-confirm" id="gu-add-btn" onclick="guAddUser()" style="flex-shrink:0;align-self:flex-end">+ ADD</button>
+        </div>
+        <div id="gu-add-status" style="font-size:11px;color:var(--text-dim);min-height:16px;font-family:var(--mono)"></div>
+      </div>
+      <!-- Members list -->
+      <div style="flex:1;overflow-y:auto;padding:0">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;padding:10px 20px 6px">CURRENT MEMBERS</div>
+        <div id="gu-members-list" style="padding:0 12px 12px">
+          <div style="color:var(--text-dim);font-size:11px;padding:12px 8px;font-family:var(--mono)">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL USERS ── -->
+    <div id="gu-pane-allusers" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+      <!-- Search + refresh -->
+      <div style="flex-shrink:0;padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center">
+        <input id="gu-au-search" type="text" class="modal-input" placeholder="Search by email or name…"
+               oninput="_guFilterAllUsers(this.value)" style="margin:0;flex:1">
+        <button class="btn btn-cancel" onclick="guLoadAllUsers()" style="flex-shrink:0;font-size:10px;padding:5px 12px">↺ REFRESH</button>
+      </div>
+      <!-- Column headers -->
+      <div style="flex-shrink:0;display:grid;grid-template-columns:1fr 160px 130px 110px;gap:6px;padding:6px 16px 4px;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px">USER</span>
+        <span style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px">CURRENT GROUP</span>
+        <span style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px">ASSIGN GROUP</span>
+        <span style="font-size:9px;color:var(--text-dim);letter-spacing:1.5px">ASSIGN ROLE</span>
+      </div>
+      <!-- User rows -->
+      <div id="gu-au-list" style="flex:1;overflow-y:auto;padding:0 8px 12px">
+        <div style="color:var(--text-dim);font-size:11px;padding:16px 8px;font-family:var(--mono)">Loading all users…</div>
       </div>
     </div>
 
