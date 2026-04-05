@@ -5612,11 +5612,12 @@ function confirmScheduleImport(){
   window._fringeSlots=[...new Set(window._fringeSlots||[])];
   const _importedSlots = freeSlots.slice(0, matches.length);
   function _finishImport(){
+    // Register slots in Firestore FIRST — _createMatchDoc synchronously adds each
+    // slot to _localPendingSlots before returning, so the applyCalendarSnapshot
+    // triggered by _applyCalendarDate below won't clear them mid-flight.
+    _importedSlots.forEach(slot => _createMatchDoc(slot));
     switchView('hub'); renderAll();
     _applyCalendarDate(true);
-    // Push each imported slot to Firestore immediately (no debounce — avoids
-    // snapshot race where applyCalendarSnapshot wipes local state before save)
-    _importedSlots.forEach(slot => _createMatchDoc(slot));
     toast(`${matches.length} MATCH${matches.length!==1?'ES':''} IMPORTED`);
   }
   if(window._fringeSlots.length>0){
