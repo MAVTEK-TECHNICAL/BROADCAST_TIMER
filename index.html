@@ -387,6 +387,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   border-radius:50%;background:var(--green);border:1px solid var(--bg);transition:background .3s;
 }
 .as-pip.saving{ background:var(--yellow);animation:blink-dot .6s infinite; }
+.as-pip.error { background:var(--red); animation:none; }
 .conn-status{ display:inline-block;transition:color .3s; }
 .conn-live       { color:var(--green); }
 .conn-connecting { color:var(--yellow);animation:blink-dot .9s infinite; }
@@ -3197,6 +3198,12 @@ function saveUserPreferences(){
 }
 
 // ── CONNECTION STATUS ─────────────────────────────────────
+function setPip(state){
+  const el = document.getElementById('nav-pip');
+  if(!el) return;
+  el.className = 'as-pip' + (state && state !== 'saved' ? ' ' + state : '');
+}
+
 function setConnStatus(s){
   const el=document.getElementById('conn-status');
   if(!el) return;
