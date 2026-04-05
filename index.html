@@ -2849,11 +2849,12 @@ function applyGroupParsers(){
     }
   }
 
-  // Re-render match cards so callsheet button visibility (which reads _groupParsers.callsheet.length)
-  // reflects the now-loaded parser assignments. Without this, a fast initial snapshot can render
-  // the cards before loadGroupParsers() resolves, leaving the callsheet button permanently hidden
-  // until the next render trigger (e.g. switching groups).
-  if (typeof renderAll === 'function') renderAll();
+  // Rebuild match card DOM so the callsheet button (which is emitted inline by renderOpColumns)
+  // reflects the now-loaded parser assignments. renderAll() alone is not enough — it only updates
+  // content within existing card elements, not the card HTML structure itself. Without this, a fast
+  // initial snapshot renders the cards before loadGroupParsers() resolves, leaving the callsheet
+  // button permanently absent until the next group switch.
+  if (typeof renderOpColumns === 'function') { renderOpColumns(); renderAll(); }
 }
 
 async function _loadGroupAndSubscribe(){
