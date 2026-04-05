@@ -452,7 +452,12 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .remove-match-btn{ position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:50%;background:rgba(255,51,85,.05);border:1.5px solid var(--red);color:var(--red);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;pointer-events:all !important;z-index:10;opacity:0.25; }
 .remove-match-btn:hover{ background:rgba(255,51,85,.5);transform:scale(1.1);opacity:1; }
 .match-title-row{ display:flex;align-items:center;justify-content:center;gap:8px;width:100%;position:relative; }
-.match-label{ font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:3px;color:var(--accent);text-transform:uppercase; }
+.match-label{ font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;cursor:grab;user-select:none; }
+.match-label:active{ cursor:grabbing; }
+.match-col.drag-over{ outline:2px dashed var(--brand-color);outline-offset:-2px; }
+.match-col.dragging { opacity:0.45; }
+.hub-card.drag-over { outline:2px dashed var(--brand-color);outline-offset:-2px; }
+.hub-card.dragging  { opacity:0.45; }
 .edit-match-btn{ background:none;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;flex-shrink:0; }
 .edit-match-btn:hover{ color:var(--accent); }
 .match-teams{ display:flex;align-items:center;justify-content:center;gap:.5em;min-height:var(--op-teams-minh,16px);font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.08em;text-transform:uppercase;line-height:1;width:100%;white-space:nowrap;overflow:hidden; }
@@ -1740,9 +1745,11 @@ function _isSlotEmpty(i){ return !matchVisible[i] && !matchEnabled[i] && !matchM
 function _findFreeSlots(n){ const slots=[]; for(let i=0;i<MAX_MATCHES&&slots.length<n;i++) if(_isSlotEmpty(i)) slots.push(i); return slots; }
 let matchTzs    = Array(MAX_MATCHES).fill('Australia/Sydney');
 let matchHubTzs = Array(MAX_MATCHES).fill('Australia/Sydney');
-let matchVisible = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
-let matchEnabled = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
-let matchMeta   = Array.from({length:MAX_MATCHES}, (_,i)=>_defMeta(i));
+let matchVisible    = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
+let matchEnabled    = Array.from({length:MAX_MATCHES}, (_,i)=>i===0);
+let matchMeta       = Array.from({length:MAX_MATCHES}, (_,i)=>_defMeta(i));
+let matchSortOrders = Array.from({length:MAX_MATCHES}, (_,i)=>i*10); // Firestore sortOrder per slot
+let _opPersonalOrder = null; // null=use Firestore order; [matchId,…]=user's personal op column order
 
 // ── SPORTS DATA ──────────────────────────────────────────────
 const SPORTS_DATA = {
@@ -2920,6 +2927,8 @@ function applyUserPreferences(prefs){
   if (prefs.hubLogoSize) { hubLogoSize=prefs.hubLogoSize;  setHubLogoSize(hubLogoSize,true); }
   if (prefs.hubCols)     { hubCols=prefs.hubCols; setHubCols(hubCols,true); }
   if (prefs.viewMode)    switchView(prefs.viewMode);
+  if (Array.isArray(prefs.opMatchOrder) && prefs.opMatchOrder.length)
+    _opPersonalOrder = prefs.opMatchOrder;
 }
 
 // ── GROUP CALENDAR SUBSCRIPTION ────────────────────────────
@@ -2969,11 +2978,12 @@ function applyCalendarSnapshot(docs){
     // Firestore — skip overwriting it so the debounce can complete correctly.
     const _hasPendingSave = _pendingSaveSlots.has(slot);
     if (!_hasPendingSave) {
-      matchVisible[slot]  = data.visible !== false;
-      matchEnabled[slot]  = data.enabled !== false;
-      matchTzs[slot]      = data.matchTz    || 'Australia/Sydney';
-      matchHubTzs[slot]   = data.matchHubTz || hubTz || 'Australia/Sydney';
-      timerSortMode[slot] = !!data.timerSortMode;
+      matchVisible[slot]    = data.visible !== false;
+      matchEnabled[slot]    = data.enabled !== false;
+      matchSortOrders[slot] = data.sortOrder ?? (slot * 10);
+      matchTzs[slot]        = data.matchTz    || 'Australia/Sydney';
+      matchHubTzs[slot]     = data.matchHubTz || hubTz || 'Australia/Sydney';
+      timerSortMode[slot]   = !!data.timerSortMode;
       const _sport = data.sport || '';
       matchMeta[slot] = {
         label:        data.label        || '',
@@ -3159,10 +3169,128 @@ function buildMatchPayload(i){
     timerSortMode: !!timerSortMode[i],
     visible:      !!matchVisible[i],
     enabled:      !!matchEnabled[i],
-    sortOrder:    i,
+    sortOrder:    matchSortOrders[i] ?? (i * 10),
     updatedAt:    window._fb.serverTimestamp(),
     updatedBy:    window._user?.uid || null,
   };
+}
+
+// ── MATCH REORDER ──────────────────────────────────────────
+// Hub view (admin/super-admin): write new sortOrders to Firestore atomically.
+// All subscribers see the updated order on the next snapshot.
+async function saveHubMatchOrder(orderedSlots){
+  if (!_groupId || !window._user) return;
+  const {db, doc, writeBatch} = window._fb;
+  const batch = writeBatch(db);
+  orderedSlots.forEach((si, idx) => {
+    const matchId = window._slotToMatchId[si];
+    if (!matchId) return;
+    matchSortOrders[si] = idx * 10;
+    batch.update(doc(db,'groups',_groupId,'calendar',matchId), { sortOrder: idx * 10 });
+  });
+  try {
+    await batch.commit();
+    dbgLog('match:reorder', `hub global — ${orderedSlots.length} matches`, 'ok');
+  } catch(e){ dbgLog('match:reorder', `FAILED — ${e.message||e}`, 'error'); toast('Reorder failed'); }
+}
+
+// Operator view (any user): personal column order saved to userPreferences.
+// Order is stored as an array of Firestore matchIds.
+function saveOpPersonalOrder(){
+  _opPersonalOrder = opSlotMap.map(si => window._slotToMatchId[si] || null).filter(Boolean);
+  scheduleSave();
+}
+
+// Apply _opPersonalOrder to opSlotMap after _rebuildOpSlotMap sets the natural order.
+// New matches (not in personal order) are appended at the end.
+function _applyPersonalOpOrder(){
+  if (!_opPersonalOrder || !_opPersonalOrder.length) return;
+  const idToSlot = {};
+  Object.entries(window._matchIdToSlot || {}).forEach(([id, slot]) => { idToSlot[id] = +slot; });
+  const inMap = new Set(opSlotMap);
+  const ordered = [];
+  for (const id of _opPersonalOrder){
+    const slot = idToSlot[id];
+    if (slot !== undefined && inMap.has(slot)) ordered.push(slot);
+  }
+  // Append any new matches not yet in personal order
+  for (const slot of opSlotMap){
+    if (!ordered.includes(slot)) ordered.push(slot);
+  }
+  opSlotMap = ordered;
+}
+
+// ── DRAG-TO-REORDER ────────────────────────────────────────
+// Operator view: personal order (per-user, not global)
+let _opDragFromCol = null;
+function opColDragStart(ev, col){
+  _opDragFromCol = col;
+  ev.dataTransfer.effectAllowed = 'move';
+  // Mark column as dragging after a tick so it's visible during drag
+  requestAnimationFrame(() => document.getElementById(`match-col-${col}`)?.classList.add('dragging'));
+}
+function opColDragOver(ev, col){
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  if (col === _opDragFromCol) return;
+  document.querySelectorAll('.match-col').forEach(el => el.classList.remove('drag-over'));
+  document.getElementById(`match-col-${col}`)?.classList.add('drag-over');
+}
+function opColDragLeave(col){
+  document.getElementById(`match-col-${col}`)?.classList.remove('drag-over');
+}
+function opColDrop(ev, col){
+  ev.preventDefault();
+  if (_opDragFromCol === null || _opDragFromCol === col) return;
+  const newMap = [...opSlotMap];
+  const [moved] = newMap.splice(_opDragFromCol, 1);
+  newMap.splice(col, 0, moved);
+  opSlotMap = newMap;
+  saveOpPersonalOrder();
+  renderOpColumns();
+  renderAll();
+  _opDragFromCol = null;
+}
+function opColDragEnd(){
+  _opDragFromCol = null;
+  document.querySelectorAll('.match-col').forEach(el => el.classList.remove('dragging','drag-over'));
+}
+
+// Hub view: global order (admin/super-admin only, batch-writes to Firestore)
+let _hubDragFromSlot = null;
+function hubCardDragStart(ev, slot){
+  _hubDragFromSlot = slot;
+  ev.dataTransfer.effectAllowed = 'move';
+  requestAnimationFrame(() => document.getElementById(`hub-card-${slot}`)?.classList.add('dragging'));
+}
+function hubCardDragOver(ev, slot){
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  if (slot === _hubDragFromSlot) return;
+  document.querySelectorAll('.hub-card').forEach(el => el.classList.remove('drag-over'));
+  document.getElementById(`hub-card-${slot}`)?.classList.add('drag-over');
+}
+function hubCardDragLeave(slot){
+  document.getElementById(`hub-card-${slot}`)?.classList.remove('drag-over');
+}
+function hubCardDrop(ev, slot){
+  ev.preventDefault();
+  if (_hubDragFromSlot === null || _hubDragFromSlot === slot) return;
+  const visibleSlots = [];
+  for (let i = 0; i < MAX_MATCHES; i++) if (isMatchVisible(i)) visibleSlots.push(i);
+  const fromIdx = visibleSlots.indexOf(_hubDragFromSlot);
+  const toIdx   = visibleSlots.indexOf(slot);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const newOrder = [...visibleSlots];
+  const [moved] = newOrder.splice(fromIdx, 1);
+  newOrder.splice(toIdx, 0, moved);
+  saveHubMatchOrder(newOrder);
+  renderHubGrid();
+  _hubDragFromSlot = null;
+}
+function hubCardDragEnd(){
+  _hubDragFromSlot = null;
+  document.querySelectorAll('.hub-card').forEach(el => el.classList.remove('dragging','drag-over'));
 }
 
 // scheduleSave() — called from preference-change handlers (brandColor, divider, etc.)
@@ -3187,6 +3315,7 @@ function saveUserPreferences(){
     hubLogoSize,
     hubCols,
     viewMode,
+    opMatchOrder: _opPersonalOrder || null,
   };
   _prefQueue = _prefQueue.catch(()=>{}).then(async () => {
     try {
@@ -3625,6 +3754,8 @@ function addMatch(){
       matchVisible[i]=matchEnabled[i]=true;
       matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
       matchTimers[i] = _defTimers();
+      // Place new match after all existing ones
+      matchSortOrders[i] = Math.max(0, ...matchSortOrders.filter(Number.isFinite)) + 10;
       // Append to the *current* opSlotMap rather than rebuilding it from scratch.
       // Rebuilding would restore any columns the user previously dismissed with ✕.
       const col = opSlotMap.length;
@@ -3638,10 +3769,17 @@ function addMatch(){
         div.id = `match-col-${col}`;
         const detailsOpen = opDetailsExpanded[i] ? '' : ' hidden';
         div.innerHTML = `
-          <div class="match-header">
+          <div class="match-header"
+               ondragover="opColDragOver(event,${col})"
+               ondragleave="opColDragLeave(${col})"
+               ondrop="opColDrop(event,${col})">
             <button class="remove-match-btn" onclick="removeMatch(${col})" title="Remove from view">✕</button>
             <div class="match-title-row">
-              <div class="match-label" id="match-label-${col}">MATCH ${col+1}</div>
+              <div class="match-label" id="match-label-${col}"
+                   draggable="true"
+                   ondragstart="opColDragStart(event,${col})"
+                   ondragend="opColDragEnd()"
+                   title="Drag to reorder">MATCH ${col+1}</div>
               <button class="edit-match-btn" onclick="opEditMatch(${col})" title="Edit match">✎</button>
             </div>
             <div class="match-teams" id="match-teams-${col}"></div>
@@ -3671,6 +3809,7 @@ function addHubMatch(){
       matchVisible[i]=matchEnabled[i]=true;
       matchMeta[i]   = {..._defMeta(i), isoDate:calendarDate}; // blank slate
       matchTimers[i] = _defTimers();
+      matchSortOrders[i] = Math.max(0, ...matchSortOrders.filter(Number.isFinite)) + 10;
       _createMatchDoc(i); renderHubGrid(); return;
     }
   }
@@ -4503,6 +4642,7 @@ function _rebuildOpSlotMap(){
     }
   }
   opSlotMap = slots; // dynamic — all matches for the day
+  _applyPersonalOpOrder(); // re-apply per-user column order if set
   renderOpColumns();
   updateAddMatchBtn();
 }
@@ -4521,10 +4661,17 @@ function renderOpColumns(){
     div.id = `match-col-${col}`;
     const detailsOpen = opDetailsExpanded[si] ? '' : ' hidden';
     div.innerHTML = `
-      <div class="match-header">
+      <div class="match-header"
+           ondragover="opColDragOver(event,${col})"
+           ondragleave="opColDragLeave(${col})"
+           ondrop="opColDrop(event,${col})">
         <button class="remove-match-btn" onclick="removeMatch(${col})" title="Remove from view">✕</button>
         <div class="match-title-row">
-          <div class="match-label" id="match-label-${col}">MATCH ${col+1}</div>
+          <div class="match-label" id="match-label-${col}"
+               draggable="true"
+               ondragstart="opColDragStart(event,${col})"
+               ondragend="opColDragEnd()"
+               title="Drag to reorder">MATCH ${col+1}</div>
           <button class="edit-match-btn" onclick="opEditMatch(${col})" title="Edit match">✎</button>
         </div>
         <div class="match-teams" id="match-teams-${col}"></div>
@@ -4949,12 +5096,22 @@ function buildHubCard(i,now,displayNum){
 
   const remBtn = i>0 ? `<button class="hub-card-btn rem" onclick="removeHubMatch(${i})" title="Remove match">✕</button>` : '';
 
+  const isAdminUser = (_userRole === 'admin' || _userRole === 'super-admin');
   const card=document.createElement('div');
   card.className='hub-card';
+  card.id=`hub-card-${i}`;
+  if(isAdminUser){
+    card.draggable=true;
+    card.ondragstart = ev => hubCardDragStart(ev, i);
+    card.ondragover  = ev => hubCardDragOver(ev, i);
+    card.ondragleave = ()=> hubCardDragLeave(i);
+    card.ondrop      = ev => hubCardDrop(ev, i);
+    card.ondragend   = ()=> hubCardDragEnd();
+  }
   card.innerHTML=`
     <div class="hub-card-head" style="border-bottom-color:${color}">
       <div class="hub-card-head-row">
-        <div class="hub-card-label" style="color:${color}">${esc(_hubCardLabel(m,displayNum))}</div>
+        <div class="hub-card-label" style="color:${color}${isAdminUser?';cursor:grab':''}">${esc(_hubCardLabel(m,displayNum))}</div>
         <div class="hub-card-acts">
           <button class="hub-card-btn" onclick="openEditMatch(${i})" title="Edit">✎</button>
           ${remBtn}
