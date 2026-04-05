@@ -492,6 +492,100 @@ exports.fetchGroupApiData = onCall(async (request) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// seedParsers  (super-admin only, idempotent)
+//
+// One-time bootstrap that creates the parsers/ registry documents and sets
+// assignedParsers on all 5 group documents. Safe to call multiple times —
+// uses set() which overwrites cleanly.
+//
+// Call once from the browser console after deploy:
+//   const fn = firebase.functions().httpsCallable('seedParsers');
+//   fn({}).then(r => console.log(r));
+//
+// Or from the app JS console:
+//   window._fb.httpsCallable(window._fb.fns,'seedParsers')({}).then(console.log)
+//
+// Input:  {}
+// Output: { ok: true, message: string }
+// ─────────────────────────────────────────────────────────────────────────────
+exports.seedParsers = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const superSnap = await db.doc(`superAdmins/${callerUid}`).get();
+  if (!superSnap.exists) throw new HttpsError('permission-denied', 'Super admin required.');
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  // ── Parser registry documents ───────────────────────────────────────────
+  const parsers = [
+    {
+      id:          'parser-nep-callsheet',
+      name:        'NEP Callsheet',
+      type:        'callsheet',
+      formatKey:   'nep',
+      description: 'NEP XLSX + PDF crew callsheet format',
+      fileAccept:  '.xlsx,.xls,.pdf',
+      isActive:    true,
+      createdAt:   now,
+      apiConfig:   null
+    },
+    {
+      id:          'parser-cd-schedule',
+      name:        'Champion Data Schedule',
+      type:        'schedule',
+      formatKey:   'champion-data',
+      description: 'Champion Data PDF schedule format',
+      fileAccept:  '.pdf',
+      isActive:    true,
+      createdAt:   now,
+      apiConfig:   null
+    }
+  ];
+
+  // ── Group parser assignments ─────────────────────────────────────────────
+  // callsheet / schedule arrays reference parserId strings.
+  // Empty arrays = no parsers of that type assigned yet.
+  const groupAssignments = {
+    'champion-data': {
+      callsheet: ['parser-nep-callsheet'],
+      schedule:  ['parser-cd-schedule']
+    },
+    'nep': {
+      callsheet: ['parser-nep-callsheet'],
+      schedule:  []
+    },
+    'apac': {
+      callsheet: [],
+      schedule:  []
+    },
+    'cms': {
+      callsheet: [],
+      schedule:  []
+    },
+    'mavtek': {
+      callsheet: ['parser-nep-callsheet'],
+      schedule:  ['parser-cd-schedule']
+    }
+  };
+
+  const batch = db.batch();
+
+  // Write parser registry docs
+  parsers.forEach(({ id, ...data }) => {
+    batch.set(db.doc(`parsers/${id}`), data);
+  });
+
+  // Update each group doc with assignedParsers (merge so we don't wipe other fields)
+  Object.entries(groupAssignments).forEach(([groupId, assigned]) => {
+    batch.set(db.doc(`groups/${groupId}`), { assignedParsers: assigned }, { merge: true });
+  });
+
+  await batch.commit();
+  console.log(`seedParsers: completed by ${callerUid}`);
+  return { ok: true, message: `Seeded ${parsers.length} parsers and ${Object.keys(groupAssignments).length} group assignments.` };
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // pollApiSources  (STUB — Phase 6, scheduled)
 //
 // Runs every 5 minutes to auto-fetch from all active API parsers that have

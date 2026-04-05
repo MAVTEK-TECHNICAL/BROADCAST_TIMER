@@ -1052,7 +1052,7 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
       <button class="sb-footer-btn" onclick="document.getElementById('import-file').click()">⬆ IMPORT</button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)" />
     </div>
-    <button class="sb-import-sched" onclick="openImportSchedule()">◈ IMPORT SCHEDULE</button>
+    <button class="sb-import-sched" id="sb-import-sched" onclick="openImportSchedule()">◈ IMPORT SCHEDULE</button>
   </div>
   <div id="sidebar-overlay" onclick="closeSidebar()"></div>
 
@@ -2666,6 +2666,7 @@ async function resolveUserRole(user){
       applyRoleToUI('super-admin');
       if (_groupId) await _loadGroupAndSubscribe();
       else { toast('SUPER ADMIN — no group assigned'); setConnStatus('live'); }
+      loadGroupParsers(_groupId); // null = all parsers for super-admin
       return;
     }
     // 2. Normal user — read userProfile
@@ -2707,10 +2708,99 @@ async function resolveUserRole(user){
         ? 'ADMIN — no group assigned yet. Ask a super-admin to assign you via Manage Users.'
         : 'No group assigned — contact your admin.');
     }
+    loadGroupParsers(_groupId); // async — updates import UI once parser assignments load
   } catch(e){
     console.error('resolveUserRole:', e);
     setConnStatus('error');
     toast('Error loading profile');
+  }
+}
+
+// ── PARSER LOADING ────────────────────────────────────────────────────────
+// Reads all parser metadata from parsers/ collection, filters to those
+// assigned to the group, and updates the UI accordingly.
+// Pass groupId=null to give super-admins all active parsers.
+async function loadGroupParsers(groupId){
+  try {
+    const {db, collection, doc, getDoc, getDocs} = window._fb;
+
+    // Fetch all parser docs + (if groupId given) the group doc in parallel
+    const fetches = [getDocs(collection(db, 'parsers'))];
+    if (groupId) fetches.push(getDoc(doc(db, 'groups', groupId)));
+    const results = await Promise.all(fetches);
+
+    const parsersSnap = results[0];
+    const groupSnap   = results[1] || null;
+
+    // Build id→metadata map for active parsers
+    const allParsers = {};
+    parsersSnap.docs.forEach(d => {
+      const data = d.data();
+      if (data.isActive !== false) allParsers[d.id] = { id: d.id, ...data };
+    });
+
+    if (groupId && groupSnap?.exists()) {
+      // Use the group's explicit assignment lists
+      const assigned = groupSnap.data().assignedParsers || { callsheet: [], schedule: [] };
+      _groupParsers = {
+        callsheet: (assigned.callsheet || []).map(id => allParsers[id]).filter(Boolean),
+        schedule:  (assigned.schedule  || []).map(id => allParsers[id]).filter(Boolean)
+      };
+    } else {
+      // Super-admin (no group) or group doc missing: show all active parsers
+      const all = Object.values(allParsers);
+      _groupParsers = {
+        callsheet: all.filter(p => p.type === 'callsheet'),
+        schedule:  all.filter(p => p.type === 'schedule')
+      };
+    }
+
+    applyGroupParsers();
+  } catch(e){
+    console.warn('loadGroupParsers:', e);
+    // Leave _groupParsers as-is (empty defaults keep existing UI state)
+  }
+}
+
+// Applies _groupParsers to the UI:
+//  • Shows/hides the sidebar "IMPORT SCHEDULE" button
+//  • Rebuilds the schedule modal preset buttons dynamically
+//  • Callsheet button visibility is handled in the match card render functions
+//    which already check _groupParsers.callsheet.length at render time
+function applyGroupParsers(){
+  // ── Sidebar: schedule import button ───────────────────────────────────
+  const schedSideBtn = document.getElementById('sb-import-sched');
+  if (schedSideBtn) schedSideBtn.style.display = _groupParsers.schedule.length ? '' : 'none';
+
+  // ── Schedule modal: preset buttons ───────────────────────────────────
+  const presetWrap = document.getElementById('sched-preset-btns');
+  if (presetWrap) {
+    if (_groupParsers.schedule.length <= 1) {
+      // Single (or no) parser — no preset selector needed
+      presetWrap.style.display = 'none';
+    } else {
+      // Multiple parsers — render a button for each
+      presetWrap.innerHTML = _groupParsers.schedule.map((p, i) =>
+        `<button class="sched-preset-btn${i===0?' active':''}"
+                 data-preset="${esc(p.formatKey)}"
+                 onclick="schedSelectPreset(this)">${esc(p.name)}</button>`
+      ).join('');
+      presetWrap.style.display = '';
+    }
+  }
+
+  // Set active preset to first assigned schedule parser (or keep existing if still valid)
+  if (_groupParsers.schedule.length > 0) {
+    const keys = _groupParsers.schedule.map(p => p.formatKey);
+    if (!keys.includes(_activePreset)) {
+      _activePreset = keys[0];
+    }
+    // Sync file input accept type
+    const parser = SCHED_PARSERS[_activePreset];
+    if (parser) {
+      const inp = document.getElementById('sched-pdf-input');
+      if (inp) inp.accept = parser.fileAccept || '.pdf';
+    }
   }
 }
 
@@ -3603,7 +3693,7 @@ function addMatch(){
             <button class="add-timer-btn" onclick="opAddTimer(${col})"><span class="tf-icon">+</span><span class="tf-l">ADD</span><span class="tf-sep"> </span><span class="tf-r">TIMER</span></button>
             <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining"><span class="tf-icon">⇅</span><span class="tf-l">SORT</span></button>
             <button class="details-footer-btn${opDetailsExpanded[i]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details"><span class="tf-icon">≡</span><span class="tf-l">DETAILS</span></button>
-            <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>
+            ${_groupParsers.callsheet.length ? `<button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>` : ''}
           </div>`;
         grid.insertBefore(div, addCol);
         window._colResizeObserver?.observe(div);
@@ -4481,7 +4571,7 @@ function renderOpColumns(){
         <button class="add-timer-btn" onclick="opAddTimer(${col})"><span class="tf-icon">+</span><span class="tf-l">ADD</span><span class="tf-sep"> </span><span class="tf-r">TIMER</span></button>
         <button class="sort-timer-btn" id="sort-btn-${col}" onclick="opSortTimers(${col})" title="Sort by time remaining"><span class="tf-icon">⇅</span><span class="tf-l">SORT</span></button>
         <button class="details-footer-btn${opDetailsExpanded[si]?' active':''}" id="details-btn-${col}" onclick="toggleOpDetails(${col})" title="Toggle schedule details"><span class="tf-icon">≡</span><span class="tf-l">DETAILS</span></button>
-        <button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>
+        ${_groupParsers.callsheet.length ? `<button class="callsheet-footer-btn" onclick="opImportCallsheet(${col})" title="Import crew callsheet"><span class="tf-icon">⬇</span><span class="tf-l">CALL</span><span class="tf-sep"> </span><span class="tf-r">SHEET</span></button>` : ''}
       </div>`;
     grid.insertBefore(div, addCol);
   });
@@ -5245,6 +5335,24 @@ function schedUpdateBtn(){
   btn.textContent=selected>0?`IMPORT ${selected} MATCH${selected!==1?'ES':''}`:'IMPORT';
   document.getElementById('sched-count-label').textContent=selected?`${selected} selected`:'';
 }
+
+// ── GROUP PARSER ASSIGNMENTS (loaded from Firestore at login) ─────────────
+// Populated by loadGroupParsers(). Each entry is a full parser metadata object
+// from the parsers/ collection merged with the formatKey → handler mapping below.
+// Super-admins receive all parsers regardless of group assignment.
+let _groupParsers = { callsheet: [], schedule: [] };
+
+// ── CALLSHEET PARSER HANDLER REGISTRY ────────────────────────────────────
+// Maps formatKey → { label, fileAccept } for callsheet parsers.
+// Actual parsing logic lives in the existing callsheet handler functions.
+// Add new callsheet format handlers here when they're built.
+const CS_PARSERS = {
+  'nep': {
+    label:      'NEP',
+    fileAccept: '.xlsx,.xls,.pdf'
+  }
+  // 'champion-data-cs': { label: 'CHAMPION DATA', fileAccept: '.xlsx,.xls' }
+};
 
 // ── PARSER PRESET REGISTRY ────────────────────────────────
 // Each preset can override: fileTypes (accept attr), dropLabel, and parse logic.
