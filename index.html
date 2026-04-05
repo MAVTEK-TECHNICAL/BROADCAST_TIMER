@@ -2927,13 +2927,16 @@ function applyCalendarSnapshot(docs){
     matchTzs[slot]      = data.matchTz    || 'Australia/Sydney';
     matchHubTzs[slot]   = data.matchHubTz || hubTz || 'Australia/Sydney';
     timerSortMode[slot] = !!data.timerSortMode;
+    const _sport = data.sport || '';
     matchMeta[slot] = {
       label:        data.label        || '',
       home:         data.home         || '',
       homeColour:   data.homeColour   || '#ffffff',
+      homeTeamRef:  _resolveTeamRef(_sport, data.home || ''),
       away:         data.away         || '',
       awayColour:   data.awayColour   || '#ffffff',
-      sport:        data.sport        || '',
+      awayTeamRef:  _resolveTeamRef(_sport, data.away || ''),
+      sport:        _sport,
       isoDate:      data.isoDate      || calendarDate,
       location:     data.location     || '',
       host:         data.host         || '',
