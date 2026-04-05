@@ -78,6 +78,13 @@ service cloud.firestore {
                        request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['preferences']);
 
+      // Users can clear their own mustChangePassword flag (set to false only)
+      // after successfully changing their password on first login.
+      allow update: if uid() == targetUid &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['mustChangePassword']) &&
+                       request.resource.data.mustChangePassword == false;
+
       // Full create/delete only via Cloud Function (super admin context)
       allow create: if isSuperAdmin();
 

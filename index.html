@@ -18,9 +18,9 @@
 import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-         signOut, onAuthStateChanged, sendPasswordResetEmail }
+         signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, collection, doc, addDoc, setDoc, getDoc,
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc,
          getDocs, deleteDoc, query, orderBy, serverTimestamp,
          onSnapshot, where, writeBatch, enableIndexedDbPersistence }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -50,8 +50,8 @@ enableIndexedDbPersistence(db).catch(e => {
 });
 
 window._fb = { auth, db, fns, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
-  collection, doc, addDoc, setDoc, getDoc, getDocs,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword,
+  collection, doc, addDoc, setDoc, getDoc, updateDoc, getDocs,
   deleteDoc, query, orderBy, serverTimestamp,
   onSnapshot, where, writeBatch, httpsCallable };
 
@@ -2451,6 +2451,72 @@ async function guRemoveMember(uid, label, btn){
   }
 }
 
+// ── SET YOUR PASSWORD modal ──────────────────────────────────────────────────
+function showSetPasswordModal(){
+  document.getElementById('modal-set-password')?.classList.remove('hidden');
+  setTimeout(() => document.getElementById('sp-new-pwd')?.focus(), 80);
+}
+
+function spValidate(){
+  const pwd  = document.getElementById('sp-new-pwd')?.value  || '';
+  const conf = document.getElementById('sp-confirm-pwd')?.value || '';
+  const btn  = document.getElementById('sp-submit-btn');
+  const st   = document.getElementById('sp-status');
+  if (!btn || !st) return;
+  if (pwd.length > 0 && pwd.length < 8){
+    st.textContent = 'Password must be at least 8 characters.'; btn.disabled = true; return;
+  }
+  if (conf.length > 0 && pwd !== conf){
+    st.textContent = 'Passwords do not match.'; btn.disabled = true; return;
+  }
+  st.textContent = '';
+  btn.disabled = !(pwd.length >= 8 && pwd === conf);
+}
+
+async function spSubmit(){
+  const pwd = document.getElementById('sp-new-pwd')?.value || '';
+  const btn = document.getElementById('sp-submit-btn');
+  const st  = document.getElementById('sp-status');
+  if (!pwd || pwd.length < 8 || !btn || !st) return;
+
+  btn.disabled = true;
+  btn.textContent = 'SAVING…';
+  st.style.color  = 'var(--text-dim)';
+  st.textContent  = '';
+
+  try {
+    const {auth, db, doc, updatePassword: _updatePassword, updateDoc: _updateDoc} = window._fb;
+    const user = auth.currentUser;
+    if (!user) throw new Error('Not signed in.');
+
+    // 1. Update the Firebase Auth password
+    await _updatePassword(user, pwd);
+
+    // 2. Clear the mustChangePassword flag in Firestore
+    const {updateDoc} = window._fb;
+    await updateDoc(doc(db, 'userProfiles', user.uid), { mustChangePassword: false });
+
+    // 3. Hide modal and continue normal role resolution
+    document.getElementById('modal-set-password')?.classList.add('hidden');
+    st.textContent = '';
+    toast('Password set — welcome!');
+
+    // Re-run role resolution now that mustChangePassword is cleared
+    await resolveUserRole(user);
+
+  } catch(e){
+    btn.disabled = false;
+    btn.textContent = 'SET PASSWORD';
+    st.style.color = 'var(--red)';
+    if (e.code === 'auth/requires-recent-login') {
+      st.textContent = 'Session expired — please sign out and sign back in with your temp password, then set a new password.';
+    } else {
+      st.textContent = 'Error: ' + (e.message || e);
+    }
+    console.error('spSubmit:', e);
+  }
+}
+
 // Shows a copyable password-setup link for a member, generated fresh on click.
 // Link is generated server-side by getPasswordResetLink — separate from user creation
 // to prevent invalidation caused by callable retries.
@@ -2529,11 +2595,28 @@ async function guAddUser(){
     const {fns, httpsCallable} = window._fb;
     const createGroupUser = httpsCallable(fns, 'createGroupUser');
     // Pass role directly — Cloud Function sets it in one atomic batch write
-    await createGroupUser({ email, displayName, groupId: _groupId, role });
+    const result = await createGroupUser({ email, displayName, groupId: _groupId, role });
+    const tempPwd = result?.data?.tempPassword || null;
 
-    // Success — prompt admin to use the 🔑 button on the member row to get a reset link
     status.style.color = 'var(--green)';
-    status.textContent = `✓ ${email} added as ${role.toUpperCase().replace('-',' ')}. Use the 🔑 button on their row to get a password-setup link.`;
+    if (tempPwd) {
+      const safePwd = esc(tempPwd);
+      status.innerHTML =
+        `✓ <strong>${esc(email)}</strong> created as <strong>${esc(role.toUpperCase().replace('-',' '))}</strong>.<br>
+         <span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">Share this temporary password — user must change it on first login:</span><br>
+         <span style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap;">
+           <input readonly value="${safePwd}" id="gu-tmp-pwd-input"
+                  style="flex:1;min-width:0;font-family:var(--mono);font-size:14px;letter-spacing:2px;font-weight:700;
+                         background:var(--surface2);border:1px solid rgba(255,255,255,.18);border-radius:3px;
+                         color:var(--accent);padding:5px 8px;cursor:text;"
+                  onclick="this.select()">
+           <button onclick="navigator.clipboard.writeText('${safePwd}').then(()=>{this.textContent='✓ Copied!';setTimeout(()=>this.textContent='Copy',2500)})"
+                   style="font-family:var(--display);font-size:10px;letter-spacing:1px;padding:5px 12px;
+                          background:var(--accent);color:#000;border:none;border-radius:3px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>
+         </span>`;
+    } else {
+      status.textContent = `✓ ${email} created as ${role.toUpperCase().replace('-',' ')}.`;
+    }
 
     // Clear form & reload list
     if (nameEl)  nameEl.value  = '';
@@ -2602,6 +2685,14 @@ async function resolveUserRole(user){
       profSnap = await getDoc(doc(db, 'userProfiles', user.uid));
     }
     const prof = profSnap.data();
+
+    // If the user was created with a temporary password, force them to set a real one
+    // before loading any app functionality.
+    if (prof.mustChangePassword) {
+      showSetPasswordModal();
+      return;  // halt role resolution until password is changed
+    }
+
     _groupId  = prof.groupId || null;
     _userRole = prof.role    || 'view-operator';
     applyRoleToUI(_userRole);
@@ -6559,6 +6650,38 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
 
     <div style="flex-shrink:0;display:flex;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border)">
       <button class="btn btn-cancel" onclick="closeModal('modal-group-users')">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SET YOUR PASSWORD MODAL ───────────────────────────────────────────────
+     Shown on first login when mustChangePassword === true in userProfiles.
+     Cannot be dismissed — user must set a real password before using the app.
+──────────────────────────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-set-password" style="z-index:9999">
+  <div class="modal" style="width:min(420px,96vw);gap:0;padding:0;overflow:hidden">
+    <div class="modal-title" style="padding:18px 22px 14px;border-bottom:1px solid var(--border);color:var(--accent)">
+      SET YOUR PASSWORD
+    </div>
+    <div style="padding:20px 22px 8px;display:flex;flex-direction:column;gap:14px">
+      <p style="font-size:12px;color:var(--text-dim);font-family:var(--mono);line-height:1.6;margin:0">
+        Your account was created with a temporary password.<br>
+        Please set a permanent password to continue.
+      </p>
+      <div class="modal-field">
+        <label>New Password</label>
+        <input class="modal-input" id="sp-new-pwd" type="password" placeholder="At least 8 characters"
+               autocomplete="new-password" oninput="spValidate()">
+      </div>
+      <div class="modal-field">
+        <label>Confirm Password</label>
+        <input class="modal-input" id="sp-confirm-pwd" type="password" placeholder="Re-enter password"
+               autocomplete="new-password" oninput="spValidate()" onkeydown="if(event.key==='Enter')spSubmit()">
+      </div>
+      <div id="sp-status" style="font-size:11px;font-family:var(--mono);min-height:16px;color:var(--red)"></div>
+    </div>
+    <div style="padding:12px 22px 18px;display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" id="sp-submit-btn" onclick="spSubmit()" disabled>SET PASSWORD</button>
     </div>
   </div>
 </div>

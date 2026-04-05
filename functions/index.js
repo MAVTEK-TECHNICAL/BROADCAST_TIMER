@@ -196,9 +196,13 @@ exports.createGroupUser = onCall(async (request) => {
     throw new HttpsError('already-exists', `${email} is already registered.`);
   }
 
-  // Generate a secure random temporary password — this is never shown to anyone.
-  // The user sets their real password via the reset-email link.
-  const tempPassword = crypto.randomBytes(24).toString('base64url');
+  // Generate a human-friendly temporary password: 4 groups of 4 chars separated by dashes.
+  // Avoids ambiguous characters (0/O, 1/I/l). Shown to the admin, who shares it with the
+  // new user out-of-band (Slack, Teams, etc.). User is forced to change it on first login.
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const tempPassword = [0,1,2,3].map(() =>
+    Array.from({length:4}, () => charset[Math.floor(Math.random() * charset.length)]).join('')
+  ).join('-');
 
   // Create the Firebase Auth user
   const createParams = {
@@ -240,23 +244,21 @@ exports.createGroupUser = onCall(async (request) => {
 
   batch.set(db.doc(`userProfiles/${newUser.uid}`), {
     email,
-    displayName:  displayName || '',
+    displayName:       displayName || '',
     groupId,
     role,
-    createdAt:   now,
-    createdBy:   callerUid,
-    preferences: defaultPreferences
+    createdAt:         now,
+    createdBy:         callerUid,
+    mustChangePassword: true,   // Forced password-change on first login
+    preferences:       defaultPreferences
   });
 
   await batch.commit();
 
-  // Do NOT generate a password reset link here. Generating it during creation risks
-  // the link being invalidated if the callable is retried on a slow network (each call
-  // to generatePasswordResetLink invalidates all prior codes for that email).
-  // Admins use the dedicated getPasswordResetLink function to generate a fresh link
-  // on demand, right before sharing it with the user.
-
-  return { uid: newUser.uid, email };
+  // Return the temporary password to the calling admin so they can share it
+  // with the new user out-of-band (Slack, Teams, etc.).
+  // The user is forced to change it on their first login — see mustChangePassword flag.
+  return { uid: newUser.uid, email, tempPassword };
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
