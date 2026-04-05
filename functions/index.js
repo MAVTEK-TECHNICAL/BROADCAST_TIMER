@@ -182,11 +182,18 @@ exports.createGroupUser = onCall(async (request) => {
   await assertGroupAdmin(callerUid, groupId);
 
   // Check the email isn't already registered
+  let existingUser = null;
   try {
-    await admin.auth().getUserByEmail(email);
-    throw new HttpsError('already-exists', `${email} is already registered.`);
+    existingUser = await admin.auth().getUserByEmail(email);
   } catch (e) {
-    if (e.code !== 'auth/user-not-found') throw e;
+    if (e.code !== 'auth/user-not-found') {
+      console.error('createGroupUser: getUserByEmail error:', e.code, e.message);
+      throw new HttpsError('internal', `Auth lookup failed: ${e.message}`);
+    }
+    // auth/user-not-found = good, email is available, continue
+  }
+  if (existingUser) {
+    throw new HttpsError('already-exists', `${email} is already registered.`);
   }
 
   // Generate a secure random temporary password — this is never shown to anyone.
