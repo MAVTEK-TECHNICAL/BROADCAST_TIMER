@@ -2961,16 +2961,25 @@ function subscribeGroupCalendar(){
 }
 
 function applyCalendarSnapshot(docs){
-  // Filter to the currently displayed date and sort by sortOrder then id
+  // Today's docs go into slots 0..K-1 (preserves slot indices for save guards).
+  // Other days' docs follow in slots K.. (enables hub multi-day range filtering).
   const dayDocs = docs
     .filter(d => d.data().isoDate === calendarDate)
     .sort((a,b) => ((a.data().sortOrder||0)-(b.data().sortOrder||0)) || a.id.localeCompare(b.id));
-  dbgLog('snapshot:apply', `${dayDocs.length} match${dayDocs.length!==1?'es':''} for ${calendarDate} (${docs.length} total docs)`, 'info');
+  const otherDocs = docs
+    .filter(d => { const iso=d.data().isoDate; return iso && iso !== calendarDate; })
+    .sort((a,b) => {
+      const da=a.data().isoDate||'', db=b.data().isoDate||'';
+      if(da!==db) return da.localeCompare(db);
+      return ((a.data().sortOrder||0)-(b.data().sortOrder||0)) || a.id.localeCompare(b.id);
+    });
+  const allDocs = [...dayDocs, ...otherDocs];
+  dbgLog('snapshot:apply', `${dayDocs.length} match${dayDocs.length!==1?'es':''} for ${calendarDate}, ${otherDocs.length} from other dates (${docs.length} total docs)`, 'info');
 
   window._slotToMatchId = [];
   window._matchIdToSlot = {};
 
-  dayDocs.forEach((d, slot) => {
+  allDocs.forEach((d, slot) => {
     const data = d.data();
     window._slotToMatchId[slot] = d.id;
     window._matchIdToSlot[d.id] = slot;
@@ -3021,11 +3030,11 @@ function applyCalendarSnapshot(docs){
     }
   });
 
-  // Clear slots beyond today's doc count — but skip any slot currently being
+  // Clear slots beyond all loaded docs — but skip any slot currently being
   // written to Firestore (_localPendingSlots). Without this guard, a snapshot
   // arriving before the addDoc resolves would wipe the local match state,
   // causing the save to write visible:false and the match to vanish.
-  for (let i=dayDocs.length; i<MAX_MATCHES; i++){
+  for (let i=allDocs.length; i<MAX_MATCHES; i++){
     if(_localPendingSlots.has(i)) continue;
     matchVisible[i] = false;
     matchEnabled[i] = false;
@@ -3736,7 +3745,17 @@ function renderTimers(){
 
 // ── CLOCK ─────────────────────────────────────────────────
 function startClock(){
+  let _lastTickDay = _todayISO();
   function tick(){
+    // Auto-advance calendar at midnight (local time)
+    const today = _todayISO();
+    if(today !== _lastTickDay){
+      _lastTickDay = today;
+      calendarDate = today;
+      // If THIS WEEK mode is active, recalculate the Mon–Sun range for the new week
+      if(hubWeekMode){ _recalcHubWeekRange(); _updateHubRangeUI(); }
+      _applyCalendarDate(true);
+    }
     document.getElementById('hub-clock').textContent  = getClockTime(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
     opSlotMap.forEach((si,i)=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getClockTime(matchTzs[si]); });
@@ -3744,6 +3763,18 @@ function startClock(){
     else updateHubCountdowns();
   }
   tick(); setInterval(tick,1000);
+}
+
+// Recompute Mon–Sun range for the current local week (used by hubWeekMode auto-refresh)
+function _recalcHubWeekRange(){
+  const now=new Date();
+  const dow=now.getDay();
+  const diffToMon=(dow+6)%7;
+  const mon=new Date(now); mon.setDate(now.getDate()-diffToMon);
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  hubRangeStart=fmt(mon);
+  hubRangeEnd=fmt(sun);
 }
 
 // ── MATCH MGMT ───────────────────────────────────────────
@@ -4745,6 +4776,8 @@ function _applyCalendarDate(silent){
   });
   // If hubTodayMode is active, track the new day in the hub range
   if(hubTodayMode){ hubRangeStart=hubRangeEnd=calendarDate; _updateHubRangeUI(); }
+  // If hubWeekMode is active, recalculate Mon–Sun in case the week has rolled over
+  if(hubWeekMode){ _recalcHubWeekRange(); _updateHubRangeUI(); }
   renderAll();         // refresh headers+timers (op) or hub grid
   if(!silent) scheduleSave();
 }
@@ -4893,15 +4926,7 @@ function setHubThisWeek(){
   hubWeekMode  = !wasActive;
   hubTodayMode = false;
   if(hubWeekMode){
-    // Compute Monday and Sunday of the current local week
-    const now = new Date();
-    const dow = now.getDay(); // 0=Sun … 6=Sat
-    const diffToMon = (dow + 6) % 7;  // days back to Monday
-    const mon = new Date(now); mon.setDate(now.getDate() - diffToMon);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    hubRangeStart = fmt(mon);
-    hubRangeEnd   = fmt(sun);
+    _recalcHubWeekRange(); // sets hubRangeStart / hubRangeEnd to current Mon–Sun
   } else {
     hubRangeStart = hubRangeEnd = null;
   }
