@@ -6589,8 +6589,10 @@ function _parseCallsheetTime(raw){
     if(ampm==='PM'&&h!==12) h+=12; if(ampm==='AM'&&h===12) h=0;
     return `${String(h).padStart(2,'0')}:${min}`;
   }
-  // 4-digit HHMM without colon (e.g. "1330", "0915") — seen in some PDF exports
-  mm=s.match(/^(\d{2})(\d{2})$/);
+  // 4-digit HHMM without colon (e.g. "1330", "0915", "1330 2130") — seen in some PDF exports
+  // Use (?!\d) so we match HHMM at the start without requiring end-of-string
+  // (off-site time often gets concatenated into the same cell: "1330 2130")
+  mm=s.match(/^(\d{2})(\d{2})(?!\d)/);
   if(mm&&parseInt(mm[1])<=23&&parseInt(mm[2])<=59) return `${mm[1]}:${mm[2]}`;
   return null;
 }
