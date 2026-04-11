@@ -372,6 +372,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .opts-row{ display:flex;align-items:center;justify-content:space-between;gap:12px; }
 .opts-row.hidden-view{ display:none; }
 .opts-label{ font-size:11px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;white-space:nowrap; }
+.opts-section-divider{ font-family:var(--display);font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-dim);padding-top:6px;border-top:1px solid var(--border);margin-top:-2px; }
+.opts-num-inp{ width:50px;background:var(--surface2);border:1px solid var(--border-bright);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:12px;padding:3px 5px;text-align:right;-moz-appearance:textfield; }
+.opts-num-inp::-webkit-outer-spin-button,.opts-num-inp::-webkit-inner-spin-button{ -webkit-appearance:none;margin:0; }
+.opts-num-inp:focus{ outline:none;border-color:var(--accent); }
 
 .nav-sf-btn{
   display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -730,8 +734,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
   background:rgba(0,0,0,.18);
 }
 .hub-timer-row.core{ border-left-color:var(--accent2); }
-.hub-timer-row.countdown-warning{ background:rgba(255,214,0,.06); }
-.hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);animation:pulse-border 1s infinite; }
+.hub-timer-row.countdown-warning{ background:rgba(255,214,0,.06);border-left-color:var(--yellow); }
+.hub-timer-row.countdown-live{ background:rgba(255,51,85,.09);border-left-color:var(--red);animation:pulse-border 1s infinite; }
 /* ── Hub card 2-row clock ─────────────────────────────────────────── */
 .hub-clock-wrap{ width:100%;display:flex;flex-direction:column;gap:1px;margin-top:3px; }
 /* ── Callsheet import ────────────────────── */
@@ -1211,6 +1215,22 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <div class="name-mode-btns">
               <button class="nmb active" id="optd-on"  onclick="setOpTimerDivider(true)">ON</button>
               <button class="nmb"        id="optd-off" onclick="setOpTimerDivider(false)">OFF</button>
+            </div>
+          </div>
+          <!-- ── Timer Colour Thresholds ── -->
+          <div class="opts-section-divider">TIMER COLOURS</div>
+          <div class="opts-row" title="Timers turn yellow with outline when time remaining drops below this">
+            <span class="opts-label" style="color:var(--yellow)">SOON AT</span>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input class="opts-num-inp" id="timer-soon-mins" type="number" min="2" max="480" value="60" oninput="setTimerThreshold('soon',this.value)" />
+              <span class="opts-label">MIN</span>
+            </div>
+          </div>
+          <div class="opts-row" title="Timers turn red with outline when time remaining drops below this">
+            <span class="opts-label" style="color:var(--red)">IMMED AT</span>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input class="opts-num-inp" id="timer-immed-mins" type="number" min="1" max="59" value="15" oninput="setTimerThreshold('immed',this.value)" />
+              <span class="opts-label">MIN</span>
             </div>
           </div>
         </div>
@@ -1725,6 +1745,9 @@ let showClockSeconds = true;  // false = hide seconds from TZ clock displays (ti
 let opTimerDivider  = true;   // true = show past/future divider line in operator view
 let hubTimerDivider = false;  // true = show past/future divider line in hub view
 let hubWeekMode  = false;   // true = hub range locked to current Mon–Sun week
+// Timer colour thresholds (ms) — operator-configurable, saved to user prefs
+let timerWarningMs = 60 * 60 * 1000;  // "SOON"      default: 60 min  (yellow + outline)
+let timerLiveMs    = 15 * 60 * 1000;  // "IMMEDIATE" default: 15 min  (red + outline)
 
 // Returns true when match i should be visible given current date filter
 function isMatchVisible(i){
@@ -2931,6 +2954,16 @@ function applyUserPreferences(prefs){
   if (prefs.viewMode)    switchView(prefs.viewMode);
   if (Array.isArray(prefs.opMatchOrder) && prefs.opMatchOrder.length)
     _opPersonalOrder = prefs.opMatchOrder;
+  if (typeof prefs.timerWarningMs==='number' && prefs.timerWarningMs>0){
+    timerWarningMs = prefs.timerWarningMs;
+    const el=document.getElementById('timer-soon-mins');
+    if(el) el.value = Math.round(timerWarningMs/60000);
+  }
+  if (typeof prefs.timerLiveMs==='number' && prefs.timerLiveMs>0){
+    timerLiveMs = prefs.timerLiveMs;
+    const el=document.getElementById('timer-immed-mins');
+    if(el) el.value = Math.round(timerLiveMs/60000);
+  }
 }
 
 // ── GROUP CALENDAR SUBSCRIPTION ────────────────────────────
@@ -3327,6 +3360,8 @@ function saveUserPreferences(){
     hubCols,
     viewMode,
     opMatchOrder: _opPersonalOrder || null,
+    timerWarningMs,
+    timerLiveMs,
   };
   _prefQueue = _prefQueue.catch(()=>{}).then(async () => {
     try {
@@ -3503,6 +3538,31 @@ function setHubTimerDivider(v){
   document.getElementById('hubtd-on') ?.classList.toggle('active', v===true);
   document.getElementById('hubtd-off')?.classList.toggle('active', v===false);
   if(viewMode==='hub') renderHubGrid(); scheduleSave();
+}
+
+// ── TIMER COLOUR THRESHOLDS ───────────────────────────────────────────
+// type: 'soon' (yellow/warning) | 'immed' (red/live)
+// val: string or number of minutes
+function setTimerThreshold(type, val){
+  const mins = Math.max(1, parseInt(val)||1);
+  const ms   = mins * 60000;
+  if(type==='soon'){
+    timerWarningMs = ms;
+    // Clamp live threshold so it stays below warning
+    if(timerLiveMs >= timerWarningMs){
+      timerLiveMs = Math.max(60000, timerWarningMs - 60000);
+      const immedEl=document.getElementById('timer-immed-mins');
+      if(immedEl) immedEl.value = Math.round(timerLiveMs/60000);
+    }
+    const immedEl=document.getElementById('timer-immed-mins');
+    if(immedEl) immedEl.max = mins-1;
+  } else {
+    timerLiveMs = Math.min(ms, timerWarningMs - 60000);
+    timerLiveMs = Math.max(60000, timerLiveMs);
+  }
+  renderTimers();
+  if(viewMode==='hub') renderHubGrid();
+  scheduleSave();
 }
 
 // ── TIMER REFERENCE MODE ──────────────────────────────────────────────
@@ -3720,10 +3780,10 @@ function renderTimers(){
         const diff=t.targetUTC ? t.targetUTC-now : null;
         let cls='positive', txt='--:--';
         if(diff!==null){
-          if(diff<0)       { cls='past';    txt=fmtCountdown(diff); }
-          else if(diff<6e4){ cls='live';    txt=fmtCountdown(diff); }
-          else if(diff<6e5){ cls='warning'; txt=fmtCountdown(diff); }
-          else             { cls='positive';txt=fmtCountdown(diff); }
+          if(diff<0)                  { cls='past';    txt=fmtCountdown(diff); }
+          else if(diff<timerLiveMs)   { cls='live';    txt=fmtCountdown(diff); }
+          else if(diff<timerWarningMs){ cls='warning'; txt=fmtCountdown(diff); }
+          else                        { cls='positive';txt=fmtCountdown(diff); }
         }
         cdEl.textContent=txt;
         cdEl.className=`timer-countdown ${cls}`;
@@ -3748,15 +3808,15 @@ function renderTimers(){
       }
       let cls='positive', txt='--:--';
       if(diff!==null){
-        if(diff<0)       { cls='past';    txt=fmtCountdown(diff); }
-        else if(diff<6e4){ cls='live';    txt=fmtCountdown(diff); }
-        else if(diff<6e5){ cls='warning'; txt=fmtCountdown(diff); }
-        else             { cls='positive';txt=fmtCountdown(diff); }
+        if(diff<0)                  { cls='past';    txt=fmtCountdown(diff); }
+        else if(diff<timerLiveMs)   { cls='live';    txt=fmtCountdown(diff); }
+        else if(diff<timerWarningMs){ cls='warning'; txt=fmtCountdown(diff); }
+        else                        { cls='positive';txt=fmtCountdown(diff); }
       }
       let row=t.core?'core':'optional';
       if(!t.timeStr && !t.core) row+=' no-time'; // collapse non-core untimed rows for readability
-      if(diff!==null&&diff>=0&&diff<6e4)  row+=' countdown-live';
-      else if(diff!==null&&diff>=0&&diff<6e5) row+=' countdown-warning';
+      if(diff!==null&&diff>=0&&diff<timerLiveMs)                           row+=' countdown-live';
+      else if(diff!==null&&diff>=0&&diff>=timerLiveMs&&diff<timerWarningMs) row+=' countdown-warning';
       const _matchChipColor = (matchMeta[si]&&matchMeta[si].cardColor) ? matchMeta[si].cardColor : 'var(--brand-color)';
       const chipColor = t.core ? _matchChipColor : 'var(--border-bright)';
       const div=document.createElement('div');
@@ -5132,12 +5192,12 @@ function buildHubCard(i,now,displayNum){
     }
     let cls='positive',txt='--:--';
     if(diff!==null){
-      if(diff<0)      {cls='past';   txt=fmtCountdown(diff);}
-      else if(diff<6e4){cls='live';  txt=fmtCountdown(diff);}
-      else if(diff<6e5){cls='warning';txt=fmtCountdown(diff);}
-      else             {cls='positive';txt=fmtCountdown(diff);}
+      if(diff<0)                  {cls='past';    txt=fmtCountdown(diff);}
+      else if(diff<timerLiveMs)   {cls='live';    txt=fmtCountdown(diff);}
+      else if(diff<timerWarningMs){cls='warning'; txt=fmtCountdown(diff);}
+      else                        {cls='positive';txt=fmtCountdown(diff);}
     }
-    const rowCls=(t.core?'core':'')+(diff!==null&&diff>=0&&diff<6e4?' countdown-live':diff!==null&&diff>=0&&diff<6e5?' countdown-warning':'');
+    const rowCls=(t.core?'core':'')+(diff!==null&&diff>=0&&diff<timerLiveMs?' countdown-live':diff!==null&&diff>=0&&diff>=timerLiveMs&&diff<timerWarningMs?' countdown-warning':'');
     timersHtml+=`<div class="hub-timer-row ${rowCls}">
       <div class="hub-t-name" style="text-align:${nameAlign}">${esc(t.name)}</div>
       <div class="hub-t-time-row">
@@ -6566,18 +6626,18 @@ function updateHubCountdowns(){
     const diff=t.targetUTC?t.targetUTC-now:null;
     let cls='positive',txt='--:--';
     if(diff!==null){
-      if(diff<0)      {cls='past';   txt=fmtCountdown(diff);}
-      else if(diff<6e4){cls='live';  txt=fmtCountdown(diff);}
-      else if(diff<6e5){cls='warning';txt=fmtCountdown(diff);}
-      else             {cls='positive';txt=fmtCountdown(diff);}
+      if(diff<0)                  {cls='past';    txt=fmtCountdown(diff);}
+      else if(diff<timerLiveMs)   {cls='live';    txt=fmtCountdown(diff);}
+      else if(diff<timerWarningMs){cls='warning'; txt=fmtCountdown(diff);}
+      else                        {cls='positive';txt=fmtCountdown(diff);}
     }
     el.textContent=txt;
     el.className=`hub-t-cd ${cls}`;
     // Update parent row state classes for live/warning pulse
     const row=el.closest('.hub-timer-row');
     if(row){
-      row.classList.toggle('countdown-live',    diff!==null&&diff>=0&&diff<6e4);
-      row.classList.toggle('countdown-warning', diff!==null&&diff>=0&&diff<6e5&&diff>=6e4);
+      row.classList.toggle('countdown-live',    diff!==null&&diff>=0&&diff<timerLiveMs);
+      row.classList.toggle('countdown-warning', diff!==null&&diff>=0&&diff>=timerLiveMs&&diff<timerWarningMs);
     }
   });
 }
