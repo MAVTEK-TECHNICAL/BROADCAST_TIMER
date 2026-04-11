@@ -439,6 +439,8 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 .sort-timer-btn{ display:flex;align-items:center;justify-content:center;gap:4px;background:transparent;border:1px dashed var(--border-bright);border-radius:4px;color:var(--text-dim);font-family:var(--ui);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 4px;cursor:pointer;transition:all .2s;flex:1; }
 .sort-timer-btn:hover{ border-color:var(--accent);color:var(--accent); }
 .sort-timer-btn.sort-active{ border-color:var(--accent);color:var(--accent);border-style:solid; }
+.sort-timer-btn.sort-on{ border-color:#3b82f6;border-style:solid;color:#3b82f6; }
+.sort-timer-btn.sort-on:hover{ border-color:#60a5fa;color:#60a5fa; }
 .timer-section-spacer{ display:block;height:2px;margin:4px 0;background:linear-gradient(90deg,transparent,var(--border-bright),transparent);flex-shrink:0; }
 .timer-remove{ display:none;background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0;line-height:1;flex-shrink:0; }
 .timer-row.optional:hover .timer-remove{ display:block; }
@@ -3583,6 +3585,45 @@ function renderAll(){ renderHeaders(); renderTimers(); if(viewMode==='hub') rend
 // ── TIMER DRAG-TO-REORDER ─────────────────────────────────
 let _timerDragging=false, _dragMi=null, _dragFromIdx=null;
 let timerSortMode=[false,false,false]; // true when column has been sorted by time remaining
+let _sortModeTimerFuture={}; // key:"${si}_${tid}" → was-future last tick, for auto-resort detection
+
+// Called each tick for any sort-mode column. Re-sorts in-place if a timer just crossed zero.
+function _checkAutoResort(si){
+  const arr=matchTimers[si];
+  const now=Date.now();
+  let needsResort=false;
+  arr.forEach(t=>{
+    if(!t.targetUTC) return;
+    const key=`${si}_${t.id}`;
+    const isFuture=(t.targetUTC-now)>=0;
+    const wasFuture=(_sortModeTimerFuture[key]!==false); // undefined on first tick → treat as future
+    _sortModeTimerFuture[key]=isFuture;
+    if(wasFuture&&!isFuture) needsResort=true; // this timer just crossed zero
+  });
+  if(!needsResort) return;
+  // Sort in-place using the same ordering logic as sortTimers()
+  const now2=Date.now();
+  arr.sort((a,b)=>{
+    if(!a.targetUTC&&!b.targetUTC) return 0;
+    if(!a.targetUTC) return 1;
+    if(!b.targetUTC) return -1;
+    const da=a.targetUTC-now2, db=b.targetUTC-now2;
+    const fA=da>=0, fB=db>=0;
+    if(fA&&!fB) return -1;
+    if(!fA&&fB) return 1;
+    if(fA) return da-db;
+    return db-da; // both past: most recently finished first
+  });
+  scheduleSaveMatch(si);
+}
+
+// Sync the sort button's persistent 'sort-on' class to the current timerSortMode for each column.
+function _updateSortButtons(){
+  opSlotMap.forEach((si,col)=>{
+    const btn=document.getElementById(`sort-btn-${col}`);
+    if(btn) btn.classList.toggle('sort-on', !!timerSortMode[si]);
+  });
+}
 
 function timerDragStart(mi,idx,e){
   _timerDragging=true; _dragMi=mi; _dragFromIdx=idx;
@@ -3612,6 +3653,7 @@ function timerDrop(mi,toIdx,e){
   const [moved]=arr.splice(_dragFromIdx,1);
   arr.splice(toIdx,0,moved);
   timerSortMode[mi]=false; // manual reorder exits sort mode (no spacer)
+  _updateSortButtons();
   scheduleSaveMatch(mi);
   timerDragEnd(e);
 }
@@ -3741,6 +3783,8 @@ function renderTimers(){
     const mc=list.closest('.match-col');
     if(mc) mc.classList.toggle('has-overflow', list.scrollHeight > list.clientHeight);
   }
+  // Keep sort buttons in sync with timerSortMode after every full render
+  if(!_timerDragging) _updateSortButtons();
 }
 
 // ── CLOCK ─────────────────────────────────────────────────
@@ -3759,8 +3803,11 @@ function startClock(){
     document.getElementById('hub-clock').textContent  = getClockTime(hubTz);
     document.getElementById('utc-display').textContent = 'UTC ' + getTimeInTz('UTC');
     opSlotMap.forEach((si,i)=>{ const el=document.getElementById(`match-clock-${i}`); if(el) el.textContent=getClockTime(matchTzs[si]); });
-    if(viewMode==='operator') renderTimers();
-    else updateHubCountdowns();
+    if(viewMode==='operator'){
+      // Auto-move timers that just crossed zero in sort-mode columns
+      opSlotMap.forEach(si=>{ if(timerSortMode[si]) _checkAutoResort(si); });
+      renderTimers();
+    } else updateHubCountdowns();
   }
   tick(); setInterval(tick,1000);
 }
@@ -3862,7 +3909,8 @@ function opEditMatch(col)  { openEditMatch(opSlotMap[col]); }
 function opAddTimer(col)   { openAddTimer(opSlotMap[col]);  }
 function opSortTimers(col) {
   sortTimers(opSlotMap[col]);
-  // Flash the visible sort button using the display column index, not the real slot
+  // Update persistent sort-on state, then flash sort-active for click feedback
+  _updateSortButtons();
   const btn=document.getElementById(`sort-btn-${col}`);
   btn?.classList.add('sort-active');
   setTimeout(()=>btn?.classList.remove('sort-active'),800);
