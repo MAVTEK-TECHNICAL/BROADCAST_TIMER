@@ -1535,11 +1535,11 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
             <label>AR Rend</label>
             <input class="modal-input" id="em-ar-rend" type="text" placeholder="e.g. REN02" style="font-family:var(--mono);font-size:12px;" />
           </div>
-          <div class="modal-field">
+          <div class="modal-field" id="em-drone-ctrl-wrap">
             <label>Drone Ctrl</label>
             <input class="modal-input" id="em-drone-ctrl" type="text" placeholder="e.g. CTL03" style="font-family:var(--mono);font-size:12px;" />
           </div>
-          <div class="modal-field">
+          <div class="modal-field" id="em-drone-rend-wrap">
             <label>Drone Rend</label>
             <input class="modal-input" id="em-drone-rend" type="text" placeholder="e.g. REN03" style="font-family:var(--mono);font-size:12px;" />
           </div>
@@ -3862,6 +3862,7 @@ function _renderOpDetails(col){
   const panel = document.getElementById(`op-details-${col}`);
   if(!panel || !opDetailsExpanded[si]) return;
   const m = matchMeta[si];
+  const isNetball = (m.sport||'').toLowerCase().includes('netball');
   const rows = [
     ['LOC',        m.location],
     ['HUB',        resolveHubCode(m.hub)],
@@ -3871,8 +3872,7 @@ function _renderOpDetails(col){
     ['VIZ BACK',   resolveVizEngine(m.backup)],
     ['AR CTRL',    m.arCtrl],
     ['AR REND',    m.arRend],
-    ['DRONE CTRL', m.droneCtrl],
-    ['DRONE REND', m.droneRend],
+    ...(!isNetball ? [['DRONE CTRL', m.droneCtrl], ['DRONE REND', m.droneRend]] : []),
     ['TACTIC',     resolveVizEngine(m.tactic)],
     ['TRACKER',    m.tracker],
     ...(m.customFields||[]).filter(cf=>cf.key).map(cf=>[cf.key.toUpperCase(), cf.val]),
@@ -4085,6 +4085,7 @@ function openEditMatch(i){
   document.getElementById('em-sport').value=sport;
   renderTeamPicker('home',sport);
   renderTeamPicker('away',sport);
+  _emUpdateDroneFields(sport);
   document.getElementById('em-tz').value=matchTzs[i];
   document.getElementById('em-hub-tz').value=matchHubTzs[i]||matchTzs[i];
   setEmAlign(m.timerNameAlign||'left');
@@ -4382,6 +4383,13 @@ function onSportChange(){
   const sport=document.getElementById('em-sport').value;
   renderTeamPicker('home',sport);
   renderTeamPicker('away',sport);
+  _emUpdateDroneFields(sport);
+}
+function _emUpdateDroneFields(sport){
+  // Netball matches have no drone equipment — hide those fields in the edit modal
+  const isNetball=(sport||'').toLowerCase().includes('netball');
+  document.getElementById('em-drone-ctrl-wrap').style.display=isNetball?'none':'';
+  document.getElementById('em-drone-rend-wrap').style.display=isNetball?'none':'';
 }
 
 function renderTeamPicker(slot,sport){
@@ -5229,6 +5237,11 @@ async function handleScheduleFile(file){
       if(strs.includes('DAY') && strs.some(s=>s.includes('GAME'))){
         headerRowIdx=ri;
         // Build column definitions — merge adjacent items that are very close
+        // Threshold of 4 keeps legitimate multi-word header pairs together (GFX MAIN,
+        // GFX BACKUP, GAME SCHEDULE, CAM 2 AR gap ≈1.4–1.5) while preventing close-but-
+        // separate columns from merging (e.g. GFX BACKUP → CAM 2 AR gap ≈6.1).
+        // "DRONE" and the next "AR" word (start of AR CLOCK) gap ≈1.5 still merge at
+        // threshold 4, but the center-based data assignment below handles that correctly.
         colDefs=[];
         const hi=rowGroups[ri].items;
         let ci=0;
@@ -5236,9 +5249,7 @@ async function handleScheduleFile(file){
           const cur=hi[ci];
           let name=cur.str.toUpperCase().trim();
           let endX=cur.x+cur.w;
-          // Merge next item only if it's within the same word-group (e.g. "GAME SCHEDULE")
-          // Keep threshold tight (< 8) so adjacent columns like "R" and "GAME" don't merge
-          while(ci+1<hi.length && hi[ci+1].x - endX < 8){
+          while(ci+1<hi.length && hi[ci+1].x - endX < 4){
             ci++;
             name+=' '+hi[ci].str.toUpperCase().trim();
             endX=hi[ci].x+hi[ci].w;
@@ -5298,13 +5309,19 @@ async function handleScheduleFile(file){
       best.allItems.push(...fl.items);
     }
 
+    // Pre-compute each column's center x for nearest-column assignment.
+    // Using center (rather than left edge) ensures that items spanning a column
+    // boundary (e.g. multi-word "CTL01 & REND 01" whose right-side words land
+    // just past the left edge of the next column) still map to the correct column.
+    const colCenters = colDefs.map(c => c.endX != null ? (c.x + c.endX) / 2 : c.x);
+
     const matches=[];
     for(const row of anchorRows){
       const cellItems=Array.from({length:colDefs.length},()=>[]);
       row.allItems.forEach(item=>{
-        let bestI=0, bestD=Math.abs(item.x-colDefs[0].x);
+        let bestI=0, bestD=Math.abs(item.x-colCenters[0]);
         for(let ci=1;ci<colDefs.length;ci++){
-          const d=Math.abs(item.x-colDefs[ci].x);
+          const d=Math.abs(item.x-colCenters[ci]);
           if(d<bestD){ bestD=d; bestI=ci; }
         }
         cellItems[bestI].push(item);
@@ -6385,12 +6402,13 @@ function resolveVizEngine(raw){
 function parseArField(raw){
   if(!raw) return {arCtrl:'',arRend:''};
   const s=raw.trim();
-  // "CTL02 & REN02" or "CTL 02 & REN 02"
-  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REN\s*(\w+)/i);
+  // Handles "CTL02 & REN02", "CTL01 & REND 01", "CTL 01 & REND 01" etc.
+  // REND? allows both "REN" and "REND" as the renderer prefix.
+  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REND?\s*(\w+)/i);
   if(both) return {arCtrl:`CTL${both[1].toUpperCase()}`,arRend:`REN${both[2].toUpperCase()}`};
   const ctlOnly=s.match(/CTL\s*(\w+)/i);
   if(ctlOnly) return {arCtrl:`CTL${ctlOnly[1].toUpperCase()}`,arRend:''};
-  const renOnly=s.match(/REN\s*(\w+)/i);
+  const renOnly=s.match(/REND?\s*(\w+)/i);
   if(renOnly) return {arCtrl:'',arRend:`REN${renOnly[1].toUpperCase()}`};
   return {arCtrl:s,arRend:''};
 }
@@ -6398,12 +6416,12 @@ function parseArField(raw){
 function parseDroneField(raw){
   if(!raw || raw==='-') return {droneCtrl:'',droneRend:''};
   const s=raw.trim();
-  // Same CTL/REN split pattern as AR
-  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REN\s*(\w+)/i);
+  // Handles "CTL02 & REN02", "CTL01 & REND 01", "CTL 01 & REND 01" etc.
+  const both=s.match(/CTL\s*(\w+)\s*[&,]\s*REND?\s*(\w+)/i);
   if(both) return {droneCtrl:`CTL${both[1].toUpperCase()}`,droneRend:`REN${both[2].toUpperCase()}`};
   const ctlOnly=s.match(/CTL\s*(\w+)/i);
   if(ctlOnly) return {droneCtrl:`CTL${ctlOnly[1].toUpperCase()}`,droneRend:''};
-  const renOnly=s.match(/REN\s*(\w+)/i);
+  const renOnly=s.match(/REND?\s*(\w+)/i);
   if(renOnly) return {droneCtrl:'',droneRend:`REN${renOnly[1].toUpperCase()}`};
   return {droneCtrl:s,droneRend:''};
 }
@@ -6573,6 +6591,9 @@ function _parseCallsheetTime(raw){
     if(ampm==='PM'&&h!==12) h+=12; if(ampm==='AM'&&h===12) h=0;
     return `${String(h).padStart(2,'0')}:${min}`;
   }
+  // 4-digit HHMM without colon (e.g. "1330", "0915") — seen in some PDF exports
+  mm=s.match(/^(\d{2})(\d{2})$/);
+  if(mm&&parseInt(mm[1])<=23&&parseInt(mm[2])<=59) return `${mm[1]}:${mm[2]}`;
   return null;
 }
 
