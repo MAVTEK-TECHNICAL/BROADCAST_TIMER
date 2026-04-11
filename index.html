@@ -6429,22 +6429,20 @@ function parseDroneField(raw){
 function fuzzyMatchTeam(token, sport){
   if(!token) return null;
   const a=token.toUpperCase().trim();
-  // Priority order: preferred sport first, then all sports
   const preferred = SCHED_TEAMS[sport]||[];
   const others = Object.values(SCHED_TEAMS).flat().filter(t=>!preferred.includes(t));
-  const list = [...preferred,...others];
-  // 1. Exact primary abbr
-  for(const t of list) if(t.abbr===a) return t;
-  // 2. Exact alt abbr
-  for(const t of list) if(t.alt.includes(a)) return t;
-  // 3. Initials match (e.g. "NM" → "North Melbourne")
   const initials = t => t.name.split(' ').map(w=>w[0]).join('').toUpperCase();
-  for(const t of list) if(initials(t)===a) return t;
-  // 4. Name starts with token
-  for(const t of list) if(t.name.toUpperCase().startsWith(a)) return t;
-  // 5. Abbr/alt ends with token (e.g. "PADL" → Port Adelaide via alt "PADL")
-  for(const t of list) if(t.abbr.endsWith(a)||t.alt.some(x=>x.endsWith(a))) return t;
-  return null;
+  // Exhaust ALL match strategies against the preferred sport before trying others.
+  // This prevents e.g. Rugby "Bulls" (abbr:BUL) winning over AFL Western Bulldogs (alt:BUL).
+  function matchIn(list){
+    for(const t of list) if(t.abbr===a) return t;
+    for(const t of list) if(t.alt.includes(a)) return t;
+    for(const t of list) if(initials(t)===a) return t;
+    for(const t of list) if(t.name.toUpperCase().startsWith(a)) return t;
+    for(const t of list) if(t.abbr.endsWith(a)||t.alt.some(x=>x.endsWith(a))) return t;
+    return null;
+  }
+  return matchIn(preferred) || matchIn(others);
 }
 
 function applySchedule(){
