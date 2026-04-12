@@ -3054,14 +3054,28 @@ function applyCalendarSnapshot(docs){
         customFields: data.customFields || [],
         day:          data.day          || '',
       };
-      matchTimers[slot] = Array.isArray(data.timers) ? data.timers.map(t=>({
-        id:        t.id        || uid(),
-        name:      t.name      || '',
-        core:      !!t.core,
-        timeStr:   t.timeStr   || null,
-        targetUTC: t.targetUTC || null,
-        refTz:     t.refTz     || null,
-      })) : _defTimers();
+      matchTimers[slot] = Array.isArray(data.timers) ? data.timers.map(t=>{
+        const refTz = t.refTz || null;
+        const timeStr = t.timeStr || null;
+        // Always recompute targetUTC from timeStr + the match's isoDate so
+        // legacy rows stored with a stale anchor day (e.g. entered the day
+        // before the match) get normalized to the correct match-day instant.
+        let targetUTC = t.targetUTC || null;
+        if(timeStr){
+          const _effTz = (refTz && refTz !== 'site' && refTz !== 'hub')
+            ? refTz
+            : (refTz === 'hub' ? matchHubTzs[slot] : matchTzs[slot]);
+          targetUTC = localToUTC(timeStr, _effTz, matchMeta[slot]?.isoDate);
+        }
+        return {
+          id:        t.id        || uid(),
+          name:      t.name      || '',
+          core:      !!t.core,
+          timeStr,
+          targetUTC,
+          refTz,
+        };
+      }) : _defTimers();
     }
   });
 
@@ -3421,7 +3435,7 @@ function _applyBroadcastTz(tz){
     matchHubTzs[i]=tz;
     const hidden=document.getElementById(`match-tz-${i}`);
     if(hidden) hidden.value=tz;
-    matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i)); });
+    matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i),matchMeta[i]?.isoDate); });
   }
   // Update clocks immediately without waiting for next tick
   document.getElementById('hub-clock').textContent=getClockTime(tz);
@@ -3435,7 +3449,7 @@ function onHubTzChange(){ _applyBroadcastTz(document.getElementById('hub-tz').va
 function onOpTzChange(){  _applyBroadcastTz(document.getElementById('op-tz').value);  }
 function onMatchTzChange(i){
   matchTzs[i]=document.getElementById(`match-tz-${i}`).value;
-  matchTimers[i].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,matchTzs[i]); });
+  matchTimers[i].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,matchTzs[i],matchMeta[i]?.isoDate); });
   scheduleSaveMatch(i);
 }
 
@@ -3611,24 +3625,35 @@ function resolveFringeTz(apply){
       if(fSite.has(i)) matchTzs[i]=tz;
       if(fHub.has(i))  matchHubTzs[i]=tz;
       // Recompute targetUTCs with updated TZs
-      matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i)); });
+      matchTimers[i].forEach(t=>{ if(t.timeStr) t.targetUTC=localToUTC(t.timeStr,getTimerRefTz(t,i),matchMeta[i]?.isoDate); });
     });
   }
   document.getElementById('modal-fringe-tz').classList.add('hidden');
   if(_fringeCallback){ _fringeCallback(); _fringeCallback=null; }
 }
 
-function localToUTC(timeStr, tz){
+function localToUTC(timeStr, tz, isoDate){
   if(!timeStr) return null;
   const [h,m]=timeStr.split(':').map(Number);
-  const now=new Date();
-  const ds=now.toLocaleDateString('en-CA',{timeZone:tz});
-  const [yr,mo,dy]=ds.split('-').map(Number);
+  let yr, mo, dy;
+  // Anchor to the match's isoDate when provided — otherwise timers end up
+  // referencing whatever day they were *entered* on, which silently drifts
+  // into the past the moment the wall clock rolls over midnight.
+  if(isoDate && /^\d{4}-\d{2}-\d{2}$/.test(isoDate)){
+    [yr,mo,dy]=isoDate.split('-').map(Number);
+  } else {
+    const now=new Date();
+    const ds=now.toLocaleDateString('en-CA',{timeZone:tz});
+    [yr,mo,dy]=ds.split('-').map(Number);
+  }
+  // Compute the tz offset at the actual anchor moment (handles DST correctly
+  // for dates far from today).
+  const guess=Date.UTC(yr,mo-1,dy,h,m,0);
   const fmt=new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  const p={}; fmt.formatToParts(now).forEach(x=>{p[x.type]=x.value;});
-  const tzNow=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
-  const off=tzNow-now.getTime();
-  return Date.UTC(yr,mo-1,dy,h,m,0)-off;
+  const p={}; fmt.formatToParts(new Date(guess)).forEach(x=>{p[x.type]=x.value;});
+  const tzView=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+  const off=tzView-guess;
+  return guess-off;
 }
 
 function fmtCountdown(ms){
@@ -4105,7 +4130,7 @@ function confirmSetTime(){
     dbgLog('timer:setTime', `ERROR — timer ${ctx?.tid} not found in slot ${ctx?.mi} (${matchTimers[ctx?.mi]?.length ?? 'null'} timers)`, 'error');
     toast('ERROR — timer not found, please close and reopen'); return;
   }
-  t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi]);
+  t.timeStr=ts; t.targetUTC=localToUTC(ts,matchTzs[ctx.mi],matchMeta[ctx.mi]?.isoDate);
   closeModal('modal-set-time'); scheduleSaveMatch(ctx.mi);
   if(viewMode==='hub') renderHubGrid();
 }
@@ -4150,7 +4175,7 @@ function confirmEditTimer(){
   const _etRef=_editTimerRef;
   const _etRefTz=(_etRef==='other')?(document.getElementById('et-ref-tz')?.value||'Australia/Sydney'):_etRef;
   t.refTz=_etRefTz;
-  t.targetUTC=ts?localToUTC(ts,getTimerRefTz(t,ctx.mi)):null;
+  t.targetUTC=ts?localToUTC(ts,getTimerRefTz(t,ctx.mi),matchMeta[ctx.mi]?.isoDate):null;
   closeModal('modal-edit-timer'); renderAll(); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
@@ -4179,7 +4204,7 @@ function confirmAddTimer(){
   const _aRef=_addTimerRef;
   const _aRefTz=(_aRef==='other')?(document.getElementById('add-ref-tz')?.value||'Australia/Sydney'):_aRef;
   const _aEffTz=getTimerRefTz({refTz:_aRefTz},ctx.mi);
-  matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,_aEffTz):null,refTz:_aRefTz});
+  matchTimers[ctx.mi].push({id:uid(),name,core:false,timeStr:ts,targetUTC:ts?localToUTC(ts,_aEffTz,matchMeta[ctx.mi]?.isoDate):null,refTz:_aRefTz});
   closeModal('modal-add-timer'); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
@@ -4272,12 +4297,12 @@ function confirmEditMatch(){
     matchTzs[mi]=newTz;
     const hiddenSel=document.getElementById(`match-tz-${mi}`);
     if(hiddenSel) hiddenSel.value=newTz;
-    matchTimers[mi].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,newTz); });
+    matchTimers[mi].forEach(t=>{ if(t.timeStr&&(!t.refTz||t.refTz==='site')) t.targetUTC=localToUTC(t.timeStr,newTz,matchMeta[mi]?.isoDate); });
   }
   const newHubTz=document.getElementById('em-hub-tz')?.value;
   if(newHubTz && newHubTz!==matchHubTzs[mi]){
     matchHubTzs[mi]=newHubTz;
-    matchTimers[mi].forEach(t=>{ if(t.timeStr&&t.refTz==='hub') t.targetUTC=localToUTC(t.timeStr,newHubTz); });
+    matchTimers[mi].forEach(t=>{ if(t.timeStr&&t.refTz==='hub') t.targetUTC=localToUTC(t.timeStr,newHubTz,matchMeta[mi]?.isoDate); });
   }
   const _prevMeta = matchMeta[mi]; // preserve fields not in the edit form
   matchMeta[mi]={
@@ -7151,7 +7176,7 @@ function confirmCallsheetImport(){
       const existing=matchTimers[_csMi].find(t=>t.core&&t.name.toUpperCase()===name);
       if(existing){
         existing.timeStr=it.timeStr;
-        existing.targetUTC=localToUTC(it.timeStr,resolvedTz);
+        existing.targetUTC=localToUTC(it.timeStr,resolvedTz,matchMeta[_csMi]?.isoDate);
         count++; return;
       }
     }
@@ -7159,7 +7184,7 @@ function confirmCallsheetImport(){
       id:`t${Date.now()}${Math.random().toString(36).slice(2,6)}`,
       name, core:false,
       timeStr:it.timeStr,
-      targetUTC:localToUTC(it.timeStr,resolvedTz),
+      targetUTC:localToUTC(it.timeStr,resolvedTz,matchMeta[_csMi]?.isoDate),
       refTz:refTzField
     });
     count++;
