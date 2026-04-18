@@ -1585,6 +1585,10 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
         <div class="em-col-title">TIMERS</div>
         <div class="em-timer-list" id="em-timer-list"></div>
         <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:6px 0" onclick="emAddTimer()">+ ADD TIMER</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-sm" style="flex:1;font-size:10px;letter-spacing:1px;padding:6px 0" onclick="emAddOffsetTimer(2)">+ ADD -2HR</button>
+          <button class="btn btn-sm" style="flex:1;font-size:10px;letter-spacing:1px;padding:6px 0" onclick="emAddOffsetTimer(1)">+ ADD -1HR</button>
+        </div>
         <div style="height:1px;background:var(--border);margin:10px 0"></div>
         <button class="btn btn-sm" style="width:100%;font-size:10px;letter-spacing:2px;padding:6px 0;border-color:var(--accent);color:var(--accent)" onclick="emImportCallsheet()">⬇ IMPORT CALLSHEET</button>
       </div>
@@ -4208,6 +4212,13 @@ function confirmAddTimer(){
   closeModal('modal-add-timer'); scheduleSaveMatch(ctx.mi);
   if(!document.getElementById('modal-edit-match').classList.contains('hidden')) emRenderTimers();
 }
+function _subtractHoursFromTime(timeStr, hours){
+  if(!timeStr) return null;
+  const [h,m]=timeStr.split(':').map(Number);
+  let nh=h-hours;
+  if(nh<0) nh+=24;
+  return String(nh).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
 function removeTimer(mi,tid){ matchTimers[mi]=matchTimers[mi].filter(t=>t.id!==tid); scheduleSaveMatch(mi); }
 
 function sortTimers(mi){
@@ -4446,6 +4457,22 @@ function emEditTimer(tid){
 function emDeleteTimer(tid){
   matchTimers[_emMatchIdx]=matchTimers[_emMatchIdx].filter(t=>t.id!==tid);
   scheduleSaveMatch(_emMatchIdx);
+  emRenderTimers();
+}
+function emAddOffsetTimer(hours){
+  const mi=_emMatchIdx;
+  const onAirTimer=matchTimers[mi].find(t=>t.core&&t.name.toUpperCase()==='ON AIR');
+  if(!onAirTimer||!onAirTimer.timeStr){ toast('SET ON AIR TIME FIRST'); return; }
+  const offsetTime=_subtractHoursFromTime(onAirTimer.timeStr, hours);
+  const name=`-${hours}HR`;
+  const resolvedTz=getTimerRefTz(onAirTimer, mi);
+  matchTimers[mi].push({
+    id:uid(), name, core:false,
+    timeStr:offsetTime,
+    targetUTC:localToUTC(offsetTime, resolvedTz, matchMeta[mi]?.isoDate),
+    refTz:onAirTimer.refTz||'site'
+  });
+  scheduleSaveMatch(mi);
   emRenderTimers();
 }
 
@@ -7025,9 +7052,9 @@ function _csRenderParsed(){
   document.getElementById('cs-info-onair').textContent=d.onAir||'\u2014';
   document.getElementById('cs-info-start').textContent=d.matchStart||'\u2014';
   document.getElementById('cs-info-state').textContent=d.state||'\u2014';
-  // Default: pre-check only special items (ON AIR / MATCH START)
+  // Default: pre-check special items (ON AIR / MATCH START / -1HR / -2HR)
   _csChecked=new Set();
-  if(d.onAir)      _csChecked.add('__onair');
+  if(d.onAir)      { _csChecked.add('__onair'); _csChecked.add('__minus2hr'); _csChecked.add('__minus1hr'); }
   if(d.matchStart) _csChecked.add('__matchstart');
   document.getElementById('cs-drop-zone').classList.add('hidden');
   document.getElementById('cs-body').classList.remove('hidden');
@@ -7050,6 +7077,8 @@ function _csRenderList(){
   const d=_csData;
   let items=[];
   if(d.onAir)      items.push({id:'__onair',    role:'ON AIR',    name:'',company:'',timeStr:d.onAir,     refTz:'site',section:'MATCH INFO',isSpecial:true});
+  if(d.onAir)      items.push({id:'__minus2hr', role:'-2HR',      name:'',company:'',timeStr:_subtractHoursFromTime(d.onAir,2), refTz:'site',section:'MATCH INFO',isSpecial:true,isOffset:true});
+  if(d.onAir)      items.push({id:'__minus1hr', role:'-1HR',      name:'',company:'',timeStr:_subtractHoursFromTime(d.onAir,1), refTz:'site',section:'MATCH INFO',isSpecial:true,isOffset:true});
   if(d.matchStart) items.push({id:'__matchstart',role:'MATCH START',name:'',company:'',timeStr:d.matchStart,refTz:'site',section:'MATCH INFO',isSpecial:true});
   items=items.concat(d.roles);
 
@@ -7139,6 +7168,8 @@ function _csAllItems(){
   if(!_csData) return [];
   const d=_csData, items=[];
   if(d.onAir)      items.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site',isSpecial:true});
+  if(d.onAir)      items.push({id:'__minus2hr', role:'-2HR',      timeStr:_subtractHoursFromTime(d.onAir,2), refTz:'site',isSpecial:true,isOffset:true});
+  if(d.onAir)      items.push({id:'__minus1hr', role:'-1HR',      timeStr:_subtractHoursFromTime(d.onAir,1), refTz:'site',isSpecial:true,isOffset:true});
   if(d.matchStart) items.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site',isSpecial:true});
   return items.concat(d.roles);
 }
@@ -7181,6 +7212,8 @@ function confirmCallsheetImport(){
   const d=_csData;
   const allItems=[];
   if(d.onAir)      allItems.push({id:'__onair',    role:'ON AIR',    timeStr:d.onAir,     refTz:'site',isSpecial:true});
+  if(d.onAir)      allItems.push({id:'__minus2hr', role:'-2HR',      timeStr:_subtractHoursFromTime(d.onAir,2), refTz:'site',isOffset:true});
+  if(d.onAir)      allItems.push({id:'__minus1hr', role:'-1HR',      timeStr:_subtractHoursFromTime(d.onAir,1), refTz:'site',isOffset:true});
   if(d.matchStart) allItems.push({id:'__matchstart',role:'MATCH START',timeStr:d.matchStart,refTz:'site',isSpecial:true});
   d.roles.forEach(r=>allItems.push(r));
   let count=0;
@@ -7191,6 +7224,15 @@ function confirmCallsheetImport(){
     if(it.isSpecial){
       // Update the existing core timer in-place rather than adding a duplicate
       const existing=matchTimers[_csMi].find(t=>t.core&&t.name.toUpperCase()===name);
+      if(existing){
+        existing.timeStr=it.timeStr;
+        existing.targetUTC=localToUTC(it.timeStr,resolvedTz,matchMeta[_csMi]?.isoDate);
+        count++; return;
+      }
+    }
+    if(it.isOffset){
+      // Update existing offset timer in-place if it already exists
+      const existing=matchTimers[_csMi].find(t=>!t.core&&t.name.toUpperCase()===name);
       if(existing){
         existing.timeStr=it.timeStr;
         existing.targetUTC=localToUTC(it.timeStr,resolvedTz,matchMeta[_csMi]?.isoDate);
