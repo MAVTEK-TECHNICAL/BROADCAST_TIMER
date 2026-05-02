@@ -3605,30 +3605,66 @@ function openFringeTzModal(slots,callback){
   _fringeCallback=callback;
   const desc=document.getElementById('fringe-tz-desc');
   desc.textContent=`${slots.length} match${slots.length!==1?' locations':' location'} could not be auto-resolved to a timezone (e.g. unknown STATE or HUB code). Select a timezone to apply to all unresolved matches, or skip to keep defaults.`;
-  // Build detail list of unresolved rows
+  // Build detail table of unresolved rows
   const listEl=document.getElementById('fringe-tz-list');
   if(listEl){
     listEl.innerHTML='';
     const fSite=window._fringeSite||new Set();
     const fHub =window._fringeHub ||new Set();
+    const cols=[
+      {key:'day',    label:'DAY'},
+      {key:'game',   label:'GAME SCHEDULE'},
+      {key:'location',label:'LOCATION'},
+      {key:'hub',    label:'HUB'},
+      {key:'state',  label:'STATE'},
+      {key:'host',   label:'HOST'},
+      {key:'truck',  label:'TRUCK'},
+      {key:'main',   label:'MAIN'},
+      {key:'backup', label:'BACKUP'},
+    ];
+    const tbl=document.createElement('table');
+    tbl.style.cssText='width:100%;border-collapse:collapse;font-size:10px;letter-spacing:.4px;font-family:var(--mono)';
+    // Header
+    const thead=document.createElement('thead');
+    const hRow=document.createElement('tr');
+    cols.forEach(c=>{
+      const th=document.createElement('th');
+      th.textContent=c.label;
+      th.style.cssText='padding:6px 8px;text-align:left;color:var(--accent);font-family:var(--display);font-weight:600;font-size:9px;letter-spacing:1.5px;white-space:nowrap;border-bottom:1px solid var(--accent);opacity:.85';
+      hRow.appendChild(th);
+    });
+    thead.appendChild(hRow);
+    tbl.appendChild(thead);
+    // Body
+    const tbody=document.createElement('tbody');
     slots.forEach(i=>{
       const meta=matchMeta[i];
       if(!meta) return;
-      const game=meta.home&&meta.away?`${meta.home} v ${meta.away}`:(meta.home||'Unknown');
-      const row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08)';
-      const label=document.createElement('span');
-      label.style.cssText='color:var(--accent);font-weight:600;white-space:nowrap;font-size:11px';
-      label.textContent=meta.label||`MATCH ${i+1}`;
-      const detail=document.createElement('span');
-      detail.style.cssText='color:var(--text-dim);font-size:10px;letter-spacing:.3px';
-      const siteIssue=fSite.has(i)?`state="${(meta.location||'').split(/\s/)[0]||'?'}"`:null;
-      const hubIssue =fHub.has(i)?`hub="${meta.hub||'?'}"`:null;
-      detail.textContent=`${game} — unresolved ${[siteIssue,hubIssue].filter(Boolean).join(', ')}`;
-      row.appendChild(label);
-      row.appendChild(detail);
-      listEl.appendChild(row);
+      const game=meta.home&&meta.away?`${meta.home} v ${meta.away}`:(meta.home||meta.label||'');
+      const rowData={day:meta.day||'',game,location:meta.location||'',hub:meta.hub||'',
+        state:(window._fringeRawStates&&window._fringeRawStates[i])||'',
+        host:meta.host||'',truck:meta.truck||'',main:meta.main||'',backup:meta.backup||''};
+      const tr=document.createElement('tr');
+      tr.style.cssText='border-bottom:1px solid rgba(255,255,255,.06)';
+      cols.forEach(c=>{
+        const td=document.createElement('td');
+        td.textContent=rowData[c.key]||'—';
+        td.style.cssText='padding:5px 8px;white-space:nowrap;color:var(--text-dim)';
+        // Highlight the problematic cell(s)
+        if(c.key==='state'&&fSite.has(i)){
+          td.style.color='#ff4466'; td.style.fontWeight='700';
+          td.title='Could not resolve STATE to a timezone';
+        }
+        if(c.key==='hub'&&fHub.has(i)){
+          td.style.color='#ff4466'; td.style.fontWeight='700';
+          td.title='Could not resolve HUB code to a timezone';
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
     });
+    tbl.appendChild(tbody);
+    listEl.appendChild(tbl);
   }
   const sel=document.getElementById('fringe-tz-sel');
   sel.innerHTML='';
@@ -6149,6 +6185,7 @@ function confirmScheduleImport(){
   window._fringeSlots=[];
   window._fringeSite=new Set();
   window._fringeHub=new Set();
+  window._fringeRawStates={};
   // Round start date — used to map bare day names ("Sat") to actual ISO dates
   const schedRefISO=document.getElementById('sched-round-start')?.value || calendarDate;
 
@@ -6212,7 +6249,7 @@ function confirmScheduleImport(){
     const _hubTz   =resolveHubTz(_rawHub);
     matchTzs[i]    = _siteTz || 'Australia/Sydney';
     matchHubTzs[i] = _hubTz  || matchTzs[i];      // default hub = site when unresolved
-    if(!_siteTz && _rawState){ window._fringeSite.add(i); window._fringeSlots.push(i); }
+    if(!_siteTz && _rawState){ window._fringeSite.add(i); window._fringeSlots.push(i); window._fringeRawStates[i]=_rawState; }
     if(!_hubTz  && _rawHub)  { window._fringeHub.add(i);  if(!window._fringeSite.has(i)) window._fringeSlots.push(i); }
     matchTimers[i]=_defTimers();
     matchVisible[i]=true; matchEnabled[i]=true;
@@ -7295,10 +7332,10 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
 </script>
 <!-- MODAL: Fringe Timezone Resolution -->
 <div class="modal-overlay hidden" id="modal-fringe-tz">
-  <div class="modal">
+  <div class="modal" style="width:min(680px,calc(100vw - 32px))">
     <div class="modal-title">RESOLVE TIMEZONES</div>
     <div style="font-size:11px;color:var(--text-dim);letter-spacing:.5px;line-height:1.6;margin-bottom:4px" id="fringe-tz-desc"></div>
-    <div id="fringe-tz-list" style="max-height:140px;overflow-y:auto;margin:6px 0 10px;padding:4px 8px;background:rgba(0,0,0,.25);border-radius:6px;border:1px solid rgba(255,255,255,.06)"></div>
+    <div id="fringe-tz-list" style="overflow-x:auto;margin:2px 0 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.25)"></div>
     <div class="modal-field">
       <label>Apply Timezone to All Unresolved Matches</label>
       <select class="modal-input" id="fringe-tz-sel" style="font-family:var(--ui);font-size:13px;"></select>
