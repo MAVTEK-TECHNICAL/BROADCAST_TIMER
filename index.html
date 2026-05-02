@@ -3605,6 +3605,31 @@ function openFringeTzModal(slots,callback){
   _fringeCallback=callback;
   const desc=document.getElementById('fringe-tz-desc');
   desc.textContent=`${slots.length} match${slots.length!==1?' locations':' location'} could not be auto-resolved to a timezone (e.g. unknown STATE or HUB code). Select a timezone to apply to all unresolved matches, or skip to keep defaults.`;
+  // Build detail list of unresolved rows
+  const listEl=document.getElementById('fringe-tz-list');
+  if(listEl){
+    listEl.innerHTML='';
+    const fSite=window._fringeSite||new Set();
+    const fHub =window._fringeHub ||new Set();
+    slots.forEach(i=>{
+      const meta=matchMeta[i];
+      if(!meta) return;
+      const game=meta.home&&meta.away?`${meta.home} v ${meta.away}`:(meta.home||'Unknown');
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08)';
+      const label=document.createElement('span');
+      label.style.cssText='color:var(--accent);font-weight:600;white-space:nowrap;font-size:11px';
+      label.textContent=meta.label||`MATCH ${i+1}`;
+      const detail=document.createElement('span');
+      detail.style.cssText='color:var(--text-dim);font-size:10px;letter-spacing:.3px';
+      const siteIssue=fSite.has(i)?`state="${(meta.location||'').split(/\s/)[0]||'?'}"`:null;
+      const hubIssue =fHub.has(i)?`hub="${meta.hub||'?'}"`:null;
+      detail.textContent=`${game} — unresolved ${[siteIssue,hubIssue].filter(Boolean).join(', ')}`;
+      row.appendChild(label);
+      row.appendChild(detail);
+      listEl.appendChild(row);
+    });
+  }
   const sel=document.getElementById('fringe-tz-sel');
   sel.innerHTML='';
   TZ_GROUPS.forEach(g=>{
@@ -7273,6 +7298,7 @@ let _t; function toast(msg){ const el=document.getElementById('toast'); el.textC
   <div class="modal">
     <div class="modal-title">RESOLVE TIMEZONES</div>
     <div style="font-size:11px;color:var(--text-dim);letter-spacing:.5px;line-height:1.6;margin-bottom:4px" id="fringe-tz-desc"></div>
+    <div id="fringe-tz-list" style="max-height:140px;overflow-y:auto;margin:6px 0 10px;padding:4px 8px;background:rgba(0,0,0,.25);border-radius:6px;border:1px solid rgba(255,255,255,.06)"></div>
     <div class="modal-field">
       <label>Apply Timezone to All Unresolved Matches</label>
       <select class="modal-input" id="fringe-tz-sel" style="font-family:var(--ui);font-size:13px;"></select>
