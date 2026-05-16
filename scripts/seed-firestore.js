@@ -120,8 +120,8 @@ const PARSERS = [
     name:        'Champion Data Schedule',
     type:        'schedule',
     formatKey:   'champion-data',
-    description: 'Champion Data schedule format — accepts .pdf (+ TSV paste fallback)',
-    fileAccept:  '.pdf',
+    description: 'Champion Data schedule format — accepts .pdf, images (+ TSV paste fallback)',
+    fileAccept:  '.pdf,.png,.jpg,.jpeg,.webp,.bmp',
     isActive:    true,
     apiConfig:   null
   },

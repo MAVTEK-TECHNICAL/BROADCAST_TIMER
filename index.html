@@ -1628,9 +1628,9 @@ optgroup{ background:#0f1117;color:var(--accent);font-size:11px; }
 
     <!-- Drop zone -->
     <div class="sched-drop-zone" id="sched-drop-zone">
-      <input type="file" id="sched-pdf-input" accept=".pdf" style="display:none" onchange="handleScheduleFileInput(event)" />
+      <input type="file" id="sched-pdf-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp" style="display:none" onchange="handleScheduleFileInput(event)" />
       <div style="font-size:22px;margin-bottom:6px;opacity:.7">⬇</div>
-      <div id="sched-drop-label">Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span></div>
+      <div id="sched-drop-label">Drop PDF or image here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span></div>
     </div>
 
     <!-- TSV paste fallback -->
@@ -5405,6 +5405,62 @@ function setEmAlign(a){
 
 // ── SCHEDULE IMPORT (BULK) ───────────────────────────────
 
+// Lazy-load Tesseract.js from CDN (for image OCR)
+async function loadTesseract(){
+  if(window.Tesseract) return;
+  await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=res; s.onerror=()=>rej(new Error('Failed to load Tesseract.js'));
+    document.head.appendChild(s);
+  });
+}
+
+// Extract text items {str,x,y,w} from an image file via Tesseract OCR
+async function extractItemsFromImage(file){
+  await loadTesseract();
+  // Load image to get natural dimensions for coordinate scaling
+  const imgUrl=URL.createObjectURL(file);
+  const img=await new Promise((res,rej)=>{
+    const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=imgUrl;
+  });
+  const natW=img.naturalWidth, natH=img.naturalHeight;
+  URL.revokeObjectURL(imgUrl);
+
+  const worker=await Tesseract.createWorker('eng',1,{
+    logger: m=>{
+      if(m.status==='recognizing text'){
+        const pct=Math.round((m.progress||0)*100);
+        const label=document.getElementById('sched-drop-label');
+        if(label) label.textContent=`OCR processing… ${pct}%`;
+      }
+    }
+  });
+  await worker.setParameters({'tessedit_pageseg_mode':'6'}); // assume uniform block of text
+  const {data}=await worker.recognize(file);
+  await worker.terminate();
+
+  // Build items from word-level bounding boxes, scaled to a PDF-like coordinate space.
+  // The PDF parser works with positions on a ~600–800px-wide coordinate space (A4 at 72dpi
+  // is 595×842). We scale image coords proportionally so the same column-detection
+  // thresholds and merge tolerances apply.
+  const SCALE_W = 800 / natW;
+  const SCALE_H = 842 / natH;
+  const items=[];
+  for(const word of data.words){
+    const s=word.text.trim();
+    if(!s) continue;
+    const bb=word.bbox;
+    items.push({
+      str:s,
+      x: Math.round(bb.x0 * SCALE_W),
+      y: Math.round(bb.y0 * SCALE_H),
+      w: Math.round((bb.x1 - bb.x0) * SCALE_W),
+    });
+  }
+  return items;
+}
+
 // Lazy-load PDF.js from CDN
 async function loadPDFJS(){
   if(window.pdfjsLib) return;
@@ -5427,9 +5483,160 @@ function handleScheduleFileInput(e){
   e.target.value=''; // reset so same file can be re-dropped
 }
 
+// ── Shared table-parsing logic ──────────────────────────
+// Takes an array of {str,x,y,w} text items (from PDF.js or Tesseract) and
+// returns an array of match objects. Both the PDF and image code paths converge here.
+function parseScheduleItems(allItems, opts={}){
+  // ROW_TOL: how close (in scaled y-pixels) two items must be to share a row.
+  // PDF text is precise (~6px tolerance), OCR bounding boxes are noisier (~10px).
+  const ROW_TOL = opts.rowTol || 6;
+  // MERGE_TOL: max gap between adjacent header words to merge into one column name.
+  // PDF headers have tight gaps (~4px); OCR gaps are wider (~8px).
+  const MERGE_TOL = opts.mergeTol || 4;
+
+  // Sort by y then x
+  allItems.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
+
+  // Group items into rows by y-proximity
+  const rowGroups=[];
+  for(const item of allItems){
+    const last=rowGroups[rowGroups.length-1];
+    if(last && Math.abs(item.y-last.refY)<=ROW_TOL){
+      last.items.push(item);
+    } else {
+      rowGroups.push({refY:item.y, items:[item]});
+    }
+  }
+  rowGroups.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
+
+  // Detect the header row (contains "DAY" and something with "GAME")
+  let headerRowIdx=-1, colDefs=null;
+  for(let ri=0;ri<rowGroups.length;ri++){
+    const strs=rowGroups[ri].items.map(it=>it.str.toUpperCase());
+    if(strs.includes('DAY') && strs.some(s=>s.includes('GAME'))){
+      headerRowIdx=ri;
+      // Build column definitions — merge adjacent items that are very close
+      colDefs=[];
+      const hi=rowGroups[ri].items;
+      let ci=0;
+      while(ci<hi.length){
+        const cur=hi[ci];
+        let name=cur.str.toUpperCase().trim();
+        let endX=cur.x+cur.w;
+        while(ci+1<hi.length && hi[ci+1].x - endX < MERGE_TOL){
+          ci++;
+          name+=' '+hi[ci].str.toUpperCase().trim();
+          endX=hi[ci].x+hi[ci].w;
+        }
+        colDefs.push({name:name.trim(), x:cur.x, endX});
+        ci++;
+      }
+      break;
+    }
+  }
+
+  // If no header found, use hard-coded default column x-positions
+  if(!colDefs){
+    colDefs=[
+      {name:'DAY',x:0},{name:'R',x:55},{name:'GAME SCHEDULE',x:100},
+      {name:'LOCATION',x:200},{name:'FMT',x:310},{name:'HUB',x:355},
+      {name:'STATE',x:415},{name:'HOST',x:460},{name:'TRUCK',x:535},
+      {name:'MAIN',x:578},{name:'BACKUP',x:638},
+    ];
+  }
+
+  // Helper: find col index by name fragment
+  const colIdx=frag=>colDefs.findIndex(c=>c.name.includes(frag));
+  const dayColI  =colIdx('DAY');
+  const gameColI =colIdx('GAME');
+  const locColI  =colIdx('LOCATION');
+  const hubColI  =colIdx('HUB');
+  const hostColI =colIdx('HOST');
+  const truckColI=colIdx('TRUCK');
+  const mainColI   =colIdx('MAIN');
+  const backupColI =colIdx('BACKUP');
+  const arColI     =colIdx('CAM 2 AR')<0?colIdx('AR'):colIdx('CAM 2 AR');
+  const droneColI  =colIdx('DRONE');
+  const tacticColI =colIdx('TACTIC');
+  const trackerColI=colIdx('TRACKER');
+  const stateColI  =colIdx('STATE');
+
+  // Two-pass extraction:
+  // Pass 1 – separate "anchor" rows (have items at DAY/GAME x range) from "floaters"
+  //          (fragments like multi-line cell spillover that have no game text)
+  // Pass 2 – adopt each floater into its nearest anchor, then extract cells with
+  //          per-column (y,x) sort so multi-line values read top→bottom correctly
+  const startI=Math.max(0, headerRowIdx+1);
+  const anchorXMin=(colDefs[dayColI]?.x||30)-20;
+  const anchorXMax=(colDefs[gameColI]?.x||92)+80;
+  const anchorRows=[], floaters=[];
+  for(let ri=startI;ri<rowGroups.length;ri++){
+    const rg=rowGroups[ri];
+    const isAnchor=rg.items.some(it=>it.x>=anchorXMin&&it.x<=anchorXMax);
+    if(isAnchor) anchorRows.push({refY:rg.refY, allItems:[...rg.items]});
+    else         floaters.push(rg);
+  }
+  for(const fl of floaters){
+    if(!anchorRows.length) continue;
+    let best=anchorRows[0], bestD=Math.abs(fl.refY-best.refY);
+    for(const a of anchorRows){ const d=Math.abs(fl.refY-a.refY); if(d<bestD){bestD=d;best=a;} }
+    best.allItems.push(...fl.items);
+  }
+
+  // Pre-compute each column's center x for nearest-column assignment.
+  // Using center (rather than left edge) ensures that items spanning a column
+  // boundary (e.g. multi-word "CTL01 & REND 01" whose right-side words land
+  // just past the left edge of the next column) still map to the correct column.
+  const colCenters = colDefs.map(c => c.endX != null ? (c.x + c.endX) / 2 : c.x);
+
+  const matches=[];
+  for(const row of anchorRows){
+    const cellItems=Array.from({length:colDefs.length},()=>[]);
+    row.allItems.forEach(item=>{
+      let bestI=0, bestD=Math.abs(item.x-colCenters[0]);
+      for(let ci=1;ci<colDefs.length;ci++){
+        const d=Math.abs(item.x-colCenters[ci]);
+        if(d<bestD){ bestD=d; bestI=ci; }
+      }
+      cellItems[bestI].push(item);
+    });
+    const cells=cellItems.map(items=>{
+      items.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
+      return items.map(i=>i.str).join(' ');
+    });
+    const day =dayColI >=0?cells[dayColI].trim() :'';
+    // Strip any leading round number that bled in from the R column (e.g. "2 GIA v VIX" → "GIA v VIX")
+    const game=(gameColI>=0?cells[gameColI].trim():'').replace(/^\d+\s+/,'').trim();
+    if(!game) continue;
+    matches.push({
+      day,game,
+      location:locColI  >=0?cells[locColI].trim()  :'',
+      hub:     hubColI  >=0?cells[hubColI].trim()  :'',
+      state:   stateColI>=0?cells[stateColI].trim():'',
+      host:    hostColI >=0?cells[hostColI].trim() :'',
+      truck:   truckColI>=0?cells[truckColI].trim():'',
+      main:    mainColI   >=0?cells[mainColI].trim()   :'',
+      backup:  backupColI >=0?cells[backupColI].trim() :'',
+      ...parseArField(arColI>=0?cells[arColI].trim():''),
+      ...parseDroneField(droneColI>=0?cells[droneColI].trim():''),
+      tactic:  tacticColI>=0?cells[tacticColI].trim():'',
+      tracker: trackerColI>=0?cells[trackerColI].trim():'',
+    });
+  }
+  return matches;
+}
+
+// Helper: check if a file is a supported image type
+function isImageFile(file){
+  return /^image\/(png|jpe?g|webp|bmp|tiff?)$/i.test(file.type)
+      || /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(file.name);
+}
+
 async function handleScheduleFile(file){
-  if(!file || file.type!=='application/pdf'){
-    toast('Please drop a PDF file');
+  const isPDF  = file && (file.type==='application/pdf' || /\.pdf$/i.test(file.name));
+  const isImg  = file && isImageFile(file);
+  if(!file || (!isPDF && !isImg)){
+    toast('Please drop a PDF or image file');
     return;
   }
   const zone=document.getElementById('sched-drop-zone');
@@ -5438,163 +5645,39 @@ async function handleScheduleFile(file){
   label.textContent=`Reading ${file.name}…`;
 
   try {
-    await loadPDFJS();
-    const buffer=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+    let allItems;
 
-    // Collect all text items with positions from every page
-    const allItems=[];
-    for(let p=1;p<=pdf.numPages;p++){
-      const page=await pdf.getPage(p);
-      const vp=page.getViewport({scale:1});
-      const content=await page.getTextContent();
-      content.items.forEach(item=>{
-        const s=item.str.trim();
-        if(!s) return;
-        allItems.push({
-          str:s,
-          x:Math.round(item.transform[4]),
-          y:Math.round(vp.height - item.transform[5]), // flip so top=0
-          w:Math.round(item.width||0),
+    if(isPDF){
+      // ── PDF path (existing) ──────────────────────────────
+      await loadPDFJS();
+      const buffer=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+      allItems=[];
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const vp=page.getViewport({scale:1});
+        const content=await page.getTextContent();
+        content.items.forEach(item=>{
+          const s=item.str.trim();
+          if(!s) return;
+          allItems.push({
+            str:s,
+            x:Math.round(item.transform[4]),
+            y:Math.round(vp.height - item.transform[5]),
+            w:Math.round(item.width||0),
+          });
         });
-      });
-    }
-
-    // Sort by y then x
-    allItems.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
-
-    // Group items into rows by y-proximity
-    const ROW_TOL=6; // conservative — keeps distinct rows separate
-    const rowGroups=[];
-    for(const item of allItems){
-      const last=rowGroups[rowGroups.length-1];
-      if(last && Math.abs(item.y-last.refY)<=ROW_TOL){
-        last.items.push(item);
-      } else {
-        rowGroups.push({refY:item.y, items:[item]});
       }
-    }
-    rowGroups.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
-
-    // Detect the header row (contains "DAY" and something with "GAME")
-    let headerRowIdx=-1, colDefs=null;
-    for(let ri=0;ri<rowGroups.length;ri++){
-      const strs=rowGroups[ri].items.map(it=>it.str.toUpperCase());
-      if(strs.includes('DAY') && strs.some(s=>s.includes('GAME'))){
-        headerRowIdx=ri;
-        // Build column definitions — merge adjacent items that are very close
-        // Threshold of 4 keeps legitimate multi-word header pairs together (GFX MAIN,
-        // GFX BACKUP, GAME SCHEDULE, CAM 2 AR gap ≈1.4–1.5) while preventing close-but-
-        // separate columns from merging (e.g. GFX BACKUP → CAM 2 AR gap ≈6.1).
-        // "DRONE" and the next "AR" word (start of AR CLOCK) gap ≈1.5 still merge at
-        // threshold 4, but the center-based data assignment below handles that correctly.
-        colDefs=[];
-        const hi=rowGroups[ri].items;
-        let ci=0;
-        while(ci<hi.length){
-          const cur=hi[ci];
-          let name=cur.str.toUpperCase().trim();
-          let endX=cur.x+cur.w;
-          while(ci+1<hi.length && hi[ci+1].x - endX < 4){
-            ci++;
-            name+=' '+hi[ci].str.toUpperCase().trim();
-            endX=hi[ci].x+hi[ci].w;
-          }
-          colDefs.push({name:name.trim(), x:cur.x, endX});
-          ci++;
-        }
-        break;
-      }
+    } else {
+      // ── Image path (OCR via Tesseract.js) ────────────────
+      allItems = await extractItemsFromImage(file);
     }
 
-    // If no header found, use hard-coded default column x-positions
-    if(!colDefs){
-      colDefs=[
-        {name:'DAY',x:0},{name:'R',x:55},{name:'GAME SCHEDULE',x:100},
-        {name:'LOCATION',x:200},{name:'FMT',x:310},{name:'HUB',x:355},
-        {name:'STATE',x:415},{name:'HOST',x:460},{name:'TRUCK',x:535},
-        {name:'MAIN',x:578},{name:'BACKUP',x:638},
-      ];
-    }
-
-    // Helper: find col index by name fragment
-    const colIdx=frag=>colDefs.findIndex(c=>c.name.includes(frag));
-    const dayColI  =colIdx('DAY');
-    const gameColI =colIdx('GAME');
-    const locColI  =colIdx('LOCATION');
-    const hubColI  =colIdx('HUB');
-    const hostColI =colIdx('HOST');
-    const truckColI=colIdx('TRUCK');
-    const mainColI   =colIdx('MAIN');
-    const backupColI =colIdx('BACKUP');
-    const arColI     =colIdx('CAM 2 AR')<0?colIdx('AR'):colIdx('CAM 2 AR');
-    const droneColI  =colIdx('DRONE');
-    const tacticColI =colIdx('TACTIC');
-    const trackerColI=colIdx('TRACKER');
-    const stateColI  =colIdx('STATE');
-
-    // Two-pass extraction:
-    // Pass 1 – separate "anchor" rows (have items at DAY/GAME x range) from "floaters"
-    //          (fragments like multi-line cell spillover that have no game text)
-    // Pass 2 – adopt each floater into its nearest anchor, then extract cells with
-    //          per-column (y,x) sort so multi-line values read top→bottom correctly
-    const startI=Math.max(0, headerRowIdx+1);
-    const anchorXMin=(colDefs[dayColI]?.x||30)-20;
-    const anchorXMax=(colDefs[gameColI]?.x||92)+80;
-    const anchorRows=[], floaters=[];
-    for(let ri=startI;ri<rowGroups.length;ri++){
-      const rg=rowGroups[ri];
-      const isAnchor=rg.items.some(it=>it.x>=anchorXMin&&it.x<=anchorXMax);
-      if(isAnchor) anchorRows.push({refY:rg.refY, allItems:[...rg.items]});
-      else         floaters.push(rg);
-    }
-    for(const fl of floaters){
-      if(!anchorRows.length) continue;
-      let best=anchorRows[0], bestD=Math.abs(fl.refY-best.refY);
-      for(const a of anchorRows){ const d=Math.abs(fl.refY-a.refY); if(d<bestD){bestD=d;best=a;} }
-      best.allItems.push(...fl.items);
-    }
-
-    // Pre-compute each column's center x for nearest-column assignment.
-    // Using center (rather than left edge) ensures that items spanning a column
-    // boundary (e.g. multi-word "CTL01 & REND 01" whose right-side words land
-    // just past the left edge of the next column) still map to the correct column.
-    const colCenters = colDefs.map(c => c.endX != null ? (c.x + c.endX) / 2 : c.x);
-
-    const matches=[];
-    for(const row of anchorRows){
-      const cellItems=Array.from({length:colDefs.length},()=>[]);
-      row.allItems.forEach(item=>{
-        let bestI=0, bestD=Math.abs(item.x-colCenters[0]);
-        for(let ci=1;ci<colDefs.length;ci++){
-          const d=Math.abs(item.x-colCenters[ci]);
-          if(d<bestD){ bestD=d; bestI=ci; }
-        }
-        cellItems[bestI].push(item);
-      });
-      const cells=cellItems.map(items=>{
-        items.sort((a,b)=>a.y!==b.y?a.y-b.y:a.x-b.x);
-        return items.map(i=>i.str).join(' ');
-      });
-      const day =dayColI >=0?cells[dayColI].trim() :'';
-      // Strip any leading round number that bled in from the R column (e.g. "2 GIA v VIX" → "GIA v VIX")
-      const game=(gameColI>=0?cells[gameColI].trim():'').replace(/^\d+\s+/,'').trim();
-      if(!game) continue;
-      matches.push({
-        day,game,
-        location:locColI  >=0?cells[locColI].trim()  :'',
-        hub:     hubColI  >=0?cells[hubColI].trim()  :'',
-        state:   stateColI>=0?cells[stateColI].trim():'',
-        host:    hostColI >=0?cells[hostColI].trim() :'',
-        truck:   truckColI>=0?cells[truckColI].trim():'',
-        main:    mainColI   >=0?cells[mainColI].trim()   :'',
-        backup:  backupColI >=0?cells[backupColI].trim() :'',
-        ...parseArField(arColI>=0?cells[arColI].trim():''),
-        ...parseDroneField(droneColI>=0?cells[droneColI].trim():''),
-        tactic:  tacticColI>=0?cells[tacticColI].trim():'',
-        tracker: trackerColI>=0?cells[trackerColI].trim():'',
-      });
-    }
+    // Shared table-parsing — OCR items use wider tolerances
+    const matches = parseScheduleItems(allItems, isImg
+      ? { rowTol: 10, mergeTol: 8 }
+      : { rowTol: 6,  mergeTol: 4 }
+    );
 
     window._schedAllMatches=matches;
     zone.className='sched-drop-zone loaded';
@@ -5602,11 +5685,11 @@ async function handleScheduleFile(file){
     renderScheduleTable(matches);
 
   } catch(err){
-    console.error('PDF parse error:',err);
+    console.error('Schedule parse error:',err);
     zone.className='sched-drop-zone';
     document.getElementById('sched-drop-label').innerHTML=
-      `Error reading PDF — <span style="text-decoration:underline;cursor:pointer" onclick="document.getElementById('sched-pdf-input').click()">try again</span> or use TSV paste`;
-    toast('PDF parse error');
+      `Error reading file — <span style="text-decoration:underline;cursor:pointer" onclick="document.getElementById('sched-pdf-input').click()">try again</span> or use TSV paste`;
+    toast('File parse error');
   }
 }
 
@@ -6069,11 +6152,11 @@ const CS_PARSERS = {
 const SCHED_PARSERS = {
   'champion-data': {
     label: 'CHAMPION DATA',
-    fileAccept: '.pdf',
+    fileAccept: '.pdf,.png,.jpg,.jpeg,.webp,.bmp',
     dropLabel: (name) => name
       ? `✓ ${name}`
-      : `Drop PDF here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span>`,
-    handleFile: handleScheduleFile,   // existing PDF handler
+      : `Drop PDF or image here, or <span style="text-decoration:underline" onclick="event.stopPropagation();document.getElementById('sched-pdf-input').click()">browse</span>`,
+    handleFile: handleScheduleFile,   // handles both PDF and image files
     parseTSV:   parseScheduleImport,  // existing TSV handler
   },
   // Future parsers go here, e.g.:
@@ -6129,7 +6212,7 @@ function openImportSchedule(){
 // TSV paste fallback parser
 function parseScheduleImport(){
   const text=document.getElementById('sched-import-text').value.trim();
-  if(!text){ toast('Paste TSV data first, or drop a PDF above'); return; }
+  if(!text){ toast('Paste TSV data first, or drop a file above'); return; }
 
   const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(!lines.length){ toast('No data found'); return; }
