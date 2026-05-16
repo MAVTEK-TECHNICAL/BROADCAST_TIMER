@@ -5669,39 +5669,119 @@ function parseScheduleItems(allItems, opts={}){
   }
   rowGroups.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
 
-  // Detect the header row (contains "DAY" and something with "GAME")
+  // ── Detect the header row ──────────────────────────────────
+  // The Champion Data schedule has a light-blue header row that OCR often
+  // garbles. Strategy:
+  //  1. Try exact match: row contains "DAY" + "GAME"
+  //  2. Try fuzzy match: row contains ≥3 known column keywords
+  //  3. Fallback: use hard-coded proportional positions
+  //
+  // When the header IS found but partially garbled (common in image OCR),
+  // use any recognized column keywords as anchor points and interpolate
+  // the known Champion Data column layout to fill gaps.
   let headerRowIdx=-1, colDefs=null;
+  const HEADER_KEYWORDS=['DAY','GAME','SCHEDULE','LOCATION','FMT','HUB',
+                         'STATE','HOST','TRUCK','CLOCK','TACTIC','TRACKER',
+                         'DRONE','BACKUP','MAIN','COMMS','IPKIT','AR'];
+  // Known PDF x-positions for each column (used as reference for interpolation)
+  const PDF_COL_MAP={
+    'DAY':30,'R':55,'GAME SCHEDULE':92,'LOCATION':200,'FMT':310,'HUB':355,
+    'STATE':415,'HOST':460,'TRUCK':535,'GFX MAIN':578,'GFX BACKUP':638,
+    'CAM 2 AR':690,'DRONE':730,'AR CLOCK':770,'COMMS':810,'IPKIT':850,
+    'TACTIC':890,'TRACKER':930
+  };
+
   for(let ri=0;ri<rowGroups.length;ri++){
     const strs=rowGroups[ri].items.map(it=>it.str.toUpperCase());
-    if(strs.includes('DAY') && strs.some(s=>s.includes('GAME'))){
+    const exact=strs.includes('DAY') && strs.some(s=>s.includes('GAME'));
+    const matchedKW=strs.filter(s=>HEADER_KEYWORDS.includes(s));
+    const fuzzy=!exact && matchedKW.length>=3;
+    if(exact||fuzzy){
       headerRowIdx=ri;
-      // Build column definitions — merge adjacent items that are very close
-      colDefs=[];
-      const hi=rowGroups[ri].items;
-      let ci=0;
-      while(ci<hi.length){
-        const cur=hi[ci];
-        let name=cur.str.toUpperCase().trim();
-        let endX=cur.x+cur.w;
-        while(ci+1<hi.length && hi[ci+1].x - endX < MERGE_TOL){
+      console.log('[parseScheduleItems] Header row',ri,
+        exact?'(exact match)':'(fuzzy: '+matchedKW.join(',')+')');
+      if(exact){
+        // Clean header — build column defs directly from items
+        colDefs=[];
+        const hi=rowGroups[ri].items;
+        let ci=0;
+        while(ci<hi.length){
+          const cur=hi[ci];
+          let name=cur.str.toUpperCase().trim();
+          let endX=cur.x+cur.w;
+          while(ci+1<hi.length && hi[ci+1].x - endX < MERGE_TOL){
+            ci++;
+            name+=' '+hi[ci].str.toUpperCase().trim();
+            endX=hi[ci].x+hi[ci].w;
+          }
+          colDefs.push({name:name.trim(), x:cur.x, endX});
           ci++;
-          name+=' '+hi[ci].str.toUpperCase().trim();
-          endX=hi[ci].x+hi[ci].w;
         }
-        colDefs.push({name:name.trim(), x:cur.x, endX});
-        ci++;
+      } else {
+        // Fuzzy header — use recognized keywords as anchor points to
+        // compute a linear mapping from PDF coordinates to image coords,
+        // then place ALL columns using that mapping.
+        const anchors=[]; // [{pdfX, imgX}]
+        for(const item of rowGroups[ri].items){
+          const name=item.str.toUpperCase().trim();
+          // Find this keyword in the PDF column map
+          for(const [colName, pdfX] of Object.entries(PDF_COL_MAP)){
+            if(colName===name || colName.includes(name)){
+              anchors.push({pdfX, imgX:item.x});
+              break;
+            }
+          }
+        }
+        if(anchors.length>=2){
+          // Linear regression (or simple 2-point fit) from pdfX → imgX
+          anchors.sort((a,b)=>a.pdfX-b.pdfX);
+          const n=anchors.length;
+          const sumPx=anchors.reduce((s,a)=>s+a.pdfX,0);
+          const sumIx=anchors.reduce((s,a)=>s+a.imgX,0);
+          const sumPxIx=anchors.reduce((s,a)=>s+a.pdfX*a.imgX,0);
+          const sumPx2=anchors.reduce((s,a)=>s+a.pdfX*a.pdfX,0);
+          const denom=n*sumPx2-sumPx*sumPx;
+          let slope, intercept;
+          if(Math.abs(denom)>1e-6){
+            slope=(n*sumPxIx-sumPx*sumIx)/denom;
+            intercept=(sumIx-slope*sumPx)/n;
+          } else {
+            slope=anchors[n-1].imgX/anchors[n-1].pdfX;
+            intercept=0;
+          }
+          const mapX=px=>Math.round(slope*px+intercept);
+          console.log('[parseScheduleItems] Fuzzy header: mapped',anchors.length,
+                      'anchors, slope='+slope.toFixed(2),'intercept='+intercept.toFixed(0));
+          colDefs=[
+            {name:'DAY',x:mapX(30)},{name:'R',x:mapX(55)},
+            {name:'GAME SCHEDULE',x:mapX(92)},{name:'LOCATION',x:mapX(200)},
+            {name:'FMT',x:mapX(310)},{name:'HUB',x:mapX(355)},
+            {name:'STATE',x:mapX(415)},{name:'HOST',x:mapX(460)},
+            {name:'TRUCK',x:mapX(535)},{name:'GFX MAIN',x:mapX(578)},
+            {name:'GFX BACKUP',x:mapX(638)},{name:'CAM 2 AR',x:mapX(690)},
+            {name:'DRONE',x:mapX(730)},{name:'AR CLOCK',x:mapX(770)},
+            {name:'COMMS',x:mapX(810)},{name:'IPKIT',x:mapX(850)},
+            {name:'TACTIC',x:mapX(890)},{name:'TRACKER',x:mapX(930)},
+          ];
+        }
+        // If <2 anchors, fall through to hard-coded fallback below
       }
       break;
     }
   }
 
-  // If no header found, use hard-coded default column x-positions
+  // Hard-coded fallback: scale proportionally if items span image-width coordinates
   if(!colDefs){
+    const PDF_WIDTH=800;
+    const maxItemX=allItems.reduce((mx,it)=>Math.max(mx,it.x+(it.w||0)),0);
+    const scale=maxItemX>PDF_WIDTH*1.5 ? maxItemX/PDF_WIDTH : 1;
+    const sc=x=>Math.round(x*scale);
+    console.log('[parseScheduleItems] No header found, using fallback cols (scale='+scale.toFixed(2)+', maxX='+maxItemX+')');
     colDefs=[
-      {name:'DAY',x:0},{name:'R',x:55},{name:'GAME SCHEDULE',x:100},
-      {name:'LOCATION',x:200},{name:'FMT',x:310},{name:'HUB',x:355},
-      {name:'STATE',x:415},{name:'HOST',x:460},{name:'TRUCK',x:535},
-      {name:'MAIN',x:578},{name:'BACKUP',x:638},
+      {name:'DAY',x:sc(0)},{name:'R',x:sc(55)},{name:'GAME SCHEDULE',x:sc(100)},
+      {name:'LOCATION',x:sc(200)},{name:'FMT',x:sc(310)},{name:'HUB',x:sc(355)},
+      {name:'STATE',x:sc(415)},{name:'HOST',x:sc(460)},{name:'TRUCK',x:sc(535)},
+      {name:'GFX MAIN',x:sc(578)},{name:'GFX BACKUP',x:sc(638)},
     ];
   }
 
@@ -5753,9 +5833,12 @@ function parseScheduleItems(allItems, opts={}){
   for(const row of anchorRows){
     const cellItems=Array.from({length:colDefs.length},()=>[]);
     row.allItems.forEach(item=>{
-      let bestI=0, bestD=Math.abs(item.x-colCenters[0]);
+      // Use item center for distance comparison — wide items (e.g. "7FRONTBAR")
+      // have their left edge closer to the wrong column but center is correct.
+      const itemCx=item.x+(item.w||0)/2;
+      let bestI=0, bestD=Math.abs(itemCx-colCenters[0]);
       for(let ci=1;ci<colDefs.length;ci++){
-        const d=Math.abs(item.x-colCenters[ci]);
+        const d=Math.abs(itemCx-colCenters[ci]);
         if(d<bestD){ bestD=d; bestI=ci; }
       }
       cellItems[bestI].push(item);
