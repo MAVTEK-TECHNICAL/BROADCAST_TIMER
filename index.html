@@ -5416,48 +5416,208 @@ async function loadTesseract(){
   });
 }
 
-// Extract text items {str,x,y,w} from an image file via Tesseract OCR
+// Extract text items {str,x,y,w} from an image file via Tesseract OCR.
+// Uses DUAL-POLARITY adaptive thresholding + grid-line removal to handle
+// schedule images with colored cell backgrounds (purple HUB, red HOST/FMT
+// columns with white text, light-blue header with dark text).
+//
+// Preprocessing pipeline:
+//   1. Upscale image for better OCR resolution
+//   2. Detect colored cell backgrounds via HSV saturation analysis
+//   3. Invert grayscale in colored regions (white text → dark text)
+//   4. Apply adaptive threshold on the adjusted grayscale
+//   5. Remove grid lines via run-length filtering
+//   6. OCR via Tesseract.js
 async function extractItemsFromImage(file){
   await loadTesseract();
-  // Load image to get natural dimensions for coordinate scaling
+  const label=document.getElementById('sched-drop-label');
+
+  // ── Load image ──────────────────────────────────────────
+  if(label) label.textContent='Loading image…';
   const imgUrl=URL.createObjectURL(file);
   const img=await new Promise((res,rej)=>{
     const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=imgUrl;
   });
-  const natW=img.naturalWidth, natH=img.naturalHeight;
   URL.revokeObjectURL(imgUrl);
+  const natW=img.naturalWidth, natH=img.naturalHeight;
 
+  // ── Upscale onto canvas for better OCR accuracy ─────────
+  if(label) label.textContent='Pre-processing image…';
+  const SCALE=Math.max(2, Math.ceil(3000/natW));
+  const cW=natW*SCALE, cH=natH*SCALE;
+  const canvas=document.createElement('canvas');
+  canvas.width=cW; canvas.height=cH;
+  const cctx=canvas.getContext('2d');
+  cctx.imageSmoothingEnabled=true;
+  cctx.imageSmoothingQuality='high';
+  cctx.drawImage(img,0,0,cW,cH);
+  const imgData=cctx.getImageData(0,0,cW,cH);
+  const px=imgData.data;
+  const len=cW*cH;
+
+  // ── Convert to grayscale + detect colored backgrounds ───
+  // We compute grayscale AND HSV saturation/value in one pass.
+  // Colored cell backgrounds (purple HUB, red HOST/FMT) have
+  // high saturation (>100 in 0-255 range). The light-blue header
+  // row has low saturation (~51) and high value, so it's excluded.
+  // For colored regions, we invert grayscale so white text becomes
+  // dark text, letting standard adaptive threshold work correctly.
+  const gray=new Uint8Array(len);
+  const isColoredBg=new Uint8Array(len); // 1 = colored dark background
+  for(let i=0;i<len;i++){
+    const r=px[i*4], g=px[i*4+1], b=px[i*4+2];
+    // Grayscale
+    gray[i]=Math.round(0.299*r+0.587*g+0.114*b);
+    // HSV saturation check (inline): sat > ~100/255 ≈ 0.39
+    const cMax=Math.max(r,g,b), cMin=Math.min(r,g,b);
+    const delta=cMax-cMin;
+    // saturation = delta/cMax (0-255 scale: delta*255/cMax)
+    // We want sat > 100 on 0-255 scale, i.e. delta/cMax > 0.392
+    if(cMax>0 && (delta*255/cMax)>100){
+      isColoredBg[i]=1;
+    }
+  }
+
+  // ── Morphological cleanup of colored-bg mask ────────────
+  // Dilate the mask to cover full cell regions including text edges.
+  // Separable box dilation: horizontal pass then vertical pass (O(n) each).
+  const DILATION=3; // radius in pixels
+  const hDilated=new Uint8Array(len);
+  // Horizontal dilation
+  for(let y=0;y<cH;y++){
+    let count=0; // sliding window count of colored pixels
+    // Initialize window [0 .. DILATION]
+    for(let x=0;x<=DILATION&&x<cW;x++) count+=isColoredBg[y*cW+x];
+    for(let x=0;x<cW;x++){
+      // Add right edge of window
+      const rx=x+DILATION;
+      if(rx<cW && rx>DILATION) count+=isColoredBg[y*cW+rx];
+      if(count>0) hDilated[y*cW+x]=1;
+      // Remove left edge of window
+      const lx=x-DILATION;
+      if(lx>=0) count-=isColoredBg[y*cW+lx];
+    }
+  }
+  // Vertical dilation
+  const dilated=new Uint8Array(len);
+  for(let x=0;x<cW;x++){
+    let count=0;
+    for(let y=0;y<=DILATION&&y<cH;y++) count+=hDilated[y*cW+x];
+    for(let y=0;y<cH;y++){
+      const ry=y+DILATION;
+      if(ry<cH && ry>DILATION) count+=hDilated[ry*cW+x];
+      if(count>0) dilated[y*cW+x]=1;
+      const ly=y-DILATION;
+      if(ly>=0) count-=hDilated[ly*cW+x];
+    }
+  }
+
+  // ── Invert grayscale in colored regions ─────────────────
+  // White text on colored bg → dark text on light bg after inversion
+  for(let i=0;i<len;i++){
+    if(dilated[i]) gray[i]=255-gray[i];
+  }
+
+  // ── Adaptive threshold using integral image ─────────────
+  // After inversion, all text is dark-on-light, so standard
+  // adaptive threshold works: pixel < localMean - C → text.
+  const BLOCK=31, C_VAL=15;
+  const half=Math.floor(BLOCK/2);
+
+  // Build integral image for O(1) local-mean lookups
+  const integral=new Float64Array(len);
+  for(let y=0;y<cH;y++){
+    let rowSum=0;
+    for(let x=0;x<cW;x++){
+      rowSum+=gray[y*cW+x];
+      integral[y*cW+x]=rowSum+(y>0?integral[(y-1)*cW+x]:0);
+    }
+  }
+
+  // Apply adaptive threshold
+  const binary=new Uint8Array(len);
+  for(let y=0;y<cH;y++){
+    for(let x=0;x<cW;x++){
+      const x0=Math.max(0,x-half), y0=Math.max(0,y-half);
+      const x1=Math.min(cW-1,x+half), y1=Math.min(cH-1,y+half);
+      const count=(x1-x0+1)*(y1-y0+1);
+      let sum=integral[y1*cW+x1];
+      if(x0>0) sum-=integral[y1*cW+(x0-1)];
+      if(y0>0) sum-=integral[(y0-1)*cW+x1];
+      if(x0>0&&y0>0) sum+=integral[(y0-1)*cW+(x0-1)];
+      binary[y*cW+x]=gray[y*cW+x]>(sum/count)-C_VAL?255:0;
+    }
+  }
+
+  // ── Remove grid lines ───────────────────────────────────
+  // Horizontal: continuous black runs exceeding LINE_LEN are grid lines.
+  const LINE_LEN=Math.round(cW/8);
+  for(let y=0;y<cH;y++){
+    let runStart=-1;
+    for(let x=0;x<=cW;x++){
+      const isBlack=x<cW&&binary[y*cW+x]===0;
+      if(isBlack){
+        if(runStart<0) runStart=x;
+      } else {
+        if(runStart>=0 && (x-runStart)>LINE_LEN){
+          for(let rx=runStart;rx<x;rx++) binary[y*cW+rx]=255;
+        }
+        runStart=-1;
+      }
+    }
+  }
+  // Vertical lines
+  const V_LINE_LEN=Math.round(cH/8);
+  for(let x=0;x<cW;x++){
+    let runStart=-1;
+    for(let y=0;y<=cH;y++){
+      const isBlack=y<cH&&binary[y*cW+x]===0;
+      if(isBlack){
+        if(runStart<0) runStart=y;
+      } else {
+        if(runStart>=0 && (y-runStart)>V_LINE_LEN){
+          for(let ry=runStart;ry<y;ry++) binary[ry*cW+x]=255;
+        }
+        runStart=-1;
+      }
+    }
+  }
+
+  // ── Write processed image back to canvas ────────────────
+  for(let i=0;i<len;i++){
+    px[i*4]=px[i*4+1]=px[i*4+2]=binary[i]; px[i*4+3]=255;
+  }
+  cctx.putImageData(imgData,0,0);
+
+  // ── OCR via Tesseract.js ────────────────────────────────
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
   const worker=await Tesseract.createWorker('eng',1,{
     logger: m=>{
       if(m.status==='recognizing text'){
         const pct=Math.round((m.progress||0)*100);
-        const label=document.getElementById('sched-drop-label');
         if(label) label.textContent=`OCR processing… ${pct}%`;
       }
     }
   });
-  await worker.setParameters({'tessedit_pageseg_mode':'6'}); // assume uniform block of text
-  const {data}=await worker.recognize(file);
+  await worker.setParameters({'tessedit_pageseg_mode':'6'});
+  const {data}=await worker.recognize(blob);
   await worker.terminate();
 
-  // Build items from word-level bounding boxes, scaled to a PDF-like coordinate space.
-  // The PDF parser works with positions on a ~600–800px-wide coordinate space (A4 at 72dpi
-  // is 595×842). We scale image coords proportionally so the same column-detection
-  // thresholds and merge tolerances apply.
-  const SCALE_W = 800 / natW;
-  const SCALE_H = 842 / natH;
+  // ── Build items ─────────────────────────────────────────
   const items=[];
   for(const word of data.words){
     const s=word.text.trim();
-    if(!s) continue;
+    if(!s||word.confidence<20) continue;
     const bb=word.bbox;
     items.push({
       str:s,
-      x: Math.round(bb.x0 * SCALE_W),
-      y: Math.round(bb.y0 * SCALE_H),
-      w: Math.round((bb.x1 - bb.x0) * SCALE_W),
+      x:bb.x0,
+      y:bb.y0,
+      w:bb.x1-bb.x0,
     });
   }
+
+  console.log('[Schedule Image OCR]',items.length,'words extracted from',file.name);
   return items;
 }
 
@@ -5673,9 +5833,11 @@ async function handleScheduleFile(file){
       allItems = await extractItemsFromImage(file);
     }
 
-    // Shared table-parsing — OCR items use wider tolerances
+    // Shared table-parsing — OCR items are in the 4× upscaled coordinate
+    // space (~6000×5000px) so tolerances must be proportionally wider than
+    // the PDF space (~600×800px).
     const matches = parseScheduleItems(allItems, isImg
-      ? { rowTol: 10, mergeTol: 8 }
+      ? { rowTol: 30, mergeTol: 15 }
       : { rowTol: 6,  mergeTol: 4 }
     );
 
